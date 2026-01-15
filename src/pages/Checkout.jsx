@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
-import { supabase } from '../lib/supabase'; // [!] 경로 확인
-import { useAuth } from '../contexts/AuthContext'; // [!] Auth Hook
+import { supabase } from '../lib/supabase'; 
+import { useAuth } from '../contexts/AuthContext'; 
 import { 
   Check, ShieldCheck, Lock, CreditCard, Building, ArrowLeft, 
   HelpCircle, Crown, Sparkles, TrendingUp, Users, Flame, Eye, AlertCircle, Clock 
@@ -9,7 +9,7 @@ import {
 import Navbar from '../components/layout/Navbar';
 import Footer from '../components/layout/Footer';
 
-// 1. Plan Data (동일 유지)
+// 1. Plan Data
 const subscriptionPlans = [
   {
     id: "BASIC",
@@ -20,7 +20,7 @@ const subscriptionPlans = [
     theme: "blue",
     gradient: "from-blue-500 to-cyan-500",
     features: ["월 30개 콘텐츠", "트래킹 서비스"],
-    stock: 5 // Fake Stock
+    stock: 5 
   },
   {
     id: "STANDARD",
@@ -32,7 +32,7 @@ const subscriptionPlans = [
     gradient: "from-emerald-500 to-teal-500",
     popular: true,
     features: ["월 100개 콘텐츠", "VOC 분석", "광고 원본 2건"],
-    stock: 2 // Low Stock Trigger
+    stock: 2 
   },
   {
     id: "PREMIUM",
@@ -43,7 +43,7 @@ const subscriptionPlans = [
     theme: "pink",
     gradient: "from-pink-500 to-rose-500",
     features: ["월 300개 콘텐츠", "Paid L3 1명 포함", "심화 분석"],
-    stock: 1 // Critical Stock Trigger
+    stock: 1 
   },
   {
     id: "VISIT",
@@ -58,7 +58,7 @@ const subscriptionPlans = [
   }
 ];
 
-// 2. Add-on Options (동일 유지)
+// 2. Add-on Options
 const addOnOptions = [
   {
     id: "L3",
@@ -97,7 +97,10 @@ const addOnOptions = [
 export default function Checkout() {
   const { state } = useLocation();
   const navigate = useNavigate();
-  const { user } = useAuth(); // [New] Auth Hook
+  
+  // [수정 포인트 1] useAuth()가 undefined일 경우를 대비해 안전하게 구조분해
+  const authContext = useAuth(); 
+  const user = authContext ? authContext.user : null;
   
   // --- State Management ---
   const initialPlanId = state?.plan?.id || 'STANDARD';
@@ -105,7 +108,6 @@ export default function Checkout() {
   const [selectedAddons, setSelectedAddons] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState('card');
   
-  // [New] Brand Info State
   const [brandInfo, setBrandInfo] = useState({
     company: '',
     name: '',
@@ -120,7 +122,13 @@ export default function Checkout() {
 
   // --- Effects ---
   useEffect(() => {
-    window.scrollTo(0, 0); // 초기 진입 시 스크롤 최상단
+    window.scrollTo(0, 0); 
+    
+    // 만약 pricing 페이지에서 넘어온 데이터가 있다면 플랜 설정
+    if (state?.plan?.id) {
+        setSelectedPlanId(state.plan.id);
+    }
+
     const interval = setInterval(() => {
       setViewers(prev => prev + Math.floor(Math.random() * 3) - 1);
     }, 5000);
@@ -131,10 +139,10 @@ export default function Checkout() {
         clearInterval(interval);
         clearInterval(timer);
     };
-  }, []);
+  }, [state]); // state 변경 감지
 
   // --- Calculations ---
-  const currentPlan = subscriptionPlans.find(p => p.id === selectedPlanId);
+  const currentPlan = subscriptionPlans.find(p => p.id === selectedPlanId) || subscriptionPlans[1]; // Fallback to STANDARD
   const parsePrice = (priceStr) => parseInt(priceStr.replace(/,/g, ''), 10);
   const basePrice = parsePrice(currentPlan.price);
   const addonsPrice = selectedAddons.reduce((acc, addonId) => {
@@ -174,7 +182,9 @@ export default function Checkout() {
         .from('orders')
         .insert([
           {
-            user_id: user.id,
+            // [수정 포인트 2] 비로그인 유저(Guest) 대응 로직
+            // 로그인 상태면 user.id, 아니면 null (DB에서 user_id가 nullable이어야 함)
+            user_id: user?.id || null, 
             plan_id: selectedPlanId,
             addons: selectedAddons,
             total_price: totalPrice,
@@ -192,13 +202,12 @@ export default function Checkout() {
 
       alert(`[주문 완료]\n플랜: ${currentPlan.name}\n결제금액: ${totalPrice.toLocaleString()}원\n\n신청해주셔서 감사합니다. 대시보드로 이동합니다.`);
       
-      // [FIX] 스크롤 최상단 이동 후 네비게이트
       window.scrollTo(0, 0);
       navigate('/dashboard');
 
     } catch (error) {
       console.error('Order Error:', error);
-      alert('주문 처리 중 오류가 발생했습니다.');
+      alert(`주문 처리 중 오류가 발생했습니다: ${error.message}`);
     } finally {
       setIsSubmitting(false);
     }

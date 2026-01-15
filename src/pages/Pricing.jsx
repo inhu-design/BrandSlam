@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { Check, ArrowRight, Globe, Zap, ShieldCheck, Users, Sparkles, HelpCircle, PlayCircle, Video, Crown, Infinity as InfinityIcon, MessageCircle, Flag, MapPin, Image as ImageIcon, TrendingUp } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Check, ArrowRight, Globe, Zap, ShieldCheck, Users, Sparkles, HelpCircle, PlayCircle, Video, Crown, Infinity as InfinityIcon, MessageCircle, Flag, MapPin, TrendingUp } from 'lucide-react';
 import Navbar from '../components/layout/Navbar';
 import Footer from '../components/layout/Footer';
 
@@ -214,7 +214,6 @@ const Hero = () => (
 );
 
 export default function Pricing() {
-  const navigate = useNavigate();
   const [activePlan, setActivePlan] = useState('STANDARD');
 
   // 현재 선택된 구독 플랜 데이터
@@ -278,9 +277,6 @@ export default function Pricing() {
 
   const currentTheme = themeClasses[currentPkg.theme];
 
-  // [수정] 플랜 분리 로직 삭제 (mainPlans, visitPlan 변수 제거)
-  // 모든 플랜을 하나의 리스트로 처리하여 한 줄(혹은 자연스러운 랩핑)로 표시
-
   // 플랜 버튼 렌더링 헬퍼 함수
   const renderPlanButton = (pkg) => {
     const isActive = activePlan === pkg.id;
@@ -315,18 +311,18 @@ export default function Pricing() {
       <Navbar />
       <Hero />
 
-      {/* 1. Subscription Plans (Tabbed Interface) */}
-      <section className="relative -mt-20 pb-24 px-4 z-20" id="campaigns">
+      {/* [수정] z-20을 z-30으로 변경하여 Hero 섹션 위로 확실히 올라오게 수정 */}
+      <section className="relative -mt-20 pb-24 px-4 z-30" id="campaigns">
         <div className="max-w-7xl mx-auto">
           
           {/* Plan Tabs */}
-          {/* [수정] 2줄로 분리되어 있던 div를 하나로 합치고, flex-wrap을 적용하여 자연스럽게 배치 */}
           <div className="flex flex-wrap justify-center gap-4 items-end mb-12 mt-4">
              {subscriptionPlans.map(renderPlanButton)}
           </div>
     
           {/* Active Plan Content Area */}
-          <div className="bg-white rounded-[2.5rem] p-8 md:p-12 transition-all duration-500 animate-fade-in-up shadow-xl">
+          {/* [수정] 카드 자체에도 relative z-30 적용 */}
+          <div className="bg-white rounded-[2.5rem] p-8 md:p-12 transition-all duration-500 animate-fade-in-up shadow-xl relative z-30">
             <div className="max-w-6xl mx-auto flex flex-col gap-12">
                 
                 {/* Header Info */}
@@ -402,12 +398,15 @@ export default function Pricing() {
                         </span>
                     </div>
 
-                    <button 
-                        onClick={() => navigate('/checkout', { state: { plan: currentPkg } })}
-                        className={`w-full max-w-md py-5 rounded-2xl font-bold text-white text-xl shadow-xl hover:shadow-2xl ${currentTheme.shadow} hover:-translate-y-1 transition-all bg-gradient-to-r ${currentPkg.gradient} flex items-center justify-center gap-2 mx-auto`}
+                    {/* [수정] Link 태그: z-50 유지, cursor-pointer 명시 */}
+                    <Link 
+                        to="/checkout"
+                        state={{ plan: { id: currentPkg.id } }} 
+                        className={`relative z-50 pointer-events-auto w-full max-w-md py-5 rounded-2xl font-bold text-white text-xl shadow-xl hover:shadow-2xl ${currentTheme.shadow} hover:-translate-y-1 transition-all bg-gradient-to-r ${currentPkg.gradient} flex items-center justify-center gap-2 mx-auto cursor-pointer block`}
                     >
-                        {currentPkg.name} {currentPkg.id === 'VISIT' ? '문의하기' : '구독하기'} <ArrowRight size={24} />
-                    </button>
+                        {currentPkg.name} 구매하기 <ArrowRight size={24} />
+                    </Link>
+                    
                     <p className="text-sm text-slate-400 mt-4 flex items-center justify-center gap-2">
                         <span>VAT 별도</span>
                         <span className="w-1 h-1 rounded-full bg-slate-300"></span>
@@ -519,7 +518,7 @@ export default function Pricing() {
         </div>
       </section>
 
-      {/* 3. Paid Influencer Tiers */}
+      {/* 3. Paid Influencer Tiers (Refactored) */}
       <section className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -531,6 +530,7 @@ export default function Pricing() {
              {influencerTiers.map((tier, idx) => (
                <div key={idx} className="bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 flex flex-col group border border-slate-100 hover:border-transparent">
                  
+                 {/* Header / Price Card */}
                  <div className={`p-8 ${tier.colorClass} text-white relative overflow-hidden`}>
                      <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-10 -mt-10 blur-xl"></div>
                      <div className="relative z-10">

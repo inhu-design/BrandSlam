@@ -218,7 +218,6 @@ const CampaignDetail = ({ campaign }) => {
       </div>
 
       {/* 4. Best Performing Message (Moved to Bottom) */}
-      {/* 사진 33.jpg 와 동일하게 맨 하단에 위치 */}
       {(campaign.status === CampaignStatus.UPLOADING || campaign.status === CampaignStatus.COMPLETED) && (
          <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 text-white shadow-lg mt-8">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
@@ -259,32 +258,35 @@ export default function Dashboard() {
 
   useEffect(() => {
     const fetchData = async () => {
-      // 1. Auth Check
+      // 1. Auth Check (로그인 안 해도 접근 가능하도록 변경)
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        navigate('/login');
-        return;
-      }
       setUser(user);
 
-      // 2. Fetch Real Data
-      // [ESLint Fix] Removed unused 'error' variable from destructuring
-      const { data } = await supabase
-        .from('campaigns')
-        .select(`
+      // 2. Data Fetching Logic
+      if (user) {
+        // [Logged In] Fetch Real Data
+        const { data } = await supabase
+          .from('campaigns')
+          .select(`
             *,
             creators (*),
             contents (*)
-        `)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+          `)
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
 
-      if (data && data.length > 0) {
-        setCampaigns(data);
-        setSelectedCampaignId(data[0].id);
-        setIsDemoMode(false);
+        if (data && data.length > 0) {
+          setCampaigns(data);
+          setSelectedCampaignId(data[0].id);
+          setIsDemoMode(false);
+        } else {
+          // 유저는 있지만 캠페인이 없으면 데모 데이터 표시
+          setCampaigns(DEMO_CAMPAIGNS);
+          setSelectedCampaignId(DEMO_CAMPAIGNS[0].id);
+          setIsDemoMode(true);
+        }
       } else {
-        // 3. Fallback to Demo Data
+        // [Guest] Load Demo Data (비로그인 사용자)
         setCampaigns(DEMO_CAMPAIGNS);
         setSelectedCampaignId(DEMO_CAMPAIGNS[0].id);
         setIsDemoMode(true);
@@ -308,7 +310,6 @@ export default function Dashboard() {
   const selectedCampaign = campaigns.find(c => c.id === selectedCampaignId);
 
   return (
-    // [Layout Fix] Footer를 하단에 고정하기 위한 flex column 구조
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <Navbar />
       
@@ -319,30 +320,35 @@ export default function Dashboard() {
           </div>
       )}
 
-      {/* Main Content Area (flex-1 to push footer down) */}
+      {/* Main Content Area */}
       <div className={`flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 ${isDemoMode ? 'py-8' : 'pt-32 pb-24'}`}>
         
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
             <div>
+                {/* [수정] 이메일 대신 '담당자님'으로 통일 */}
                 <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-2">
-                    Welcome, {user?.email?.split('@')[0]}님 👋
+                    Welcome, 담당자님 👋
                 </h1>
                 <p className="text-slate-500">
                     현재 진행 중인 캠페인 현황을 한눈에 확인하세요.
                 </p>
             </div>
-            <button 
-                onClick={() => setIsPasswordMode(!isPasswordMode)}
-                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors shadow-sm w-fit text-slate-600"
-            >
-                <Settings size={16} />
-                계정 설정
-            </button>
+            
+            {/* 설정 버튼은 로그인한 유저에게만 표시 */}
+            {user && (
+                <button 
+                    onClick={() => setIsPasswordMode(!isPasswordMode)}
+                    className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors shadow-sm w-fit text-slate-600"
+                >
+                    <Settings size={16} />
+                    계정 설정
+                </button>
+            )}
         </div>
 
-        {/* Password Setting Panel */}
-        {isPasswordMode && (
+        {/* Password Setting Panel (로그인한 유저만 가능) */}
+        {isPasswordMode && user && (
             <div className="mb-8 bg-white p-6 rounded-2xl shadow-sm border border-indigo-100 animate-fade-in-up max-w-lg">
                 <h3 className="text-sm font-bold mb-3 flex items-center gap-2 text-indigo-900">
                     <Lock size={16} className="text-indigo-600"/> 비밀번호 재설정
@@ -420,7 +426,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Footer is now outside the main container, spanning full width at bottom */}
       <Footer /> 
     </div>
   );

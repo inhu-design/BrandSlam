@@ -1,22 +1,17 @@
 import React from 'react';
-import { Link } from 'react-router-dom'; // [Link 컴포넌트 임포트]
+import { Link } from 'react-router-dom'; 
 import { 
   ArrowRight, 
   ShieldCheck, 
-  RefreshCw, 
-  Zap, 
-  Globe, 
-  Search, 
-  Bot, 
-  FileBarChart,
-  CheckCircle2,
-  Layers,
-  Package,
-  Sparkles,
-  Play,
-  BarChart3,
-  Clock,
-  Lock
+  Layers, 
+  Package, 
+  Sparkles, 
+  Play, 
+  BarChart3, 
+  Clock, 
+  Lock,
+  Globe,
+  CheckCircle2
 } from 'lucide-react';
 
 import Navbar from '../components/layout/Navbar'; 
@@ -43,15 +38,16 @@ const Hero = () => (
         Global Seeding Automation v1.0
       </div>
       
-      {/* 멘토 Pick: Features 페이지 전용 카피 적용 */}
-      <h1 className="text-5xl md:text-7xl font-extrabold text-slate-900 tracking-tight mb-6 leading-tight animate-fade-in-up animation-delay-100 drop-shadow-sm">
-         A to Z 까지 원클릭<br />
-        <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600">
+      {/* [수정] 타이포그래피 및 줄바꿈 개선 */}
+      <h1 className="text-5xl md:text-7xl font-extrabold text-slate-900 tracking-normal mb-8 leading-snug drop-shadow-sm animate-fade-in-up animation-delay-100">
+          A to Z 까지 원클릭
+        <span className="block mt-3 md:mt-5 text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600">
           시딩 자동화를 경험하세요
         </span>
       </h1>
       
-      <p className="max-w-2xl mx-auto text-lg md:text-xl text-slate-500 mb-10 leading-relaxed animate-fade-in-up animation-delay-200">
+      {/* [수정] 반응형 줄바꿈 적용 */}
+      <p className="max-w-2xl mx-auto text-lg md:text-xl text-slate-500 mb-12 leading-relaxed animate-fade-in-up animation-delay-200 break-keep">
         섭외, 리마인드, 업로드 체크, 트레킹까지.<br className="hidden md:block"/>
         모든 시딩 프로세스를 100% 자동화하여 귀사의 리소스를 아껴드립니다.
       </p>
@@ -138,15 +134,16 @@ const CoreFeatures = () => {
               </div>
 
               {/* Content */}
-              <h3 className="text-2xl font-bold text-slate-900 mb-4 leading-tight group-hover:text-indigo-900 transition-colors">
+              {/* [수정] 줄바꿈 및 가독성 개선 */}
+              <h3 className="text-2xl font-bold text-slate-900 mb-4 leading-tight group-hover:text-indigo-900 transition-colors break-keep">
                 {feat.title}
               </h3>
-              <p className="text-slate-500 leading-relaxed mb-8 flex-grow">
+              <p className="text-slate-500 leading-relaxed mb-8 flex-grow break-keep">
                 {feat.desc}
               </p>
 
               {/* Check Points */}
-              <div className="space-y-3 bg-slate-50 p-5 rounded-2xl border border-slate-100 group-hover:bg-white group-hover:border-${feat.theme}-100 transition-colors">
+              <div className={`space-y-3 bg-slate-50 p-5 rounded-2xl border border-slate-100 group-hover:bg-white group-hover:border-${feat.theme}-100 transition-colors`}>
                 {feat.points.map((point, idx) => (
                   <div key={idx} className="flex items-start gap-3">
                     <div className={`mt-1 p-0.5 rounded-full bg-${feat.theme}-100 text-${feat.theme}-600 shrink-0`}>
@@ -156,95 +153,6 @@ const CoreFeatures = () => {
                   </div>
                 ))}
               </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-};
-
-// 3. Process Cycle
-const ProcessCycle = () => {
-  const steps = [
-    {
-      id: "01",
-      title: "서비스 인지 & 설문",
-      desc: "브랜드 상태 진단 및 맞춤형 교육자료 제공",
-      icon: <Search className="text-white" size={24} />,
-      color: "from-blue-500 to-cyan-500"
-    },
-    {
-      id: "02",
-      title: "견적 & 미팅 옵션",
-      desc: "예산에 맞는 최적의 플랜 즉시 제안",
-      icon: <FileBarChart className="text-white" size={24} />,
-      color: "from-indigo-500 to-blue-500"
-    },
-    {
-      id: "03",
-      title: "선입금 100% & 실행",
-      desc: "우선순위 배정 시스템으로 대기 없는 런칭",
-      icon: <Zap className="text-white" size={24} />,
-      color: "from-violet-500 to-purple-500"
-    },
-    {
-      id: "04",
-      title: "미업로드 리스크 관리",
-      desc: "업로드 여부를 감시하고 리마인드 트리거 발동",
-      icon: <Bot className="text-white" size={24} />,
-      color: "from-fuchsia-500 to-pink-500"
-    },
-    {
-      id: "05",
-      title: "회수율 100% 목표",
-      desc: "구매한 건 수 만큼 회수율 목표 달성",
-      icon: <RefreshCw className="text-white" size={24} />,
-      color: "from-rose-500 to-orange-500"
-    },
-    {
-      id: "06",
-      title: "재이용 유도 (Loop)",
-      desc: "성과 데이터 분석을 통한 효율 극대화",
-      icon: <Globe className="text-white" size={24} />,
-      color: "from-amber-500 to-yellow-500"
-    }
-  ];
-
-  return (
-    <section id="process" className="py-24 bg-slate-50 relative border-y border-slate-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="text-center mb-16">
-          <h2 className="text-sm font-bold text-indigo-600 tracking-widest uppercase mb-3">Service Cycle</h2>
-          <h3 className="text-3xl md:text-4xl font-extrabold text-slate-900">
-            데이터 기반의 <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">6단계 자동화 사이클</span>
-          </h3>
-          <p className="mt-4 text-slate-500 max-w-2xl mx-auto">
-             복잡한 인플루언서 마케팅 과정을 시스템화했습니다. <br/>
-             각 단계는 유기적으로 연결되어 브랜드의 성장을 가속화합니다.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {steps.map((step) => (
-            <div key={step.id} className="group relative p-8 rounded-3xl border border-white bg-white shadow-lg shadow-slate-200/50 hover:border-indigo-100 hover:shadow-2xl hover:shadow-indigo-500/10 transition-all duration-300 hover:-translate-y-1 overflow-hidden">
-               {/* Hover Gradient Background */}
-               <div className={`absolute inset-0 opacity-0 group-hover:opacity-5 bg-gradient-to-br ${step.color} transition-opacity duration-300`}></div>
-               
-               <div className="relative z-10">
-                  <div className="flex justify-between items-start mb-6">
-                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center bg-gradient-to-br ${step.color} shadow-lg shadow-indigo-500/20 group-hover:scale-110 transition-transform duration-300`}>
-                      {step.icon}
-                    </div>
-                    <span className="text-5xl font-black text-slate-100 group-hover:text-slate-50/0 group-hover:bg-clip-text group-hover:bg-gradient-to-br group-hover:from-slate-200 group-hover:to-slate-300 transition-all duration-300">
-                      {step.id}
-                    </span>
-                  </div>
-                  <h4 className="text-xl font-bold text-slate-900 mb-3 group-hover:text-indigo-900 transition-colors">{step.title}</h4>
-                  <p className="text-slate-500 leading-relaxed text-sm group-hover:text-slate-600">
-                    {step.desc}
-                  </p>
-               </div>
             </div>
           ))}
         </div>
@@ -277,7 +185,7 @@ const WhyBrandSlam = () => {
         <section className="py-24 bg-white relative">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="text-center mb-16">
-                    <h2 className="text-3xl font-bold text-slate-900 mb-4">Why Brand Slam?</h2>
+                    <h2 className="text-3xl font-bold text-slate-900 mb-4 tracking-normal">Why Brand Slam?</h2>
                     <p className="text-slate-500">성공하는 브랜드들이 우리를 선택하는 이유입니다.</p>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -287,7 +195,7 @@ const WhyBrandSlam = () => {
                                 {item.icon}
                             </div>
                             <h3 className="text-xl font-bold text-slate-900 mb-3">{item.title}</h3>
-                            <p className="text-slate-500 leading-relaxed">{item.desc}</p>
+                            <p className="text-slate-500 leading-relaxed break-keep">{item.desc}</p>
                         </div>
                     ))}
                 </div>
@@ -304,17 +212,20 @@ const CTA = () => (
     <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-purple-500/10 rounded-full blur-[100px]"></div>
 
     <div className="max-w-4xl mx-auto px-4 text-center relative z-10 text-white">
-      <h2 className="text-4xl md:text-6xl font-extrabold mb-8 leading-tight tracking-tight">
+      {/* [수정] 타이포그래피 및 줄바꿈 개선 */}
+      <h2 className="text-4xl md:text-6xl font-extrabold mb-8 leading-snug tracking-normal">
         마케팅의 미래, <br />
         <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 to-purple-300">지금 경험하세요.</span>
       </h2>
+      
+      {/* [수정] 반응형 줄바꿈 적용 */}
       <p className="text-xl text-slate-400 mb-12 max-w-2xl mx-auto font-light leading-relaxed">
-        Brand Slam의 모든 기능을 제한 없이.<br />
+        Brand Slam의 모든 기능을 제한 없이.<br className="hidden md:block"/>
         카드 등록 없이, 단 3분이면 시작할 수 있습니다.
       </p>
       
       <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-        {/* [Link] Checkout 페이지로 이동 (요청사항 반영) */}
+        {/* [Link] Checkout 페이지로 이동 */}
         <Link 
           to="/checkout"
           onClick={() => window.scrollTo(0, 0)}
@@ -324,7 +235,7 @@ const CTA = () => (
           
         </Link>
 
-        {/* [Link] Consulting 페이지로 이동 (요청사항 반영) */}
+        {/* [Link] Consulting 페이지로 이동 */}
         <Link 
           to="/consulting"
           onClick={() => window.scrollTo(0, 0)}
@@ -348,7 +259,7 @@ export default function Features() {
       <Navbar />
       <Hero />
       <CoreFeatures />
-      <ProcessCycle />
+      {/* ProcessCycle 섹션 삭제됨 */}
       <WhyBrandSlam />
       <CTA />
       <Footer />

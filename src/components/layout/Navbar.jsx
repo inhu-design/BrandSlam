@@ -60,11 +60,9 @@ const Navbar = () => {
         : 'bg-transparent py-6'
     }`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* [수정] relative 클래스 추가: 내부 absolute 요소의 기준점 역할 */}
         <div className="relative flex justify-between items-center">
           
           {/* 1. Logo (Left) */}
-          {/* z-10을 주어 겹칠 경우를 대비해 위로 올림 */}
           <Link to="/" onClick={handleNavClick} className="flex items-center gap-2 cursor-pointer z-10">
               {logoImg ? (
                 <img src={logoImg} alt="Brand Slam" className="h-24 w-auto object-contain" />
@@ -74,7 +72,6 @@ const Navbar = () => {
           </Link>
 
           {/* 2. Desktop Menu (Center - Absolute Position) */}
-          {/* [핵심 수정] absolute left-1/2 -translate-x-1/2 로 부모 기준 정중앙 강제 고정 */}
           <div className="hidden md:flex absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 items-center gap-8">
             {navLinks.map((link) => (
               link.path.startsWith('#') ? (
@@ -95,9 +92,9 @@ const Navbar = () => {
           </div>
 
           {/* 3. CTA Buttons (Right) */}
-          {/* z-10을 주어 클릭 가능하도록 확보 */}
           <div className="hidden md:flex items-center gap-4 z-10">
             {user ? (
+              // 로그인 상태일 때
               <>
                 <Link 
                   to="/dashboard" 
@@ -115,13 +112,23 @@ const Navbar = () => {
                 </button>
               </>
             ) : (
-              <Link 
-                to="/login" 
-                onClick={handleNavClick}
-                className="text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors"
-              >
-                로그인
-              </Link>
+              // 비로그인 상태일 때 [수정됨: 대시보드 미리보기 추가]
+              <>
+                <Link 
+                  to="/dashboard" 
+                  onClick={handleNavClick}
+                  className="text-sm font-bold text-indigo-600 hover:text-indigo-800 transition-colors mr-2"
+                >
+                  대시보드 미리보기
+                </Link>
+                <Link 
+                  to="/login" 
+                  onClick={handleNavClick}
+                  className="text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors"
+                >
+                  로그인
+                </Link>
+              </>
             )}
             
             <Link 
@@ -163,6 +170,7 @@ const Navbar = () => {
           <hr className="border-gray-100" />
           
           {user ? (
+            // 모바일 - 로그인 상태
             <>
               <div className="text-center py-2 text-xs text-gray-400">
                 {user.email}님 환영합니다
@@ -183,13 +191,23 @@ const Navbar = () => {
               </button>
             </>
           ) : (
-            <Link 
-              to="/login"
-              onClick={handleNavClick}
-              className="w-full text-center py-3 text-sm font-medium text-gray-900 bg-gray-50 rounded-lg"
-            >
-              로그인
-            </Link>
+            // 모바일 - 비로그인 상태 [수정됨: 대시보드 미리보기 추가]
+            <>
+              <Link 
+                to="/dashboard"
+                onClick={handleNavClick}
+                className="w-full text-center py-3 text-sm font-bold text-indigo-600 bg-indigo-50 rounded-lg"
+              >
+                대시보드 미리보기
+              </Link>
+              <Link 
+                to="/login"
+                onClick={handleNavClick}
+                className="w-full text-center py-3 text-sm font-medium text-gray-900 bg-gray-50 rounded-lg"
+              >
+                로그인
+              </Link>
+            </>
           )}
           
           <Link 

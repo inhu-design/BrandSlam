@@ -20,6 +20,7 @@ const Hero = () => (
     </div>
     
     <div className="max-w-7xl mx-auto px-4 relative z-10 text-center">
+      {/* 뱃지: 이미 애니메이션 적용됨 */}
       <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/80 backdrop-blur-sm border border-indigo-100 text-xs font-bold text-indigo-600 mb-8 shadow-sm animate-fade-in-up ring-1 ring-indigo-50">
         <span className="relative flex h-2 w-2">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
@@ -28,19 +29,22 @@ const Hero = () => (
         US Market Automation Solution
       </div>
       
-      <h1 className="text-5xl md:text-7xl font-extrabold text-slate-900 tracking-normal mb-8 leading-snug drop-shadow-sm">
+      {/* [수정] 타이틀 애니메이션 추가 (delay-100) */}
+      <h1 className="text-5xl md:text-7xl font-extrabold text-slate-900 tracking-normal mb-8 leading-snug drop-shadow-sm animate-fade-in-up animation-delay-100">
         미국 시장 진출
         <span className="block mt-3 md:mt-5 text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600">
           해답은 '시스템' 입니다
         </span>
       </h1>
       
-      <p className="max-w-2xl mx-auto text-lg md:text-xl text-slate-500 mb-12 leading-relaxed">
+      {/* [수정] 설명글 애니메이션 추가 (delay-200) */}
+      <p className="max-w-2xl mx-auto text-lg md:text-xl text-slate-500 mb-12 leading-relaxed animate-fade-in-up animation-delay-200">
         수량만 선택하면 콘텐츠는 매달 자동으로 공급됩니다.<br className="hidden md:block" />
         Brand Slam은 '만드는 일'이 아닌 '안정적으로 공급받는 구조'를 제공합니다.
       </p>
       
-      <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+      {/* [수정] 버튼 그룹 애니메이션 추가 (delay-300) */}
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in-up animation-delay-300">
         <Link 
           to="/pricing" 
           onClick={() => window.scrollTo(0, 0)}
