@@ -194,9 +194,7 @@ const Footer = () => {
                 <span className="font-bold text-gray-900">올인원 인플루언서 마케팅 자동화 솔루션</span> 입니다. 
               </p>
               <div className="flex gap-4 pt-4">
-                <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 cursor-pointer transition-colors"><Globe size={16}/></div>
-                <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 cursor-pointer transition-colors"><Users size={16}/></div>
-              </div>
+             </div>
             </div>
             
             {/* 오른쪽 링크 섹션 */}

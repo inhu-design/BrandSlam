@@ -98,7 +98,7 @@ export default function Checkout() {
   const { state } = useLocation();
   const navigate = useNavigate();
   
-  // [수정 포인트 1] useAuth()가 undefined일 경우를 대비해 안전하게 구조분해
+  // Auth Context 안전하게 접근
   const authContext = useAuth(); 
   const user = authContext ? authContext.user : null;
   
@@ -139,10 +139,10 @@ export default function Checkout() {
         clearInterval(interval);
         clearInterval(timer);
     };
-  }, [state]); // state 변경 감지
+  }, [state]);
 
   // --- Calculations ---
-  const currentPlan = subscriptionPlans.find(p => p.id === selectedPlanId) || subscriptionPlans[1]; // Fallback to STANDARD
+  const currentPlan = subscriptionPlans.find(p => p.id === selectedPlanId) || subscriptionPlans[1];
   const parsePrice = (priceStr) => parseInt(priceStr.replace(/,/g, ''), 10);
   const basePrice = parsePrice(currentPlan.price);
   const addonsPrice = selectedAddons.reduce((acc, addonId) => {
@@ -182,8 +182,6 @@ export default function Checkout() {
         .from('orders')
         .insert([
           {
-            // [수정 포인트 2] 비로그인 유저(Guest) 대응 로직
-            // 로그인 상태면 user.id, 아니면 null (DB에서 user_id가 nullable이어야 함)
             user_id: user?.id || null, 
             plan_id: selectedPlanId,
             addons: selectedAddons,
@@ -231,11 +229,14 @@ export default function Checkout() {
     <div className="font-sans antialiased text-slate-900 bg-slate-50 min-h-screen flex flex-col">
       <Navbar />
       
-      <div className="flex-1 pt-28 pb-24 px-4 sm:px-6 lg:px-8">
+      <div className="flex-1 pt-44 pb-24 px-4 sm:px-6 lg:px-8">
         <div className="max-w-6xl mx-auto">
           
           <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-            <Link to="/pricing" className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors self-start md:self-auto">
+            <Link 
+              to="/pricing" 
+              className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors self-start md:self-auto relative z-10"
+            >
               <ArrowLeft size={20} />
               <span>다른 플랜 보러가기</span>
             </Link>
@@ -359,7 +360,7 @@ export default function Checkout() {
                 </div>
               </div>
 
-              {/* Step 3: Brand Info Form (Connected to State) */}
+              {/* Step 3: Brand Info Form */}
               <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-1.5 h-full bg-slate-900"></div>
                 <h2 className="text-xl font-bold mb-6 flex items-center gap-3">
