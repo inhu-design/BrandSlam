@@ -22,59 +22,19 @@ const CampaignStatus = {
 };
 
 /**
- * [Mock Data] Demo Campaigns
+ * [Mock Data] Demo Campaigns - Reordered based on process flow
  */
 const DEMO_CAMPAIGNS = [
-  {
-    id: 'demo-1',
-    plan: 'STANDARD',
-    status: CampaignStatus.UPLOADING,
-    brand_name: 'BrandSlam Demo',
-    product_name: 'Vita-C Serum',
-    start_date: '2024-01-15',
-    end_date: '2024-02-15',
-    target_creators: 30,
-    matched_creators: 30,
-    best_message: "끈적임 없이 흡수되는 비타민 세럼, 아침에도 밀리지 않아요!",
-    kpi_views: '1.2M', kpi_likes: '45.2K', kpi_comments: '1,203', kpi_shares: '3,400',
-    // [Updated] Top 10 Creators (All Uploaded)
-    creators: [
-      { id: 1, name: '@sarah_beauty', platform: 'TikTok', status: 'Uploaded', link: '#', engagement: 'High', views: '450K' },
-      { id: 2, name: '@skincare_guru', platform: 'TikTok', status: 'Uploaded', link: '#', engagement: 'High', views: '320K' },
-      { id: 3, name: '@glowwithme', platform: 'Reels', status: 'Uploaded', link: '#', engagement: 'Medium', views: '150K' },
-      { id: 4, name: '@daily_routine', platform: 'TikTok', status: 'Uploaded', link: '#', engagement: 'Medium', views: '98K' },
-      { id: 5, name: '@beauty_hacks', platform: 'Shorts', status: 'Uploaded', link: '#', engagement: 'Medium', views: '85K' },
-      { id: 6, name: '@pure_skin', platform: 'TikTok', status: 'Uploaded', link: '#', engagement: 'Low', views: '42K' },
-      { id: 7, name: '@makeup_artist_j', platform: 'Reels', status: 'Uploaded', link: '#', engagement: 'Low', views: '30K' },
-      // [Modified] 8~10 Rank Updated to Uploaded
-      { id: 8, name: '@kbeauty_lover', platform: 'TikTok', status: 'Uploaded', link: '#', engagement: 'Medium', views: '28K' },
-      { id: 9, name: '@cosmetic_science', platform: 'Youtube', status: 'Uploaded', link: '#', engagement: 'Low', views: '15K' },
-      { id: 10, name: '@glass_skin_tips', platform: 'TikTok', status: 'Uploaded', link: '#', engagement: 'Low', views: '12K' },
-    ],
-    contents: [
-      // [Updated] ID 1: Beauty Influencer Portrait (감성적인 인플루언서 셀카 느낌)
-      { id: 1, thumbnail_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&q=80', views: '450K', creator: '@sarah_beauty' },
-      { id: 2, thumbnail_url: 'https://images.unsplash.com/photo-1570554886111-e80fcca6a029?w=400&q=80', views: '320K', creator: '@skincare_guru' },
-      { id: 3, thumbnail_url: 'https://images.unsplash.com/photo-1612817288484-6f916006741a?w=400&q=80', views: '150K', creator: '@glowwithme' },
-      { id: 4, thumbnail_url: 'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=400&q=80', views: '98K', creator: '@daily_routine' },
-      // [Updated] ID 5: Clean Beauty Model (깨끗한 피부 표현 모델)
-      { id: 5, thumbnail_url: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=400&q=80', views: '85K', creator: '@beauty_hacks' },
-      { id: 6, thumbnail_url: 'https://images.unsplash.com/photo-1619451334792-150fd785ee74?w=400&q=80', views: '42K', creator: '@pure_skin' },
-      { id: 7, thumbnail_url: 'https://images.unsplash.com/photo-1552693673-1bf958298935?w=400&q=80', views: '30K', creator: '@makeup_artist_j' },
-      { id: 8, thumbnail_url: 'https://images.unsplash.com/photo-1617897903246-719242758050?w=400&q=80', views: '28K', creator: '@kbeauty_lover' },
-      { id: 9, thumbnail_url: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400&q=80', views: '15K', creator: '@cosmetic_science' },
-      { id: 10, thumbnail_url: 'https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=400&q=80', views: '12K', creator: '@glass_skin_tips' },
-    ]
-  },
+  // 1. 인플루언서 섭외 중 (Contacting)
   {
     id: 'demo-2',
     plan: 'BASIC',
     status: CampaignStatus.CONTACTING,
     brand_name: 'BrandSlam Demo',
     product_name: 'Daily Sunscreen',
-    start_date: '2024-02-01',
-    end_date: '2024-03-01',
-    target_creators: 50,
+    start_date: '2026-01-01',
+    end_date: '2026-02-01',
+    target_creators: 30,
     matched_creators: 18,
     kpi_views: '-', kpi_likes: '-', kpi_comments: '-', kpi_shares: '-',
     candidates: [
@@ -87,27 +47,63 @@ const DEMO_CAMPAIGNS = [
     creators: [],
     contents: []
   },
-  // [NEW] Completed Campaign Demo
+  // 2. 콘텐츠 업로드 중 (Uploading)
+  {
+    id: 'demo-1',
+    plan: 'STANDARD',
+    status: CampaignStatus.UPLOADING,
+    brand_name: 'BrandSlam Demo',
+    product_name: 'Vita-C Serum',
+    start_date: '2025-12-15',
+    end_date: '2026-01-15',
+    target_creators: 30,
+    matched_creators: 30,
+    best_message: "끈적임 없이 흡수되는 비타민 세럼, 아침에도 밀리지 않아요!",
+    kpi_views: '1.2M', kpi_likes: '45.2K', kpi_comments: '1,203', kpi_shares: '3,400',
+    creators: [
+      { id: 1, name: '@sarah_beauty', platform: 'TikTok', status: 'Uploaded', link: '#', engagement: 'High', views: '450K' },
+      { id: 2, name: '@skincare_guru', platform: 'TikTok', status: 'Uploaded', link: '#', engagement: 'High', views: '320K' },
+      { id: 3, name: '@glowwithme', platform: 'Reels', status: 'Uploaded', link: '#', engagement: 'Medium', views: '150K' },
+      { id: 4, name: '@daily_routine', platform: 'TikTok', status: 'Uploaded', link: '#', engagement: 'Medium', views: '98K' },
+      { id: 5, name: '@beauty_hacks', platform: 'Shorts', status: 'Uploaded', link: '#', engagement: 'Medium', views: '85K' },
+      { id: 6, name: '@pure_skin', platform: 'TikTok', status: 'Uploaded', link: '#', engagement: 'Low', views: '42K' },
+      { id: 7, name: '@makeup_artist_j', platform: 'Reels', status: 'Uploaded', link: '#', engagement: 'Low', views: '30K' },
+      { id: 8, name: '@kbeauty_lover', platform: 'TikTok', status: 'Uploaded', link: '#', engagement: 'Medium', views: '28K' },
+      { id: 9, name: '@cosmetic_science', platform: 'Youtube', status: 'Uploaded', link: '#', engagement: 'Low', views: '15K' },
+      { id: 10, name: '@glass_skin_tips', platform: 'TikTok', status: 'Uploaded', link: '#', engagement: 'Low', views: '12K' },
+    ],
+    contents: [
+      { id: 1, thumbnail_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&q=80', views: '450K', creator: '@sarah_beauty' },
+      { id: 2, thumbnail_url: 'https://images.unsplash.com/photo-1570554886111-e80fcca6a029?w=400&q=80', views: '320K', creator: '@skincare_guru' },
+      { id: 3, thumbnail_url: 'https://images.unsplash.com/photo-1612817288484-6f916006741a?w=400&q=80', views: '150K', creator: '@glowwithme' },
+      { id: 4, thumbnail_url: 'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=400&q=80', views: '98K', creator: '@daily_routine' },
+      { id: 5, thumbnail_url: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=400&q=80', views: '85K', creator: '@beauty_hacks' },
+      { id: 6, thumbnail_url: 'https://images.unsplash.com/photo-1619451334792-150fd785ee74?w=400&q=80', views: '42K', creator: '@pure_skin' },
+      { id: 7, thumbnail_url: 'https://images.unsplash.com/photo-1552693673-1bf958298935?w=400&q=80', views: '30K', creator: '@makeup_artist_j' },
+      { id: 8, thumbnail_url: 'https://images.unsplash.com/photo-1617897903246-719242758050?w=400&q=80', views: '28K', creator: '@kbeauty_lover' },
+      { id: 9, thumbnail_url: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400&q=80', views: '15K', creator: '@cosmetic_science' },
+      { id: 10, thumbnail_url: 'https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=400&q=80', views: '12K', creator: '@glass_skin_tips' },
+    ]
+  },
+  // 3. 캠페인 완료 (Completed)
   {
     id: 'demo-3',
     plan: 'PREMIUM',
     status: CampaignStatus.COMPLETED,
     brand_name: 'BrandSlam Demo',
     product_name: 'Calming Toner',
-    start_date: '2023-12-01',
-    end_date: '2024-01-01',
+    start_date: '2025-12-01',
+    end_date: '2026-01-01',
     target_creators: 100,
     matched_creators: 100,
     best_message: "진정 효과뿐만 아니라 속건조까지 잡아주는 인생 토너",
     kpi_views: '3.5M', kpi_likes: '120K', kpi_comments: '5,400', kpi_shares: '12K',
     creators: [], 
     contents: [],
-    // [Updated] Analytics Data for Graph
     analytics: {
         dates: ['12/01', '12/05', '12/10', '12/15', '12/20', '12/25', '12/30'],
-        daily_views: [20, 45, 120, 250, 220, 180, 150], // Views in K
+        daily_views: [20, 45, 120, 250, 220, 180, 150], 
         engagement_rate: '8.5%',
-        // [New] Top 3 Ads
         top_contents: [
             { id: 1, creator: "@jenny_glow", platform: "TikTok", views: "1.2M", thumbnail: "https://images.unsplash.com/photo-1556229010-6c3f2c9ca5f8?w=400&q=80" },
             { id: 2, creator: "@skincare_daddy", platform: "Reels", views: "890K", thumbnail: "https://images.unsplash.com/photo-1616683693504-3ea7e9ad6fec?w=400&q=80" },
@@ -305,10 +301,8 @@ const AnalyticsReport = ({ campaign }) => {
                     </button>
                 </div>
 
-                {/* [Improved] Graph Area with Axes */}
                 <div className="bg-slate-50 rounded-xl border border-slate-100 p-6 mb-6">
                     <div className="flex h-64 relative items-end pb-8 pl-8 gap-4">
-                        {/* Y-Axis Label */}
                         <div className="absolute top-0 left-0 h-full flex flex-col justify-between text-[10px] text-slate-400 pb-8">
                             <span>300K</span>
                             <span>200K</span>
@@ -316,7 +310,6 @@ const AnalyticsReport = ({ campaign }) => {
                             <span>0</span>
                         </div>
                         
-                        {/* Bars & X-Axis */}
                         {campaign.analytics?.daily_views.map((views, idx) => (
                             <div key={idx} className="flex-1 flex flex-col justify-end group relative h-full">
                                 <div 
@@ -327,7 +320,6 @@ const AnalyticsReport = ({ campaign }) => {
                                         {views}K Views
                                     </div>
                                 </div>
-                                {/* X-Axis Date Label */}
                                 <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] text-slate-400 whitespace-nowrap">
                                     {campaign.analytics?.dates[idx]}
                                 </div>
@@ -347,7 +339,6 @@ const AnalyticsReport = ({ campaign }) => {
                         <p className="text-2xl font-extrabold text-slate-900">{campaign.analytics?.engagement_rate}</p>
                         <p className="text-[10px] text-slate-500 mt-1">업계 평균(3.5%) 상회</p>
                     </div>
-                    {/* [Updated] Top 3 Ads Display */}
                     <div className="col-span-1 md:col-span-3 mt-4">
                         <h4 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
                             <Trophy size={16} className="text-yellow-500"/> Best Performing Ads (Top 3)
@@ -377,7 +368,6 @@ const AnalyticsReport = ({ campaign }) => {
 const OngoingCampaign = ({ campaign }) => {
     return (
         <div className="space-y-8 animate-fade-in-up">
-            {/* 1. KPI Summary */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <MetricCard icon={Eye} label="Total Views" value={campaign.kpi_views} color="bg-blue-50 text-blue-600" />
                 <MetricCard icon={Heart} label="Likes" value={campaign.kpi_likes} color="bg-red-50 text-red-600" />
@@ -385,7 +375,6 @@ const OngoingCampaign = ({ campaign }) => {
                 <MetricCard icon={Share2} label="Shares" value={campaign.kpi_shares} color="bg-purple-50 text-purple-600" />
             </div>
 
-            {/* 2. Top 10 Creators Table with Actions */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                 <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
                     <h3 className="font-bold text-slate-800 flex items-center gap-2">
@@ -439,7 +428,6 @@ const OngoingCampaign = ({ campaign }) => {
                 </div>
             </div>
 
-            {/* 3. Uploaded Contents Gallery (Showing All 10) */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
                 <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
                     <PlayCircle size={18} className="text-slate-400"/> Uploaded Contents Gallery
@@ -472,7 +460,6 @@ const OngoingCampaign = ({ campaign }) => {
 const CampaignDetail = ({ campaign }) => {
   if (!campaign) return <div className="text-center py-20 text-slate-400">캠페인을 선택해주세요.</div>;
 
-  // 1. 섭외 중 (Contacting)
   if (campaign.status === CampaignStatus.CONTACTING) {
       return (
           <CandidateList 
@@ -483,12 +470,10 @@ const CampaignDetail = ({ campaign }) => {
       );
   }
 
-  // 2. 완료됨 (Completed) - Analytics
   if (campaign.status === CampaignStatus.COMPLETED) {
       return <AnalyticsReport campaign={campaign} />;
   }
 
-  // 3. 업로드 중 / 배송 중 (Ongoing)
   return <OngoingCampaign campaign={campaign} />;
 };
 
@@ -497,26 +482,19 @@ const CampaignDetail = ({ campaign }) => {
 export default function Dashboard() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
-  
-  // State
   const [campaigns, setCampaigns] = useState([]);
   const [selectedCampaignId, setSelectedCampaignId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isDemoMode, setIsDemoMode] = useState(false);
-  
-  // Password Setting State
   const [newPassword, setNewPassword] = useState('');
   const [isPasswordMode, setIsPasswordMode] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
-      // 1. Auth Check
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
 
-      // 2. Data Fetching Logic
       if (user) {
-        // [Logged In] Fetch Real Data
         const { data } = await supabase
           .from('campaigns')
           .select(`*, creators (*), contents (*)`)
@@ -533,12 +511,10 @@ export default function Dashboard() {
           setIsDemoMode(true);
         }
       } else {
-        // [Guest] Load Demo Data
         setCampaigns(DEMO_CAMPAIGNS);
         setSelectedCampaignId(DEMO_CAMPAIGNS[0].id);
         setIsDemoMode(true);
       }
-      
       setLoading(false);
     };
 
@@ -559,42 +535,28 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <Navbar />
-      
-      {/* Demo Mode Banner */}
       {isDemoMode && (
           <div className="bg-indigo-600 text-white text-center py-2 text-sm font-medium pt-24 animate-fade-in-down relative z-10">
               <span className="opacity-90">현재 <b>데모 모드</b>입니다. 실제 캠페인을 시작하시면 실시간 데이터를 확인할 수 있습니다.</span>
           </div>
       )}
-
-      {/* Main Content Area */}
       <div className={`flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-6 lg:px-8 ${isDemoMode ? 'py-8' : 'pt-32 pb-24'}`}>
-        
-        {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
             <div>
                 <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-2">
-                    {user 
-                      ? `반갑습니다, ${user.email.split('@')[0]} 님 👋` 
-                      : `반갑습니다, 담당자님 👋`}
+                    {user ? `반갑습니다, ${user.email.split('@')[0]} 님 👋` : `반갑습니다, 담당자님 👋`}
                 </h1>
-                <p className="text-slate-500">
-                    현재 진행 중인 캠페인 현황을 한눈에 확인하세요.
-                </p>
+                <p className="text-slate-500">현재 진행 중인 캠페인 현황을 한눈에 확인하세요.</p>
             </div>
-            
             {user && (
                 <button 
                     onClick={() => setIsPasswordMode(!isPasswordMode)}
                     className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors shadow-sm w-fit text-slate-600"
                 >
-                    <Settings size={16} />
-                    계정 설정
+                    <Settings size={16} /> 계정 설정
                 </button>
             )}
         </div>
-
-        {/* Password Setting Panel */}
         {isPasswordMode && user && (
             <div className="mb-8 bg-white p-6 rounded-2xl shadow-sm border border-indigo-100 animate-fade-in-up max-w-lg">
                 <h3 className="text-sm font-bold mb-3 flex items-center gap-2 text-indigo-900">
@@ -608,27 +570,17 @@ export default function Dashboard() {
                         onChange={(e) => setNewPassword(e.target.value)}
                         className="flex-1 px-4 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500 transition-all"
                     />
-                    <button 
-                        onClick={handlePasswordUpdate}
-                        className="bg-indigo-600 text-white px-5 py-2 rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors whitespace-nowrap shadow-sm"
-                    >
-                        변경하기
-                    </button>
+                    <button onClick={handlePasswordUpdate} className="bg-indigo-600 text-white px-5 py-2 rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors whitespace-nowrap shadow-sm">변경하기</button>
                 </div>
             </div>
         )}
-
-        {/* Main Dashboard Grid */}
         <div className="flex flex-col lg:flex-row gap-6 items-start">
-            
-            {/* [Left Sidebar] Campaign List & Promo */}
             <div className="w-full lg:w-1/4 space-y-6">
                 <div className="space-y-4">
                     <div className="flex items-center justify-between mb-2 px-1">
                         <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider">My Campaigns</h2>
                         <span className="text-xs font-medium bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{campaigns.length}</span>
                     </div>
-                    
                     <div className="space-y-3">
                         {campaigns.map(campaign => (
                             <CampaignCard 
@@ -639,57 +591,33 @@ export default function Dashboard() {
                             />
                         ))}
                     </div>
-                    
-                    <div 
-                        onClick={() => navigate('/pricing')}
-                        className="p-5 rounded-2xl border-2 border-dashed border-slate-200 text-center hover:border-indigo-300 hover:bg-indigo-50/50 transition-all cursor-pointer group"
-                    >
+                    <div onClick={() => navigate('/pricing')} className="p-5 rounded-2xl border-2 border-dashed border-slate-200 text-center hover:border-indigo-300 hover:bg-indigo-50/50 transition-all cursor-pointer group">
                         <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-2 text-slate-400 group-hover:bg-white group-hover:text-indigo-500 transition-colors">
                             <Package size={20} />
                         </div>
                         <p className="text-xs font-bold text-slate-600 group-hover:text-indigo-700">새 캠페인 추가하기</p>
                     </div>
                 </div>
-
-                {/* Cross-selling Promo Boxes */}
                 <div className="space-y-3 pt-6 border-t border-slate-100">
                     <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider px-1">More Services</h2>
-                    
-                    {/* 1. Medical Tourism */}
                     <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-4 rounded-xl border border-emerald-100 hover:shadow-md transition-shadow cursor-pointer group">
                         <div className="flex items-center gap-3 mb-2">
-                            <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-emerald-600 shadow-sm">
-                                <Plane size={16} />
-                            </div>
+                            <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-emerald-600 shadow-sm"><Plane size={16} /></div>
                             <span className="font-bold text-emerald-800 text-sm">의료관광 마케팅</span>
                         </div>
-                        <p className="text-xs text-emerald-600/80 leading-relaxed mb-2">
-                            한국 병/의원을 위한 글로벌 환자 유치 전용 패키지
-                        </p>
-                        <span className="text-[10px] font-bold text-emerald-700 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                            자세히 보기 <ChevronRight size={10} />
-                        </span>
+                        <p className="text-xs text-emerald-600/80 leading-relaxed mb-2">한국 병/의원을 위한 글로벌 환자 유치 전용 패키지</p>
+                        <span className="text-[10px] font-bold text-emerald-700 flex items-center gap-1 group-hover:translate-x-1 transition-transform">자세히 보기 <ChevronRight size={10} /></span>
                     </div>
-
-                    {/* 2. Brand Rewards */}
                     <div className="bg-gradient-to-br from-orange-50 to-amber-50 p-4 rounded-xl border border-orange-100 hover:shadow-md transition-shadow cursor-pointer group">
                         <div className="flex items-center gap-3 mb-2">
-                            <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-orange-600 shadow-sm">
-                                <Gift size={16} />
-                            </div>
+                            <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-orange-600 shadow-sm"><Gift size={16} /></div>
                             <span className="font-bold text-orange-800 text-sm">브랜드사 리워드</span>
                         </div>
-                        <p className="text-xs text-orange-600/80 leading-relaxed mb-2">
-                            우수 인플루언서에게 추가 보상을 지급하여 락인(Lock-in)하세요.
-                        </p>
-                        <span className="text-[10px] font-bold text-orange-700 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                            자세히 보기 <ChevronRight size={10} />
-                        </span>
+                        <p className="text-xs text-orange-600/80 leading-relaxed mb-2">우수 인플루언서에게 추가 보상을 지급하여 락인(Lock-in)하세요.</p>
+                        <span className="text-[10px] font-bold text-orange-700 flex items-center gap-1 group-hover:translate-x-1 transition-transform">자세히 보기 <ChevronRight size={10} /></span>
                     </div>
                 </div>
             </div>
-
-            {/* [Right Content] Campaign Detail */}
             <div className="w-full lg:w-3/4">
                  <div className="bg-white p-6 md:p-8 rounded-[2rem] shadow-sm border border-slate-200 min-h-[800px]">
                     <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 pb-6 border-b border-slate-100 gap-4">
@@ -705,14 +633,11 @@ export default function Dashboard() {
                         </div>
                         <StatusBadge status={selectedCampaign?.status} />
                     </div>
-                    
                     <CampaignDetail campaign={selectedCampaign} />
                  </div>
             </div>
-
         </div>
       </div>
-
       <Footer /> 
     </div>
   );
