@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom'; // useNavigate 추가
 import { Check, ArrowRight, Globe, Zap, ShieldCheck, Users, Sparkles, HelpCircle, PlayCircle, Video, Crown, Infinity as InfinityIcon, MessageCircle, Flag, MapPin, TrendingUp } from 'lucide-react';
 import Navbar from '../components/layout/Navbar';
 import Footer from '../components/layout/Footer';
@@ -215,6 +215,7 @@ const Hero = () => (
 
 export default function Pricing() {
   const [activePlan, setActivePlan] = useState('STANDARD');
+  const navigate = useNavigate(); // [필수] useNavigate 훅 사용
 
   // 현재 선택된 구독 플랜 데이터
   const currentPkg = subscriptionPlans.find(pkg => pkg.id === activePlan);
@@ -306,13 +307,20 @@ export default function Pricing() {
     );
   };
 
+  // [수정] 통합된 구매 버튼 핸들러
+  // - VISIT을 포함한 모든 플랜이 '/checkout'으로 이동합니다.
+  const handlePurchase = () => {
+      // 모든 플랜 공통: Checkout 페이지로 이동하며 선택한 플랜 데이터 전달
+      navigate('/checkout', { state: { plan: { id: currentPkg.id } } });
+  };
+
   return (
     <div className="font-sans antialiased text-slate-900 bg-slate-50 min-h-screen flex flex-col">
       <Navbar />
       <Hero />
 
-      {/* [수정] z-20을 z-30으로 변경하여 Hero 섹션 위로 확실히 올라오게 수정 */}
-      <section className="relative -mt-20 pb-24 px-4 z-30" id="campaigns">
+      {/* [수정] z-index 조정하여 Hero 위로 올라오게 함 */}
+      <section className="relative -mt-20 pb-24 px-4 z-20" id="campaigns">
         <div className="max-w-7xl mx-auto">
           
           {/* Plan Tabs */}
@@ -321,8 +329,7 @@ export default function Pricing() {
           </div>
     
           {/* Active Plan Content Area */}
-          {/* [수정] 카드 자체에도 relative z-30 적용 */}
-          <div className="bg-white rounded-[2.5rem] p-8 md:p-12 transition-all duration-500 animate-fade-in-up shadow-xl relative z-30">
+          <div className="bg-white rounded-[2.5rem] p-8 md:p-12 transition-all duration-500 animate-fade-in-up shadow-xl relative z-10">
             <div className="max-w-6xl mx-auto flex flex-col gap-12">
                 
                 {/* Header Info */}
@@ -398,14 +405,13 @@ export default function Pricing() {
                         </span>
                     </div>
 
-                    {/* [수정] Link 태그: z-50 유지, cursor-pointer 명시 */}
-                    <Link 
-                        to="/checkout"
-                        state={{ plan: currentPkg }}
-                        className={`relative z-50 pointer-events-auto w-full max-w-md py-5 rounded-2xl font-bold text-white text-xl shadow-xl hover:shadow-2xl ${currentTheme.shadow} hover:-translate-y-1 transition-all bg-gradient-to-r ${currentPkg.gradient} flex items-center justify-center gap-2 mx-auto cursor-pointer`}
+                    {/* [수정] 모든 플랜에서 '구독하기' 버튼으로 통일 및 checkout 이동 */}
+                    <button 
+                        onClick={handlePurchase}
+                        className={`relative z-10 w-full max-w-md py-5 rounded-2xl font-bold text-white text-xl shadow-xl hover:shadow-2xl ${currentTheme.shadow} hover:-translate-y-1 transition-all bg-gradient-to-r ${currentPkg.gradient} flex items-center justify-center gap-2 mx-auto cursor-pointer`}
                     >
-                        {currentPkg.name} 구매하기 <ArrowRight size={24} />
-                    </Link>
+                        {currentPkg.name} 구독하기 <ArrowRight size={24} />
+                    </button>
                     
                     <p className="text-sm text-slate-400 mt-4 flex items-center justify-center gap-2">
                         <span>VAT 별도</span>
@@ -419,7 +425,7 @@ export default function Pricing() {
         </div>
       </section>
 
-      {/* 2. UNLIMITED Plan (Consulting Linked) */}
+      {/* 2. UNLIMITED Plan */}
       <section className="py-24 bg-[#0F172A] relative overflow-hidden text-white">
         <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-purple-600/20 rounded-full blur-[120px]"></div>
         <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-indigo-600/20 rounded-full blur-[120px]"></div>
@@ -518,7 +524,7 @@ export default function Pricing() {
         </div>
       </section>
 
-      {/* 3. Paid Influencer Tiers (Refactored) */}
+      {/* 3. Paid Influencer Tiers */}
       <section className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -527,48 +533,48 @@ export default function Pricing() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-             {influencerTiers.map((tier, idx) => (
-               <div key={idx} className="bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 flex flex-col group border border-slate-100 hover:border-transparent">
-                 
-                 {/* Header / Price Card */}
-                 <div className={`p-8 ${tier.colorClass} text-white relative overflow-hidden`}>
-                     <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-10 -mt-10 blur-xl"></div>
-                     <div className="relative z-10">
-                       <div className="text-xs font-bold opacity-80 mb-1 border border-white/30 inline-block px-2 py-0.5 rounded-full">{tier.level}</div>
-                       <h3 className="font-bold text-xl mb-3">{tier.name}</h3>
-                       <p className="text-sm opacity-90 mb-4 font-medium leading-snug">{tier.desc}</p>
-                       
-                       <div className="flex items-baseline gap-1">
-                           <span className="text-2xl font-extrabold">{tier.price}</span>
-                           <span className="text-sm font-bold">원</span>
-                           <span className="text-xs opacity-80 font-medium">/ 건</span>
-                       </div>
-                     </div>
-                 </div>
-                 
-                 <div className="p-6 flex-1 flex flex-col">
-                   <div className="flex flex-col gap-3 mb-6 pb-6 border-b border-slate-100">
-                       <div className="flex items-center gap-2">
-                           <Users size={16} className="text-slate-400"/>
-                           <span className="text-sm font-bold text-slate-700">Followers: {tier.followers}</span>
-                       </div>
-                       <div className="flex items-center gap-2">
-                           <TrendingUp size={16} className="text-red-500"/>
-                           <span className="text-sm font-bold text-slate-900">GMV: {tier.gmv} <span className="text-xs text-slate-400 font-normal">(30일)</span></span>
-                       </div>
-                   </div>
-                   
-                   <ul className="space-y-5 mb-2 flex-1">
+              {influencerTiers.map((tier, idx) => (
+                <div key={idx} className="bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 flex flex-col group border border-slate-100 hover:border-transparent">
+                  
+                  {/* Header / Price Card */}
+                  <div className={`p-8 ${tier.colorClass} text-white relative overflow-hidden`}>
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-10 -mt-10 blur-xl"></div>
+                      <div className="relative z-10">
+                        <div className="text-xs font-bold opacity-80 mb-1 border border-white/30 inline-block px-2 py-0.5 rounded-full">{tier.level}</div>
+                        <h3 className="font-bold text-xl mb-3">{tier.name}</h3>
+                        <p className="text-sm opacity-90 mb-4 font-medium leading-snug">{tier.desc}</p>
+                        
+                        <div className="flex items-baseline gap-1">
+                            <span className="text-2xl font-extrabold">{tier.price}</span>
+                            <span className="text-sm font-bold">원</span>
+                            <span className="text-xs opacity-80 font-medium">/ 건</span>
+                        </div>
+                      </div>
+                  </div>
+                  
+                  <div className="p-6 flex-1 flex flex-col">
+                    <div className="flex flex-col gap-3 mb-6 pb-6 border-b border-slate-100">
+                        <div className="flex items-center gap-2">
+                            <Users size={16} className="text-slate-400"/>
+                            <span className="text-sm font-bold text-slate-700">Followers: {tier.followers}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <TrendingUp size={16} className="text-red-500"/>
+                            <span className="text-sm font-bold text-slate-900">GMV: {tier.gmv} <span className="text-xs text-slate-400 font-normal">(30일)</span></span>
+                        </div>
+                    </div>
+                    
+                    <ul className="space-y-5 mb-2 flex-1">
                       {tier.features.map((feat, i) => (
                         <li key={i} className="flex items-start gap-2 text-sm text-slate-600 font-medium leading-relaxed">
                           <div className={`w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0 ${tier.dotColor}`}></div>
                           {feat}
                         </li>
                       ))}
-                   </ul>
-                 </div>
-               </div>
-             ))}
+                    </ul>
+                  </div>
+                </div>
+              ))}
           </div>
 
           <div className="mt-16 text-center">
