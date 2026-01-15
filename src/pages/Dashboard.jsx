@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Package, Clock, Truck, UserCheck, AlertCircle, 
   Lock, Settings, BarChart3, Users, PlayCircle, Eye, Heart, MessageCircle, Share2, 
-  ChevronRight, Calendar, ExternalLink, Zap
+  ChevronRight, Calendar, ExternalLink, Zap, Trash2, CheckCircle2, MoreHorizontal,
+  Plane, Gift, TrendingUp, BarChart2, Trophy
 } from 'lucide-react';
 import Navbar from '../components/layout/Navbar'; 
 import Footer from '../components/layout/Footer';
@@ -13,15 +14,15 @@ import Footer from '../components/layout/Footer';
  * [Type Definition] Campaign Status Enum
  */
 const CampaignStatus = {
-  PAYMENT_PENDING: 'PAYMENT_PENDING', // 입금 대기
-  CONTACTING: 'CONTACTING',           // 인플루언서 컨택 중
-  SHIPPING: 'SHIPPING',               // 제품 발송 중
-  UPLOADING: 'UPLOADING',             // 콘텐츠 업로드 중
-  COMPLETED: 'COMPLETED'              // 캠페인 완료
+  PAYMENT_PENDING: 'PAYMENT_PENDING',
+  CONTACTING: 'CONTACTING',
+  SHIPPING: 'SHIPPING',
+  UPLOADING: 'UPLOADING',
+  COMPLETED: 'COMPLETED'
 };
 
 /**
- * [Mock Data] Demo Campaigns for Pre-purchase Preview
+ * [Mock Data] Demo Campaigns
  */
 const DEMO_CAMPAIGNS = [
   {
@@ -32,17 +33,37 @@ const DEMO_CAMPAIGNS = [
     product_name: 'Vita-C Serum',
     start_date: '2024-01-15',
     end_date: '2024-02-15',
+    target_creators: 30,
+    matched_creators: 30,
     best_message: "끈적임 없이 흡수되는 비타민 세럼, 아침에도 밀리지 않아요!",
     kpi_views: '1.2M', kpi_likes: '45.2K', kpi_comments: '1,203', kpi_shares: '3,400',
+    // [Updated] Top 10 Creators (All Uploaded)
     creators: [
-      { name: '@sarah_beauty', platform: 'TikTok', status: 'Uploaded', link: '#' },
-      { name: '@skincare_guru', platform: 'TikTok', status: 'Shipping', link: '#' },
-      { name: '@glowwithme', platform: 'Reels', status: 'Contacting', link: '#' },
+      { id: 1, name: '@sarah_beauty', platform: 'TikTok', status: 'Uploaded', link: '#', engagement: 'High', views: '450K' },
+      { id: 2, name: '@skincare_guru', platform: 'TikTok', status: 'Uploaded', link: '#', engagement: 'High', views: '320K' },
+      { id: 3, name: '@glowwithme', platform: 'Reels', status: 'Uploaded', link: '#', engagement: 'Medium', views: '150K' },
+      { id: 4, name: '@daily_routine', platform: 'TikTok', status: 'Uploaded', link: '#', engagement: 'Medium', views: '98K' },
+      { id: 5, name: '@beauty_hacks', platform: 'Shorts', status: 'Uploaded', link: '#', engagement: 'Medium', views: '85K' },
+      { id: 6, name: '@pure_skin', platform: 'TikTok', status: 'Uploaded', link: '#', engagement: 'Low', views: '42K' },
+      { id: 7, name: '@makeup_artist_j', platform: 'Reels', status: 'Uploaded', link: '#', engagement: 'Low', views: '30K' },
+      // [Modified] 8~10 Rank Updated to Uploaded
+      { id: 8, name: '@kbeauty_lover', platform: 'TikTok', status: 'Uploaded', link: '#', engagement: 'Medium', views: '28K' },
+      { id: 9, name: '@cosmetic_science', platform: 'Youtube', status: 'Uploaded', link: '#', engagement: 'Low', views: '15K' },
+      { id: 10, name: '@glass_skin_tips', platform: 'TikTok', status: 'Uploaded', link: '#', engagement: 'Low', views: '12K' },
     ],
     contents: [
-      { id: 1, thumbnail_url: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=400&q=80', views: '450K' },
-      { id: 2, thumbnail_url: 'https://images.unsplash.com/photo-1611162616475-46b635cb6868?w=400&q=80', views: '320K' },
-      { id: 3, thumbnail_url: 'https://images.unsplash.com/photo-1611162618071-b39a2ec055fb?w=400&q=80', views: '120K' },
+      // [Updated] ID 1: Beauty Influencer Portrait (감성적인 인플루언서 셀카 느낌)
+      { id: 1, thumbnail_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&q=80', views: '450K', creator: '@sarah_beauty' },
+      { id: 2, thumbnail_url: 'https://images.unsplash.com/photo-1570554886111-e80fcca6a029?w=400&q=80', views: '320K', creator: '@skincare_guru' },
+      { id: 3, thumbnail_url: 'https://images.unsplash.com/photo-1612817288484-6f916006741a?w=400&q=80', views: '150K', creator: '@glowwithme' },
+      { id: 4, thumbnail_url: 'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=400&q=80', views: '98K', creator: '@daily_routine' },
+      // [Updated] ID 5: Clean Beauty Model (깨끗한 피부 표현 모델)
+      { id: 5, thumbnail_url: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=400&q=80', views: '85K', creator: '@beauty_hacks' },
+      { id: 6, thumbnail_url: 'https://images.unsplash.com/photo-1619451334792-150fd785ee74?w=400&q=80', views: '42K', creator: '@pure_skin' },
+      { id: 7, thumbnail_url: 'https://images.unsplash.com/photo-1552693673-1bf958298935?w=400&q=80', views: '30K', creator: '@makeup_artist_j' },
+      { id: 8, thumbnail_url: 'https://images.unsplash.com/photo-1617897903246-719242758050?w=400&q=80', views: '28K', creator: '@kbeauty_lover' },
+      { id: 9, thumbnail_url: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400&q=80', views: '15K', creator: '@cosmetic_science' },
+      { id: 10, thumbnail_url: 'https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=400&q=80', views: '12K', creator: '@glass_skin_tips' },
     ]
   },
   {
@@ -53,9 +74,46 @@ const DEMO_CAMPAIGNS = [
     product_name: 'Daily Sunscreen',
     start_date: '2024-02-01',
     end_date: '2024-03-01',
+    target_creators: 50,
+    matched_creators: 18,
     kpi_views: '-', kpi_likes: '-', kpi_comments: '-', kpi_shares: '-',
+    candidates: [
+        { id: 101, name: "Jessica M.", handle: "@jess_daily", platform: "TikTok", followers: "45K", location: "Los Angeles, CA", status: "Pending Review", contact: "jess***@gmail.com" },
+        { id: 102, name: "Mike Ross", handle: "@mike_glowing", platform: "TikTok", followers: "120K", location: "New York, NY", status: "Approved", contact: "mike***@agency.com" },
+        { id: 103, name: "Emily Blunt", handle: "@emily_skincare", platform: "Reels", followers: "82K", location: "Austin, TX", status: "Pending Review", contact: "emily***@naver.com" },
+        { id: 104, name: "Chris Evans", handle: "@captain_skin", platform: "TikTok", followers: "210K", location: "Chicago, IL", status: "Rejected", contact: "chris***@daum.net" },
+        { id: 105, name: "Scarlett J.", handle: "@black_widow_beauty", platform: "Shorts", followers: "550K", location: "Seattle, WA", status: "Approved", contact: "scarlett***@kakao.com" },
+    ],
     creators: [],
     contents: []
+  },
+  // [NEW] Completed Campaign Demo
+  {
+    id: 'demo-3',
+    plan: 'PREMIUM',
+    status: CampaignStatus.COMPLETED,
+    brand_name: 'BrandSlam Demo',
+    product_name: 'Calming Toner',
+    start_date: '2023-12-01',
+    end_date: '2024-01-01',
+    target_creators: 100,
+    matched_creators: 100,
+    best_message: "진정 효과뿐만 아니라 속건조까지 잡아주는 인생 토너",
+    kpi_views: '3.5M', kpi_likes: '120K', kpi_comments: '5,400', kpi_shares: '12K',
+    creators: [], 
+    contents: [],
+    // [Updated] Analytics Data for Graph
+    analytics: {
+        dates: ['12/01', '12/05', '12/10', '12/15', '12/20', '12/25', '12/30'],
+        daily_views: [20, 45, 120, 250, 220, 180, 150], // Views in K
+        engagement_rate: '8.5%',
+        // [New] Top 3 Ads
+        top_contents: [
+            { id: 1, creator: "@jenny_glow", platform: "TikTok", views: "1.2M", thumbnail: "https://images.unsplash.com/photo-1556229010-6c3f2c9ca5f8?w=400&q=80" },
+            { id: 2, creator: "@skincare_daddy", platform: "Reels", views: "890K", thumbnail: "https://images.unsplash.com/photo-1616683693504-3ea7e9ad6fec?w=400&q=80" },
+            { id: 3, creator: "@beauty_insider", platform: "Shorts", views: "650K", thumbnail: "https://images.unsplash.com/photo-1629198688000-71f23e745b6e?w=400&q=80" }
+        ]
+    }
   }
 ];
 
@@ -100,144 +158,338 @@ const MetricCard = ({ icon: Icon, label, value, color }) => (
 const CampaignCard = ({ campaign, onClick, isActive }) => (
   <div 
     onClick={onClick}
-    className={`p-5 rounded-2xl border transition-all cursor-pointer ${
+    className={`p-4 rounded-2xl border transition-all cursor-pointer ${
       isActive 
       ? 'bg-white border-indigo-500 ring-1 ring-indigo-500 shadow-md' 
       : 'bg-white border-slate-200 hover:border-indigo-300 hover:shadow-sm'
     }`}
   >
-    <div className="flex justify-between items-start mb-3">
-      <div>
-        <span className="text-xs font-bold text-indigo-600 mb-1 block">{campaign.plan} PLAN</span>
-        <h3 className="font-bold text-slate-900 line-clamp-1">{campaign.product_name || '상품명 미정'}</h3>
+    <div className="flex justify-between items-start mb-2">
+      <div className="min-w-0">
+        <span className="text-[10px] font-bold text-indigo-600 mb-0.5 block">{campaign.plan} PLAN</span>
+        <h3 className="font-bold text-slate-900 text-sm truncate pr-2">{campaign.product_name || '상품명 미정'}</h3>
       </div>
-      <StatusBadge status={campaign.status} />
     </div>
-    <div className="flex items-center gap-2 text-xs text-slate-400">
-      <Calendar size={12} />
-      {campaign.start_date || '일정 미정'} ~ {campaign.end_date || '...'}
+    <div className="flex items-center justify-between mt-2">
+        <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
+            <Calendar size={10} />
+            <span className="truncate">{campaign.start_date || '일정 미정'}</span>
+        </div>
+        <StatusBadge status={campaign.status} />
     </div>
   </div>
 );
 
+// --- Detail Component: Candidate List (섭외 중) ---
+const CandidateList = ({ candidates, targetCount, matchedCount }) => {
+    const progress = Math.min(Math.round((matchedCount / targetCount) * 100), 100);
+
+    return (
+        <div className="space-y-6 animate-fade-in-up">
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                <div className="flex justify-between items-end mb-3">
+                    <div>
+                        <h4 className="font-bold text-slate-800 text-lg">섭외 진행 현황</h4>
+                        <p className="text-xs text-slate-500 mt-1">목표 인원 달성 시 자동으로 배송 단계로 넘어갑니다.</p>
+                    </div>
+                    <div className="text-right">
+                        <span className="text-3xl font-extrabold text-indigo-600">{progress}%</span>
+                        <span className="text-xs text-slate-400 font-medium ml-1">({matchedCount}/{targetCount})</span>
+                    </div>
+                </div>
+                <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
+                    <div 
+                        className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 transition-all duration-1000 ease-out rounded-full relative"
+                        style={{ width: `${progress}%` }}
+                    >
+                        <div className="absolute top-0 left-0 w-full h-full bg-white/20 animate-[shimmer_2s_infinite]"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                    <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                        <UserCheck size={18} className="text-slate-400"/> 섭외 리스트 (실시간)
+                    </h3>
+                    <div className="flex gap-2">
+                        <button className="text-xs font-medium px-3 py-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600 transition-colors">
+                            CSV 다운로드
+                        </button>
+                    </div>
+                </div>
+                
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                        <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-100">
+                            <tr>
+                                <th className="px-6 py-3 w-1/4">인플루언서</th>
+                                <th className="px-6 py-3">플랫폼/팔로워</th>
+                                <th className="px-6 py-3">거주지/연락처</th>
+                                <th className="px-6 py-3">상태</th>
+                                <th className="px-6 py-3 text-right">관리</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {candidates && candidates.map((creator) => (
+                                <tr key={creator.id} className="hover:bg-slate-50/80 transition-colors group">
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-xs">
+                                                {creator.name.charAt(0)}
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-slate-800">{creator.name}</p>
+                                                <a href="#" className="text-xs text-indigo-500 hover:underline">{creator.handle}</a>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex flex-col">
+                                            <span className="font-medium text-slate-700">{creator.platform}</span>
+                                            <span className="text-xs text-slate-400">{creator.followers} Followers</span>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex flex-col gap-0.5">
+                                            <span className="text-slate-600 flex items-center gap-1 text-xs">
+                                                {creator.location}
+                                            </span>
+                                            <span className="text-slate-400 text-[10px]">{creator.contact}</span>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                                            creator.status === 'Approved' ? 'bg-green-50 text-green-600 border-green-100' :
+                                            creator.status === 'Rejected' ? 'bg-red-50 text-red-600 border-red-100' :
+                                            'bg-yellow-50 text-yellow-600 border-yellow-100'
+                                        }`}>
+                                            {creator.status === 'Approved' ? '섭외완료' : 
+                                             creator.status === 'Rejected' ? '거절됨' : '검토중'}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                        <button 
+                                            className="text-slate-400 hover:text-red-500 p-2 rounded-full hover:bg-red-50 transition-all"
+                                            title="리스트에서 제외"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                alert(`${creator.name} 님을 리스트에서 제외하시겠습니까?`);
+                                            }}
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- Detail Component: Analytics (완료된 캠페인) ---
+const AnalyticsReport = ({ campaign }) => {
+    return (
+        <div className="space-y-8 animate-fade-in-up">
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2">
+                        <BarChart2 size={20} className="text-indigo-600" /> 
+                        캠페인 최종 성과 리포트
+                    </h3>
+                    <button className="text-sm text-slate-500 hover:text-indigo-600 flex items-center gap-1 border px-3 py-1.5 rounded-lg hover:border-indigo-200 transition-colors">
+                        <ExternalLink size={14}/> PDF 다운로드
+                    </button>
+                </div>
+
+                {/* [Improved] Graph Area with Axes */}
+                <div className="bg-slate-50 rounded-xl border border-slate-100 p-6 mb-6">
+                    <div className="flex h-64 relative items-end pb-8 pl-8 gap-4">
+                        {/* Y-Axis Label */}
+                        <div className="absolute top-0 left-0 h-full flex flex-col justify-between text-[10px] text-slate-400 pb-8">
+                            <span>300K</span>
+                            <span>200K</span>
+                            <span>100K</span>
+                            <span>0</span>
+                        </div>
+                        
+                        {/* Bars & X-Axis */}
+                        {campaign.analytics?.daily_views.map((views, idx) => (
+                            <div key={idx} className="flex-1 flex flex-col justify-end group relative h-full">
+                                <div 
+                                    className="w-full bg-indigo-300 hover:bg-indigo-500 transition-all rounded-t-sm relative"
+                                    style={{ height: `${(views / 300) * 100}%` }}
+                                >
+                                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                                        {views}K Views
+                                    </div>
+                                </div>
+                                {/* X-Axis Date Label */}
+                                <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] text-slate-400 whitespace-nowrap">
+                                    {campaign.analytics?.dates[idx]}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
+                        <p className="text-xs text-indigo-600 font-bold mb-1">총 도달(Reach)</p>
+                        <p className="text-2xl font-extrabold text-slate-900">{campaign.kpi_views}</p>
+                        <p className="text-[10px] text-slate-500 mt-1">예상 대비 145% 달성 🚀</p>
+                    </div>
+                    <div className="p-4 bg-green-50 rounded-xl border border-green-100">
+                        <p className="text-xs text-green-600 font-bold mb-1">평균 참여율(ER)</p>
+                        <p className="text-2xl font-extrabold text-slate-900">{campaign.analytics?.engagement_rate}</p>
+                        <p className="text-[10px] text-slate-500 mt-1">업계 평균(3.5%) 상회</p>
+                    </div>
+                    {/* [Updated] Top 3 Ads Display */}
+                    <div className="col-span-1 md:col-span-3 mt-4">
+                        <h4 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
+                            <Trophy size={16} className="text-yellow-500"/> Best Performing Ads (Top 3)
+                        </h4>
+                        <div className="grid grid-cols-3 gap-4">
+                            {campaign.analytics?.top_contents.map((content) => (
+                                <div key={content.id} className="relative aspect-[9/16] rounded-xl overflow-hidden group cursor-pointer border border-slate-200 shadow-sm">
+                                    <img src={content.thumbnail} alt="Top Content" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                                    <div className="absolute top-2 left-2 bg-yellow-400 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
+                                        TOP {content.id}
+                                    </div>
+                                    <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/80 to-transparent p-3">
+                                        <p className="text-white text-xs font-bold mb-0.5">{content.creator}</p>
+                                        <p className="text-white/80 text-[10px] flex items-center gap-1"><Eye size={10}/> {content.views}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- Detail Component: Ongoing Campaign (업로드 중) ---
+const OngoingCampaign = ({ campaign }) => {
+    return (
+        <div className="space-y-8 animate-fade-in-up">
+            {/* 1. KPI Summary */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <MetricCard icon={Eye} label="Total Views" value={campaign.kpi_views} color="bg-blue-50 text-blue-600" />
+                <MetricCard icon={Heart} label="Likes" value={campaign.kpi_likes} color="bg-red-50 text-red-600" />
+                <MetricCard icon={MessageCircle} label="Comments" value={campaign.kpi_comments} color="bg-green-50 text-green-600" />
+                <MetricCard icon={Share2} label="Shares" value={campaign.kpi_shares} color="bg-purple-50 text-purple-600" />
+            </div>
+
+            {/* 2. Top 10 Creators Table with Actions */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+                    <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                        <Users size={18} className="text-slate-400"/> Engagement Top 10 Creators
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-1">성과가 좋은 크리에이터에게 추가 광고를 집행하거나 리워드를 지급해보세요.</p>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                        <thead className="bg-white text-slate-500 font-medium border-b border-slate-100">
+                            <tr>
+                                <th className="px-6 py-3">Rank</th>
+                                <th className="px-6 py-3">Creator</th>
+                                <th className="px-6 py-3">Views</th>
+                                <th className="px-6 py-3">Status</th>
+                                <th className="px-6 py-3 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 bg-white">
+                            {campaign.creators.map((creator, idx) => (
+                                <tr key={creator.id} className="hover:bg-slate-50 transition-colors">
+                                    <td className="px-6 py-3 font-bold text-slate-400 w-12">{idx + 1}</td>
+                                    <td className="px-6 py-3">
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-bold text-slate-700">{creator.name}</span>
+                                            <span className="text-[10px] text-slate-400 border px-1 rounded">{creator.platform}</span>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-3 font-bold text-indigo-600">{creator.views}</td>
+                                    <td className="px-6 py-3">
+                                        <span className={`text-[10px] px-2 py-0.5 rounded border font-bold ${
+                                            creator.status === 'Uploaded' ? 'bg-green-50 text-green-600 border-green-100' : 'bg-slate-50 text-slate-500 border-slate-100'
+                                        }`}>
+                                            {creator.status}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-3 text-right">
+                                        <div className="flex justify-end gap-2">
+                                            <button className="text-[10px] font-bold px-2 py-1 bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100 transition-colors border border-indigo-100 flex items-center gap-1">
+                                                <Zap size={10} /> Spark Ads
+                                            </button>
+                                            <button className="text-[10px] font-bold px-2 py-1 bg-pink-50 text-pink-600 rounded hover:bg-pink-100 transition-colors border border-pink-100 flex items-center gap-1">
+                                                <Gift size={10} /> Credit 지급
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* 3. Uploaded Contents Gallery (Showing All 10) */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <PlayCircle size={18} className="text-slate-400"/> Uploaded Contents Gallery
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                    {campaign.contents.map((content, idx) => (
+                        <div key={idx} className="relative aspect-[9/16] rounded-xl overflow-hidden bg-slate-100 group cursor-pointer border border-slate-200 shadow-sm hover:shadow-md transition-all">
+                            {content.thumbnail_url ? (
+                                <img src={content.thumbnail_url} alt="Thumbnail" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-slate-200 text-slate-400 text-xs">No Image</div>
+                            )}
+                            <div className="absolute top-2 left-2 bg-black/50 backdrop-blur-sm text-white text-[10px] px-2 py-0.5 rounded-full truncate max-w-[80%]">
+                                {content.creator}
+                            </div>
+                            <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/80 to-transparent p-3">
+                                <p className="text-white text-xs font-bold flex items-center gap-1">
+                                    <Eye size={10} /> {content.views || '0'}
+                                </p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- Main Campaign Detail Container ---
 const CampaignDetail = ({ campaign }) => {
   if (!campaign) return <div className="text-center py-20 text-slate-400">캠페인을 선택해주세요.</div>;
 
-  return (
-    <div className="space-y-8 animate-fade-in-up">
-      {/* 1. KPI Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <MetricCard icon={Eye} label="Total Views" value={campaign.kpi_views} color="bg-blue-50 text-blue-600" />
-        <MetricCard icon={Heart} label="Likes" value={campaign.kpi_likes} color="bg-red-50 text-red-600" />
-        <MetricCard icon={MessageCircle} label="Comments" value={campaign.kpi_comments} color="bg-green-50 text-green-600" />
-        <MetricCard icon={Share2} label="Shares" value={campaign.kpi_shares} color="bg-purple-50 text-purple-600" />
-      </div>
+  // 1. 섭외 중 (Contacting)
+  if (campaign.status === CampaignStatus.CONTACTING) {
+      return (
+          <CandidateList 
+            candidates={campaign.candidates} 
+            targetCount={campaign.target_creators || 50} 
+            matchedCount={campaign.matched_creators || 0} 
+          />
+      );
+  }
 
-      {/* 2. Creator Pool Status */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-          <h3 className="font-bold text-slate-800 flex items-center gap-2">
-            <Users size={18} className="text-slate-400"/> Creator Pool Status
-          </h3>
-          <span className="text-xs text-slate-400">실시간 업데이트</span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-white text-slate-500 font-medium border-b border-slate-100">
-              <tr>
-                <th className="px-6 py-3">Creator Name</th>
-                <th className="px-6 py-3">Platform</th>
-                <th className="px-6 py-3">Status</th>
-                <th className="px-6 py-3">Link</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 bg-white">
-              {campaign.creators && campaign.creators.length > 0 ? campaign.creators.map((creator, idx) => (
-                <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-6 py-3 font-medium text-slate-700">{creator.name}</td>
-                  <td className="px-6 py-3 text-slate-500">{creator.platform}</td>
-                  <td className="px-6 py-3">
-                    <span className={`text-xs px-2 py-0.5 rounded border font-medium ${
-                      creator.status === 'Uploaded' ? 'bg-green-50 text-green-600 border-green-100' :
-                      creator.status === 'Shipping' ? 'bg-orange-50 text-orange-600 border-orange-100' :
-                      'bg-slate-50 text-slate-500 border-slate-100'
-                    }`}>
-                      {creator.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-3">
-                    {creator.link ? (
-                        <a href={creator.link} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
-                        View <ExternalLink size={12}/>
-                        </a>
-                    ) : (
-                        <span className="text-slate-300">-</span>
-                    )}
-                  </td>
-                </tr>
-              )) : (
-                <tr>
-                  <td colSpan="4" className="px-6 py-8 text-center text-slate-400">
-                    아직 매칭된 크리에이터가 없습니다.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+  // 2. 완료됨 (Completed) - Analytics
+  if (campaign.status === CampaignStatus.COMPLETED) {
+      return <AnalyticsReport campaign={campaign} />;
+  }
 
-      {/* 3. Uploaded Contents Gallery */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-         <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-            <PlayCircle size={18} className="text-slate-400"/> Uploaded Contents
-         </h3>
-         {campaign.contents && campaign.contents.length > 0 ? (
-           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-             {campaign.contents.map((content, idx) => (
-               <div key={idx} className="relative aspect-[9/16] rounded-xl overflow-hidden bg-slate-100 group cursor-pointer border border-slate-200 shadow-sm hover:shadow-md transition-all">
-                 {content.thumbnail_url ? (
-                     <img src={content.thumbnail_url} alt="Thumbnail" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
-                 ) : (
-                     <div className="w-full h-full flex items-center justify-center bg-slate-200 text-slate-400 text-xs">No Image</div>
-                 )}
-                 
-                 <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/80 to-transparent p-3">
-                    <p className="text-white text-xs font-bold flex items-center gap-1">
-                      <Eye size={10} /> {content.views || '0'}
-                    </p>
-                 </div>
-               </div>
-             ))}
-           </div>
-         ) : (
-            <div className="py-12 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                <p className="text-slate-400 text-sm">아직 업로드된 콘텐츠가 없습니다.</p>
-            </div>
-         )}
-      </div>
-
-      {/* 4. Best Performing Message (Moved to Bottom) */}
-      {(campaign.status === CampaignStatus.UPLOADING || campaign.status === CampaignStatus.COMPLETED) && (
-         <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 text-white shadow-lg mt-8">
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-               <div className="flex-1">
-                  <h4 className="font-bold text-lg mb-2 flex items-center gap-2"><Zap size={18} className="text-yellow-300"/> Best Performing Message</h4>
-                  <p className="text-indigo-100 text-xs mb-3">이번 캠페인에서 가장 반응이 좋았던 소구 포인트입니다.</p>
-                  <div className="bg-white/10 backdrop-blur-md p-4 rounded-xl border border-white/20">
-                      <p className="font-medium text-sm leading-relaxed">
-                          "{campaign.best_message || "데이터 수집 중입니다..."}"
-                      </p>
-                  </div>
-               </div>
-               <button className="bg-white text-indigo-600 px-6 py-3 rounded-xl text-sm font-bold hover:bg-indigo-50 transition-colors shadow-sm whitespace-nowrap">
-                  다음 캠페인에 사용
-               </button>
-            </div>
-         </div>
-      )}
-    </div>
-  );
+  // 3. 업로드 중 / 배송 중 (Ongoing)
+  return <OngoingCampaign campaign={campaign} />;
 };
 
 // --- Main Dashboard ---
@@ -258,7 +510,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     const fetchData = async () => {
-      // 1. Auth Check (로그인 안 해도 접근 가능하도록 변경)
+      // 1. Auth Check
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
 
@@ -267,11 +519,7 @@ export default function Dashboard() {
         // [Logged In] Fetch Real Data
         const { data } = await supabase
           .from('campaigns')
-          .select(`
-            *,
-            creators (*),
-            contents (*)
-          `)
+          .select(`*, creators (*), contents (*)`)
           .eq('user_id', user.id)
           .order('created_at', { ascending: false });
 
@@ -280,13 +528,12 @@ export default function Dashboard() {
           setSelectedCampaignId(data[0].id);
           setIsDemoMode(false);
         } else {
-          // 유저는 있지만 캠페인이 없으면 데모 데이터 표시
           setCampaigns(DEMO_CAMPAIGNS);
           setSelectedCampaignId(DEMO_CAMPAIGNS[0].id);
           setIsDemoMode(true);
         }
       } else {
-        // [Guest] Load Demo Data (비로그인 사용자)
+        // [Guest] Load Demo Data
         setCampaigns(DEMO_CAMPAIGNS);
         setSelectedCampaignId(DEMO_CAMPAIGNS[0].id);
         setIsDemoMode(true);
@@ -321,21 +568,21 @@ export default function Dashboard() {
       )}
 
       {/* Main Content Area */}
-      <div className={`flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 ${isDemoMode ? 'py-8' : 'pt-32 pb-24'}`}>
+      <div className={`flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-6 lg:px-8 ${isDemoMode ? 'py-8' : 'pt-32 pb-24'}`}>
         
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
             <div>
-                {/* [수정] 이메일 대신 '담당자님'으로 통일 */}
                 <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-2">
-                    Welcome, 담당자님 👋
+                    {user 
+                      ? `반갑습니다, ${user.email.split('@')[0]} 님 👋` 
+                      : `반갑습니다, 담당자님 👋`}
                 </h1>
                 <p className="text-slate-500">
                     현재 진행 중인 캠페인 현황을 한눈에 확인하세요.
                 </p>
             </div>
             
-            {/* 설정 버튼은 로그인한 유저에게만 표시 */}
             {user && (
                 <button 
                     onClick={() => setIsPasswordMode(!isPasswordMode)}
@@ -347,7 +594,7 @@ export default function Dashboard() {
             )}
         </div>
 
-        {/* Password Setting Panel (로그인한 유저만 가능) */}
+        {/* Password Setting Panel */}
         {isPasswordMode && user && (
             <div className="mb-8 bg-white p-6 rounded-2xl shadow-sm border border-indigo-100 animate-fade-in-up max-w-lg">
                 <h3 className="text-sm font-bold mb-3 flex items-center gap-2 text-indigo-900">
@@ -372,48 +619,88 @@ export default function Dashboard() {
         )}
 
         {/* Main Dashboard Grid */}
-        <div className="flex flex-col lg:flex-row gap-8 items-start">
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
             
-            {/* [Left Sidebar] Campaign List */}
-            <div className="w-full lg:w-1/3 space-y-4">
-                <div className="flex items-center justify-between mb-2">
-                    <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider">My Campaigns</h2>
-                    <span className="text-xs font-medium bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{campaigns.length}</span>
-                </div>
-                
-                <div className="space-y-3">
-                    {campaigns.map(campaign => (
-                        <CampaignCard 
-                            key={campaign.id} 
-                            campaign={campaign} 
-                            isActive={selectedCampaignId === campaign.id}
-                            onClick={() => setSelectedCampaignId(campaign.id)}
-                        />
-                    ))}
-                </div>
-                
-                {/* New Campaign CTA */}
-                <div 
-                    onClick={() => navigate('/pricing')}
-                    className="p-6 rounded-2xl border-2 border-dashed border-slate-200 text-center hover:border-indigo-300 hover:bg-indigo-50/50 transition-all cursor-pointer group"
-                >
-                    <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3 text-slate-400 group-hover:bg-white group-hover:text-indigo-500 transition-colors">
-                        <Package size={24} />
+            {/* [Left Sidebar] Campaign List & Promo */}
+            <div className="w-full lg:w-1/4 space-y-6">
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between mb-2 px-1">
+                        <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider">My Campaigns</h2>
+                        <span className="text-xs font-medium bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{campaigns.length}</span>
                     </div>
-                    <p className="text-sm font-bold text-slate-600 group-hover:text-indigo-700">새 캠페인 추가하기</p>
-                    <p className="text-xs text-slate-400 mt-1">플랜을 선택하여 확장을 시작하세요</p>
+                    
+                    <div className="space-y-3">
+                        {campaigns.map(campaign => (
+                            <CampaignCard 
+                                key={campaign.id} 
+                                campaign={campaign} 
+                                isActive={selectedCampaignId === campaign.id}
+                                onClick={() => setSelectedCampaignId(campaign.id)}
+                            />
+                        ))}
+                    </div>
+                    
+                    <div 
+                        onClick={() => navigate('/pricing')}
+                        className="p-5 rounded-2xl border-2 border-dashed border-slate-200 text-center hover:border-indigo-300 hover:bg-indigo-50/50 transition-all cursor-pointer group"
+                    >
+                        <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-2 text-slate-400 group-hover:bg-white group-hover:text-indigo-500 transition-colors">
+                            <Package size={20} />
+                        </div>
+                        <p className="text-xs font-bold text-slate-600 group-hover:text-indigo-700">새 캠페인 추가하기</p>
+                    </div>
+                </div>
+
+                {/* Cross-selling Promo Boxes */}
+                <div className="space-y-3 pt-6 border-t border-slate-100">
+                    <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider px-1">More Services</h2>
+                    
+                    {/* 1. Medical Tourism */}
+                    <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-4 rounded-xl border border-emerald-100 hover:shadow-md transition-shadow cursor-pointer group">
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-emerald-600 shadow-sm">
+                                <Plane size={16} />
+                            </div>
+                            <span className="font-bold text-emerald-800 text-sm">의료관광 마케팅</span>
+                        </div>
+                        <p className="text-xs text-emerald-600/80 leading-relaxed mb-2">
+                            한국 병/의원을 위한 글로벌 환자 유치 전용 패키지
+                        </p>
+                        <span className="text-[10px] font-bold text-emerald-700 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                            자세히 보기 <ChevronRight size={10} />
+                        </span>
+                    </div>
+
+                    {/* 2. Brand Rewards */}
+                    <div className="bg-gradient-to-br from-orange-50 to-amber-50 p-4 rounded-xl border border-orange-100 hover:shadow-md transition-shadow cursor-pointer group">
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-orange-600 shadow-sm">
+                                <Gift size={16} />
+                            </div>
+                            <span className="font-bold text-orange-800 text-sm">브랜드사 리워드</span>
+                        </div>
+                        <p className="text-xs text-orange-600/80 leading-relaxed mb-2">
+                            우수 인플루언서에게 추가 보상을 지급하여 락인(Lock-in)하세요.
+                        </p>
+                        <span className="text-[10px] font-bold text-orange-700 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                            자세히 보기 <ChevronRight size={10} />
+                        </span>
+                    </div>
                 </div>
             </div>
 
             {/* [Right Content] Campaign Detail */}
-            <div className="w-full lg:w-2/3">
-                 <div className="bg-white p-6 md:p-8 rounded-[2rem] shadow-sm border border-slate-200 min-h-[600px]">
+            <div className="w-full lg:w-3/4">
+                 <div className="bg-white p-6 md:p-8 rounded-[2rem] shadow-sm border border-slate-200 min-h-[800px]">
                     <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 pb-6 border-b border-slate-100 gap-4">
                         <div>
-                            <h2 className="text-2xl font-bold text-slate-900 mb-1">{selectedCampaign?.product_name || 'Campaign'}</h2>
+                            <div className="flex items-center gap-2 mb-1">
+                                <h2 className="text-2xl font-bold text-slate-900">{selectedCampaign?.product_name || 'Campaign'}</h2>
+                                <span className="text-xs font-bold px-2 py-0.5 bg-slate-100 text-slate-500 rounded">{selectedCampaign?.plan}</span>
+                            </div>
                             <p className="text-slate-500 text-sm flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                                실시간 데이터 분석 중
+                                <span className={`w-2 h-2 rounded-full ${selectedCampaign?.status === CampaignStatus.COMPLETED ? 'bg-slate-400' : 'bg-green-500 animate-pulse'}`}></span>
+                                {selectedCampaign?.status === CampaignStatus.COMPLETED ? '데이터 분석 완료' : '실시간 데이터 분석 중'}
                             </p>
                         </div>
                         <StatusBadge status={selectedCampaign?.status} />

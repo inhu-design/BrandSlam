@@ -401,8 +401,8 @@ export default function Pricing() {
                     {/* [수정] Link 태그: z-50 유지, cursor-pointer 명시 */}
                     <Link 
                         to="/checkout"
-                        state={{ plan: { id: currentPkg.id } }} 
-                        className={`relative z-50 pointer-events-auto w-full max-w-md py-5 rounded-2xl font-bold text-white text-xl shadow-xl hover:shadow-2xl ${currentTheme.shadow} hover:-translate-y-1 transition-all bg-gradient-to-r ${currentPkg.gradient} flex items-center justify-center gap-2 mx-auto cursor-pointer block`}
+                        state={{ plan: currentPkg }}
+                        className={`relative z-50 pointer-events-auto w-full max-w-md py-5 rounded-2xl font-bold text-white text-xl shadow-xl hover:shadow-2xl ${currentTheme.shadow} hover:-translate-y-1 transition-all bg-gradient-to-r ${currentPkg.gradient} flex items-center justify-center gap-2 mx-auto cursor-pointer`}
                     >
                         {currentPkg.name} 구매하기 <ArrowRight size={24} />
                     </Link>
