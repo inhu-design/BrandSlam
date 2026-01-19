@@ -65,7 +65,7 @@ const Navbar = () => {
           {/* 1. Logo (Left) */}
           <Link to="/" onClick={handleNavClick} className="flex items-center gap-2 cursor-pointer z-10">
               {logoImg ? (
-                <img src={logoImg} alt="Brand Slam" className="h-24 w-auto object-contain" />
+                <img src={logoImg} alt="Brand Slam" className="h-16 w-auto object-contain" />
               ) : (
                 <span className="font-bold text-2xl tracking-tighter text-blue-900">BRAND SLAM</span>
               )}

@@ -16,6 +16,9 @@ import Login from './pages/Login';
 import Checkout from './pages/Checkout';
 import Consulting from './pages/Consulting';
 import Dashboard from './pages/Dashboard';
+import About from './pages/About';
+import Management from './pages/Management';
+
 
 function App() {
   return (
@@ -31,6 +34,9 @@ function App() {
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/consulting" element={<Consulting />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/management" element={<Management />} />
+          
         </Routes>
       </AuthProvider>
     </BrowserRouter>

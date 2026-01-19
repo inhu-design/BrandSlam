@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Globe, Users, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import logoImg from '../../assets/logo.png';
 
-// --- [수정] 법적 고지 데이터 업데이트 ---
+// --- 법적 고지 데이터 (변경 없음) ---
 const LEGAL_CONTENTS = {
   terms: {
     title: "이용약관 (취소 및 환불 정책)",
@@ -93,7 +93,6 @@ const LegalModal = ({ isOpen, onClose, title, content }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col relative">
-        {/* 모달 헤더 */}
         <div className="flex justify-between items-center p-6 border-b border-gray-100">
           <h3 className="text-xl font-bold text-gray-900">{title}</h3>
           <button 
@@ -104,12 +103,10 @@ const LegalModal = ({ isOpen, onClose, title, content }) => {
           </button>
         </div>
         
-        {/* 모달 내용 (스크롤 가능) */}
         <div className="p-6 overflow-y-auto text-sm text-gray-600 leading-relaxed whitespace-pre-wrap h-full">
           {content}
         </div>
 
-        {/* 모달 푸터 */}
         <div className="p-4 border-t border-gray-100 flex justify-end">
           <button 
             onClick={onClose}
@@ -124,10 +121,8 @@ const LegalModal = ({ isOpen, onClose, title, content }) => {
 };
 
 const Footer = () => {
-  // 모달 상태 관리
   const [activeModal, setActiveModal] = useState(null);
 
-  // 모달이 열려있을 때 배경 스크롤 방지
   useEffect(() => {
     if (activeModal) {
       document.body.style.overflow = 'hidden';
@@ -152,16 +147,16 @@ const Footer = () => {
     },
     {
       title: "Company",
+      // [수정] 링크 연결 (/about, /management, /consulting)
       items: [
-        { name: "회사 소개", path: "#" },
-        { name: "인플루언서 매니지먼트 시스템", path: "#" },
-        { name: "문의하기", path: "#" }
+        { name: "회사 소개", path: "/about" },
+        { name: "인플루언서 매니지먼트 시스템", path: "/management" },
+        { name: "문의하기", path: "/consulting" }
       ]
     },
     {
       title: "Legal",
       items: [
-        // modalKey를 사용하여 구분
         { name: "이용약관", modalKey: "terms" },
         { name: "개인정보처리방침", modalKey: "privacy" },
         { name: "결제 및 환불 규정", modalKey: "refund" }
@@ -175,14 +170,13 @@ const Footer = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 mb-16">
             
-            {/* 왼쪽 브랜드 설명 영역 */}
             <div className="col-span-2 lg:col-span-2 space-y-4">
               <Link to="/" onClick={scrollToTop} className="inline-block">
                  {logoImg ? (
                    <img 
                      src={logoImg} 
                      alt="Brand Slam" 
-                     className="h-24 w-auto object-contain" 
+                     className="h-16 w-auto object-contain" 
                    />
                  ) : (
                    <span className="font-bold text-xl tracking-tighter text-blue-900">BRAND SLAM</span>
@@ -193,18 +187,14 @@ const Footer = () => {
                 Brand Slam은 글로벌 뷰티 브랜드를 위한 <br className="hidden md:block" />
                 <span className="font-bold text-gray-900">올인원 인플루언서 마케팅 자동화 솔루션</span> 입니다. 
               </p>
-              <div className="flex gap-4 pt-4">
-             </div>
             </div>
             
-            {/* 오른쪽 링크 섹션 */}
             {footerSections.map((section, idx) => (
               <div key={idx}>
                 <h4 className="font-bold text-gray-900 mb-6">{section.title}</h4>
                 <ul className="space-y-4 text-sm text-gray-500">
                   {section.items.map((item, i) => (
                     <li key={i}>
-                      {/* 모달 키가 있으면 버튼으로, 없으면 링크로 렌더링 */}
                       {item.modalKey ? (
                         <button
                           onClick={() => setActiveModal(item.modalKey)}
@@ -228,10 +218,8 @@ const Footer = () => {
             ))}
           </div>
           
-          {/* 하단 정보 영역 (사업자 정보) */}
           <div className="pt-8 border-t border-gray-100">
             <div className="flex flex-col gap-6">
-              {/* 사업자 정보 텍스트 */}
               <div className="text-[11px] md:text-xs text-gray-400 space-y-1.5 leading-relaxed">
                 <p className="font-bold text-gray-500 mb-2">주식회사 브랜드슬램 (Brand Slam Inc.)</p>
                 <div className="flex flex-wrap gap-x-4 gap-y-1">
@@ -247,7 +235,6 @@ const Footer = () => {
                 </div>
               </div>
 
-              {/* Copyright */}
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-xs text-gray-400 mt-2">
                 <p>© 2026 Brand Slam Inc. All rights reserved.</p>
               </div>
@@ -256,7 +243,6 @@ const Footer = () => {
         </div>
       </footer>
 
-      {/* 법적 고지 모달 렌더링 */}
       <LegalModal 
         isOpen={!!activeModal}
         onClose={() => setActiveModal(null)}
