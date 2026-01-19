@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase'; // [!] 경로 확인
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   Video, 
@@ -18,7 +18,7 @@ import {
   User,
   Building,
   Phone,
-  Ban // [New] 금지 아이콘 추가
+  Ban
 } from 'lucide-react';
 import Navbar from '../components/layout/Navbar';
 import Footer from '../components/layout/Footer';
@@ -157,33 +157,29 @@ export default function Consulting() {
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [takenTimes, setTakenTimes] = useState([]); // [New] 이미 예약된 시간들
+  const [takenTimes, setTakenTimes] = useState([]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
 
-  // [New] 날짜가 선택될 때마다, 해당 날짜의 '예약된 시간'을 DB에서 가져옴
   useEffect(() => {
     if (selectedDate) {
       const fetchTakenTimes = async () => {
-        // 한국 시간 기준 날짜 포맷팅 (YYYY-MM-DD) - 타임존 이슈 방지용 로컬 포맷 사용
-        const dateStr = selectedDate.toLocaleDateString('en-CA'); // 'en-CA' outputs YYYY-MM-DD
+        const dateStr = selectedDate.toLocaleDateString('en-CA'); 
 
-        // 1. 해당 날짜에 status가 'cancelled'가 아닌 모든 예약을 조회
         const { data, error } = await supabase
           .from('consulting_requests')
           .select('preferred_time')
           .eq('preferred_date', dateStr)
-          .neq('status', 'cancelled'); // 취소된 건은 제외하고 조회
+          .neq('status', 'cancelled');
 
         if (error) {
           console.error("Error fetching times:", error);
         } else {
-          // 2. 예약된 시간만 추출하여 상태 업데이트
           const times = data.map(item => item.preferred_time);
           setTakenTimes(times);
-          setSelectedTime(null); // 날짜 바뀌면 선택한 시간 초기화
+          setSelectedTime(null);
         }
       };
 
@@ -192,7 +188,6 @@ export default function Consulting() {
   }, [selectedDate]);
 
   const handleTypeSelect = (type) => {
-    if (type === 'chat') return;
     setSelectedType(type);
     setTimeout(() => {
       document.getElementById('booking-form').scrollIntoView({ behavior: 'smooth' });
@@ -209,7 +204,6 @@ export default function Consulting() {
     setIsSubmitting(true);
 
     try {
-      // YYYY-MM-DD (Local Time)
       const dateStr = selectedDate.toLocaleDateString('en-CA');
 
       const { error } = await supabase
@@ -222,7 +216,7 @@ export default function Consulting() {
             phone: userInfo.phone,
             category: category.label,
             topic_detail: detail,
-            preferred_date: dateStr, // 수정된 날짜 포맷
+            preferred_date: dateStr,
             preferred_time: selectedTime,
             status: 'pending'
           }
@@ -232,7 +226,6 @@ export default function Consulting() {
 
       alert(`[예약 완료]\n\n일시: ${dateStr} ${selectedTime}\n주제: ${category.label}\n\n입력하신 연락처로 줌(Zoom) 링크를 보내드립니다.`);
       
-      // [New] 페이지 최상단으로 이동 후 메인으로
       window.scrollTo(0, 0); 
       navigate('/');
 
@@ -273,21 +266,24 @@ export default function Consulting() {
               <p className="text-slate-500">Zoom/Google Meet을 통해 화면을 공유하며 심도 깊은 전략을 논의합니다.</p>
             </button>
 
-            <button 
-              onClick={() => handleTypeSelect('chat')}
-              className="relative p-8 rounded-3xl border-2 border-slate-100 bg-slate-50 text-left cursor-not-allowed opacity-70"
+            {/* 실시간 채팅 상담 (카카오톡 연동 수정 완료) */}
+            <a 
+              href="http://pf.kakao.com/_VxmWxon/chat"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group relative p-8 rounded-3xl border-2 border-white bg-white/60 hover:bg-white hover:border-indigo-200 hover:shadow-lg transition-all duration-300 overflow-hidden text-left cursor-pointer"
             >
-              <div className="absolute top-6 right-6 bg-slate-200 text-slate-500 text-xs font-bold px-3 py-1 rounded-full">
-                COMING SOON
+              <div className="absolute top-6 right-6 bg-indigo-50 text-indigo-600 text-xs font-bold px-3 py-1 rounded-full">
+                상담 가능
               </div>
               <div className="flex justify-between items-start mb-6">
-                <div className="p-4 rounded-2xl bg-slate-200 text-slate-400">
+                <div className="p-4 rounded-2xl bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                   <MessageSquare size={32} />
                 </div>
               </div>
-              <h3 className="text-2xl font-bold text-slate-400 mb-2">실시간 채팅 상담</h3>
-              <p className="text-slate-400">간단한 궁금증을 해결해드리는 AI 기반 채팅 서비스가 준비 중입니다.</p>
-            </button>
+              <h3 className="text-2xl font-bold text-slate-900 mb-2">실시간 채팅 상담</h3>
+              <p className="text-slate-500">간단한 궁금증을 해결해드리는 카카오톡 실시간 상담이 가능합니다.</p>
+            </a>
           </div>
 
           {selectedType === 'video' && (
@@ -380,17 +376,16 @@ export default function Consulting() {
                     ) : (
                         <div className="grid grid-cols-3 gap-3">
                             {timeSlots.map((time) => {
-                                // [New] 예약된 시간인지 확인
                                 const isTaken = takenTimes.includes(time);
                                 
                                 return (
                                     <button
                                         key={time}
                                         onClick={() => !isTaken && setSelectedTime(time)}
-                                        disabled={isTaken} // 예약된 시간 비활성화
+                                        disabled={isTaken}
                                         className={`py-3 rounded-xl text-sm font-bold transition-all relative ${
                                             isTaken
-                                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200' // 비활성화 스타일
+                                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
                                             : selectedTime === time
                                                 ? 'bg-indigo-600 text-white shadow-lg transform scale-105'
                                                 : 'bg-white border border-slate-200 text-slate-600 hover:border-indigo-500 hover:text-indigo-600'
