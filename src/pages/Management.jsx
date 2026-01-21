@@ -40,20 +40,39 @@ export default function Management() {
   ];
 
   return (
-    <div className="font-sans text-slate-900 bg-white min-h-screen flex flex-col">
+    // 전체 배경을 Pricing 페이지와 동일하게 slate-50으로 설정하여 Navbar와의 이질감 제거
+    <div className="font-sans text-slate-900 bg-slate-50 min-h-screen flex flex-col">
       <Navbar />
 
-      {/* Hero Section */}
-      <section className="relative pt-40 pb-20 px-4 sm:px-6 lg:px-8 bg-slate-900 text-white overflow-hidden">
-        <div className="max-w-7xl mx-auto text-center relative z-10">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-500/20 border border-indigo-400/50 text-indigo-300 text-sm font-bold uppercase tracking-widest mb-6">
+      {/* Hero Section - Pricing 페이지 스타일 적용 (Light Theme + Blob Background) */}
+      <section className="relative pt-32 pb-20 md:pt-48 md:pb-32 overflow-hidden">
+        {/* Background Blobs (Pricing 페이지와 동일한 연출) */}
+        <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
+            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-300 rounded-full mix-blend-multiply filter blur-[128px] opacity-40 animate-blob"></div>
+            <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-300 rounded-full mix-blend-multiply filter blur-[128px] opacity-40 animate-blob animation-delay-2000"></div>
+            <div className="absolute bottom-[-10%] left-[20%] w-[40%] h-[40%] bg-indigo-300 rounded-full mix-blend-multiply filter blur-[128px] opacity-40 animate-blob animation-delay-4000"></div>
+        </div>
+
+        <div className="max-w-7xl mx-auto text-center relative z-10 px-4 sm:px-6 lg:px-8">
+          {/* Badge 스타일 변경 (Dark -> Light) */}
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/80 backdrop-blur-sm border border-indigo-100 text-xs font-bold text-indigo-600 mb-8 shadow-sm ring-1 ring-indigo-50 animate-fade-in-up">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+            </span>
             Systematic Creator Management
           </div>
-          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-6 leading-tight">
+
+          {/* Title 색상 변경 (White -> Slate-900) */}
+          <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight mb-6 leading-tight text-slate-900 animate-fade-in-up animation-delay-100">
             성공적인 캠페인은<br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">철저한 검증 시스템</span>에서 시작됩니다
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">
+              철저한 검증 시스템
+            </span>에서 시작됩니다
           </h1>
-          <p className="text-lg text-slate-400 max-w-2xl mx-auto">
+
+          {/* Description 색상 변경 (Slate-400 -> Slate-500) */}
+          <p className="text-lg md:text-xl text-slate-500 max-w-2xl mx-auto leading-relaxed animate-fade-in-up animation-delay-200">
             단순히 팔로워가 많은 사람이 아닌, <br className="hidden md:block" />
             우리 브랜드에 진심으로 반응할 '진성 오디언스'를 가진 크리에이터를 찾습니다.
           </p>
@@ -61,7 +80,8 @@ export default function Management() {
       </section>
 
       {/* 5-Step Process */}
-      <section className="py-24 px-4 sm:px-6 lg:px-8 bg-slate-50">
+      {/* 배경색을 White로 변경하여 위쪽 Hero(slate-50)와 구분감 생성 */}
+      <section className="py-24 px-4 sm:px-6 lg:px-8 bg-white relative z-10">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold text-slate-900">5단계 검증 프로세스</h2>
@@ -70,7 +90,7 @@ export default function Management() {
 
           <div className="relative">
             {/* Connecting Line (Desktop) */}
-            <div className="hidden md:block absolute left-[50%] top-0 bottom-0 w-0.5 bg-slate-200 -translate-x-1/2"></div>
+            <div className="hidden md:block absolute left-[50%] top-0 bottom-0 w-0.5 bg-slate-100 -translate-x-1/2"></div>
 
             <div className="space-y-12 relative z-10">
               {steps.map((step, idx) => (
@@ -84,8 +104,8 @@ export default function Management() {
 
                   {/* Content Box */}
                   <div className="flex-1 w-full md:w-1/2">
-                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow text-center md:text-left">
-                      <div className={`w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center mb-4 mx-auto md:mx-0`}>
+                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow text-center md:text-left hover:-translate-y-1 duration-300">
+                      <div className={`w-10 h-10 rounded-lg bg-white text-indigo-600 flex items-center justify-center mb-4 mx-auto md:mx-0 shadow-sm border border-slate-100`}>
                         {step.icon}
                       </div>
                       <h3 className="text-xl font-bold text-slate-900 mb-2">{step.title}</h3>
@@ -100,7 +120,7 @@ export default function Management() {
       </section>
 
       {/* Tier System */}
-      <section className="py-24 px-4 sm:px-6 lg:px-8 bg-white">
+      <section className="py-24 px-4 sm:px-6 lg:px-8 bg-slate-50">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold text-slate-900">체계적인 티어(Tier) 관리</h2>
@@ -109,16 +129,16 @@ export default function Management() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { lv: "L3", title: "Micro", range: "20K - 80K", desc: "높은 관여도와 가성비, 공동구매 및 바이럴 확산에 최적화", color: "bg-blue-50 border-blue-100 text-blue-700" },
-              { lv: "L4", title: "Mid-Tier", range: "80K - 200K", desc: "제품에 대한 신뢰도와 전문성 보유, 브랜딩 강화 목적", color: "bg-indigo-50 border-indigo-100 text-indigo-700" },
-              { lv: "L5", title: "Premium", range: "200K - 500K", desc: "TVC급 고퀄리티 영상 제작, 확실한 전환과 인지도 상승", color: "bg-purple-50 border-purple-100 text-purple-700" },
-              { lv: "L6", title: "Top-Tier", range: "500K +", desc: "글로벌 파급력을 가진 메가 인플루언서, 트렌드 리딩", color: "bg-pink-50 border-pink-100 text-pink-700" },
+              { lv: "L3", title: "Micro", range: "20K - 80K", desc: "높은 관여도와 가성비, 공동구매 및 바이럴 확산에 최적화", color: "bg-white border-blue-100 text-blue-700 shadow-sm hover:border-blue-300" },
+              { lv: "L4", title: "Mid-Tier", range: "80K - 200K", desc: "제품에 대한 신뢰도와 전문성 보유, 브랜딩 강화 목적", color: "bg-white border-indigo-100 text-indigo-700 shadow-sm hover:border-indigo-300" },
+              { lv: "L5", title: "Premium", range: "200K - 500K", desc: "TVC급 고퀄리티 영상 제작, 확실한 전환과 인지도 상승", color: "bg-white border-purple-100 text-purple-700 shadow-sm hover:border-purple-300" },
+              { lv: "L6", title: "Top-Tier", range: "500K +", desc: "글로벌 파급력을 가진 메가 인플루언서, 트렌드 리딩", color: "bg-white border-pink-100 text-pink-700 shadow-sm hover:border-pink-300" },
             ].map((tier, idx) => (
-              <div key={idx} className={`p-6 rounded-2xl border ${tier.color} flex flex-col items-center text-center transition-transform hover:-translate-y-1`}>
+              <div key={idx} className={`p-6 rounded-2xl border ${tier.color} flex flex-col items-center text-center transition-all hover:-translate-y-1 hover:shadow-md`}>
                 <div className="text-2xl font-black mb-2">{tier.lv}</div>
                 <div className="text-sm font-bold uppercase tracking-wider mb-4 opacity-80">{tier.title}</div>
-                <div className="text-3xl font-bold mb-4">{tier.range}</div>
-                <p className="text-sm opacity-90 leading-relaxed">{tier.desc}</p>
+                <div className="text-3xl font-bold mb-4 text-slate-900">{tier.range}</div>
+                <p className="text-sm text-slate-600 leading-relaxed">{tier.desc}</p>
               </div>
             ))}
           </div>
@@ -126,8 +146,11 @@ export default function Management() {
       </section>
 
       {/* QC Promise */}
-      <section className="py-20 px-4 bg-slate-900 text-white text-center">
-        <div className="max-w-3xl mx-auto">
+      <section className="py-20 px-4 bg-slate-900 text-white text-center relative overflow-hidden">
+        {/* 장식용 배경 요소 추가 */}
+        <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-indigo-600/20 rounded-full blur-[100px]"></div>
+        
+        <div className="max-w-3xl mx-auto relative z-10">
           <Layers size={48} className="mx-auto mb-6 text-indigo-400 opacity-80" />
           <h2 className="text-2xl md:text-3xl font-bold mb-6">
             "단 한 명의 불량 인플루언서도 허용하지 않습니다"
@@ -139,7 +162,7 @@ export default function Management() {
           </p>
           <button 
             onClick={() => navigate('/pricing')}
-            className="px-8 py-3 bg-white text-slate-900 font-bold rounded-xl hover:bg-indigo-50 transition-colors"
+            className="px-8 py-3 bg-white text-slate-900 font-bold rounded-xl hover:bg-indigo-50 transition-colors shadow-lg hover:shadow-xl hover:-translate-y-0.5"
           >
             캠페인 시작하기
           </button>

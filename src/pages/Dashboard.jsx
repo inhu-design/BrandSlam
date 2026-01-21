@@ -5,7 +5,7 @@ import {
   Package, Clock, Truck, UserCheck, AlertCircle, 
   Lock, Settings, BarChart3, Users, PlayCircle, Eye, Heart, MessageCircle, Share2, 
   ChevronRight, Calendar, ExternalLink, Zap, Trash2, CheckCircle2, MoreHorizontal,
-  Plane, Gift, TrendingUp, BarChart2, Trophy
+  Plane, Gift, TrendingUp, BarChart2, Trophy, RefreshCw, AlertTriangle, Download
 } from 'lucide-react';
 import Navbar from '../components/layout/Navbar'; 
 import Footer from '../components/layout/Footer';
@@ -19,6 +19,27 @@ const CampaignStatus = {
   SHIPPING: 'SHIPPING',
   UPLOADING: 'UPLOADING',
   COMPLETED: 'COMPLETED'
+};
+
+/**
+ * [Helper] PII Masking Function
+ * 개인정보 보호를 위한 마스킹 처리
+ */
+const maskData = (text, type = 'general') => {
+  if (!text) return '-';
+  if (type === 'email') {
+    const [local, domain] = text.split('@');
+    return `${local.slice(0, 2)}****@${domain}`;
+  }
+  if (type === 'address') {
+    // 구체적 주소 숨김 및 마스킹
+    return "배송사를 통해 전달됨 (비공개)"; 
+  }
+  if (type === 'contact') {
+      return text.slice(0, 3) + "****" + text.slice(-2);
+  }
+  // 일반적인 마스킹 (거주지 등)
+  return text.length > 5 ? text.slice(0, 5) + "****" : "****";
 };
 
 /**
@@ -180,6 +201,20 @@ const CampaignCard = ({ campaign, onClick, isActive }) => (
 const CandidateList = ({ candidates, targetCount, matchedCount }) => {
     const progress = Math.min(Math.round((matchedCount / targetCount) * 100), 100);
 
+    const handleDownloadCSV = () => {
+        // [Logic] 확정된 상태가 아니면 다운로드 불가
+        // 현재는 'CONTACTING' 상태이므로 확정이 아님을 전제로 함
+        alert("납품 리스트가 아직 확정되지 않았습니다. 인플루언서 섭외가 완료되고 확정된 후에 다운로드 가능합니다.");
+    };
+
+    const handleDeleteCreator = (e, creatorName) => {
+        e.stopPropagation();
+        // [UX] 확인 모달 및 30% 제한 안내 메시지
+        if (window.confirm(`[인플루언서 교체 안내]\n\n${creatorName} 님을 정말 교체하시겠습니까?\n\n* 섭외 중 단계에서는 제공된 리스트의 30%까지만 교체/삭제가 가능합니다.`)) {
+             alert("교체 요청이 접수되었습니다. (데모)");
+        }
+    };
+
     return (
         <div className="space-y-6 animate-fade-in-up">
             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
@@ -209,8 +244,11 @@ const CandidateList = ({ candidates, targetCount, matchedCount }) => {
                         <UserCheck size={18} className="text-slate-400"/> 섭외 리스트 (실시간)
                     </h3>
                     <div className="flex gap-2">
-                        <button className="text-xs font-medium px-3 py-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600 transition-colors">
-                            CSV 다운로드
+                        <button 
+                            onClick={handleDownloadCSV}
+                            className="text-xs font-medium px-3 py-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600 transition-colors flex items-center gap-1"
+                        >
+                            <Download size={12}/> CSV 다운로드
                         </button>
                     </div>
                 </div>
@@ -223,7 +261,7 @@ const CandidateList = ({ candidates, targetCount, matchedCount }) => {
                                 <th className="px-6 py-3">플랫폼/팔로워</th>
                                 <th className="px-6 py-3">거주지/연락처</th>
                                 <th className="px-6 py-3">상태</th>
-                                <th className="px-6 py-3 text-right">관리</th>
+                                <th className="px-6 py-3 text-right">교체/관리</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -246,12 +284,18 @@ const CandidateList = ({ candidates, targetCount, matchedCount }) => {
                                             <span className="text-xs text-slate-400">{creator.followers} Followers</span>
                                         </div>
                                     </td>
+                                    {/* [PII] 마스킹 처리된 정보 출력 */}
                                     <td className="px-6 py-4">
                                         <div className="flex flex-col gap-0.5">
                                             <span className="text-slate-600 flex items-center gap-1 text-xs">
-                                                {creator.location}
+                                                {maskData(creator.location, 'general')}
                                             </span>
-                                            <span className="text-slate-400 text-[10px]">{creator.contact}</span>
+                                            <span className="text-slate-400 text-[10px]">
+                                                {maskData(creator.contact, 'email')}
+                                            </span>
+                                            <span className="text-slate-400 text-[10px]">
+                                                배송지: {maskData(null, 'address')}
+                                            </span>
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
@@ -265,15 +309,13 @@ const CandidateList = ({ candidates, targetCount, matchedCount }) => {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 text-right">
+                                        {/* [UX] 삭제 -> 교환 아이콘 및 개념 변경 */}
                                         <button 
-                                            className="text-slate-400 hover:text-red-500 p-2 rounded-full hover:bg-red-50 transition-all"
-                                            title="리스트에서 제외"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                alert(`${creator.name} 님을 리스트에서 제외하시겠습니까?`);
-                                            }}
+                                            className="text-slate-400 hover:text-indigo-500 p-2 rounded-full hover:bg-indigo-50 transition-all group-hover:visible"
+                                            title="다른 인플루언서로 교체 요청 (30% 한도 내)"
+                                            onClick={(e) => handleDeleteCreator(e, creator.name)}
                                         >
-                                            <Trash2 size={16} />
+                                            <RefreshCw size={16} />
                                         </button>
                                     </td>
                                 </tr>
@@ -528,6 +570,10 @@ export default function Dashboard() {
     else { alert("비밀번호가 설정되었습니다."); setIsPasswordMode(false); setNewPassword(''); }
   };
 
+  const handleSparkAdsClick = () => {
+    alert("현재 준비 중인 서비스입니다. (Coming Soon)");
+  };
+
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>;
 
   const selectedCampaign = campaigns.find(c => c.id === selectedCampaignId);
@@ -535,12 +581,16 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <Navbar />
-      {isDemoMode && (
-          <div className="bg-indigo-600 text-white text-center py-2 text-sm font-medium pt-24 animate-fade-in-down relative z-10">
-              <span className="opacity-90">현재 <b>데모 모드</b>입니다. 실제 캠페인을 시작하시면 실시간 데이터를 확인할 수 있습니다.</span>
-          </div>
-      )}
-      <div className={`flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-6 lg:px-8 ${isDemoMode ? 'py-8' : 'pt-32 pb-24'}`}>
+      {/* [수정] 상단바 제거하고 Navbar 아래 여백 조정 */}
+      <div className={`flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-32 pb-24`}>
+        {/* [수정] 데모 모드 안내 문구 위치 및 디자인 변경 */}
+        {isDemoMode && (
+            <div className="mb-6 p-3 bg-indigo-50 border border-indigo-100 rounded-lg flex items-center gap-2 text-indigo-700 text-sm animate-fade-in-down">
+                <AlertCircle size={16} />
+                <span>현재 <b>데모 모드</b>입니다. 실제 캠페인을 시작하시면 실시간 데이터를 확인할 수 있습니다.</span>
+            </div>
+        )}
+
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
             <div>
                 <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-2">
@@ -575,11 +625,13 @@ export default function Dashboard() {
             </div>
         )}
         <div className="flex flex-col lg:flex-row gap-6 items-start">
+            {/* Left Sidebar / Menu Column */}
             <div className="w-full lg:w-1/4 space-y-6">
                 <div className="space-y-4">
                     <div className="flex items-center justify-between mb-2 px-1">
-                        <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider">My Campaigns</h2>
-                        <span className="text-xs font-medium bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{campaigns.length}</span>
+                        {/* [UI] 명도 개선: slate-400 -> slate-600 */}
+                        <h2 className="text-sm font-bold text-slate-600 uppercase tracking-wider">My Campaigns</h2>
+                        <span className="text-xs font-medium bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full">{campaigns.length}</span>
                     </div>
                     <div className="space-y-3">
                         {campaigns.map(campaign => (
@@ -591,33 +643,49 @@ export default function Dashboard() {
                             />
                         ))}
                     </div>
-                    <div onClick={() => navigate('/pricing')} className="p-5 rounded-2xl border-2 border-dashed border-slate-200 text-center hover:border-indigo-300 hover:bg-indigo-50/50 transition-all cursor-pointer group">
-                        <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-2 text-slate-400 group-hover:bg-white group-hover:text-indigo-500 transition-colors">
+                    <div onClick={() => navigate('/pricing')} className="p-5 rounded-2xl border-2 border-dashed border-slate-300 text-center hover:border-indigo-400 hover:bg-indigo-50/50 transition-all cursor-pointer group">
+                        <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-2 text-slate-500 group-hover:bg-white group-hover:text-indigo-500 transition-colors">
                             <Package size={20} />
                         </div>
-                        <p className="text-xs font-bold text-slate-600 group-hover:text-indigo-700">새 캠페인 추가하기</p>
+                        <p className="text-xs font-bold text-slate-700 group-hover:text-indigo-700">새 캠페인 추가하기</p>
                     </div>
                 </div>
-                <div className="space-y-3 pt-6 border-t border-slate-100">
-                    <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider px-1">More Services</h2>
-                    <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-4 rounded-xl border border-emerald-100 hover:shadow-md transition-shadow cursor-pointer group">
+                
+                {/* [Service Section] 성과 부스팅 개편 */}
+                <div className="space-y-3 pt-6 border-t border-slate-200">
+                    <h2 className="text-sm font-bold text-slate-600 uppercase tracking-wider px-1">성과부스팅 (Performance Boosting)</h2>
+                    
+                    {/* [수정] KOL Boosting Card: Spark Ads와 동일하게 비활성화 처리 */}
+                    <div 
+                        onClick={handleSparkAdsClick}
+                        className="bg-slate-50 p-4 rounded-xl border border-slate-200 cursor-not-allowed opacity-80"
+                    >
                         <div className="flex items-center gap-3 mb-2">
-                            <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-emerald-600 shadow-sm"><Plane size={16} /></div>
-                            <span className="font-bold text-emerald-800 text-sm">의료관광 마케팅</span>
+                            {/* Icon Color Changed */}
+                            <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-slate-400 shadow-sm"><TrendingUp size={16} /></div>
+                            <span className="font-bold text-slate-500 text-sm">KOL 부스팅</span>
                         </div>
-                        <p className="text-xs text-emerald-600/80 leading-relaxed mb-2">한국 병/의원을 위한 글로벌 환자 유치 전용 패키지</p>
-                        <span className="text-[10px] font-bold text-emerald-700 flex items-center gap-1 group-hover:translate-x-1 transition-transform">자세히 보기 <ChevronRight size={10} /></span>
+                        <p className="text-xs text-slate-400 leading-relaxed mb-2">성과가 좋은 인플루언서를 유상으로 추가 섭외하여 임팩트를 극대화하세요.</p>
+                        {/* Status Changed to match disabled look */}
+                        <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">준비 중입니다 (Coming Soon)</span>
                     </div>
-                    <div className="bg-gradient-to-br from-orange-50 to-amber-50 p-4 rounded-xl border border-orange-100 hover:shadow-md transition-shadow cursor-pointer group">
+
+                    {/* Spark Ads Card (Coming Soon / Disabled) */}
+                    <div 
+                        onClick={handleSparkAdsClick}
+                        className="bg-slate-50 p-4 rounded-xl border border-slate-200 cursor-not-allowed opacity-80"
+                    >
                         <div className="flex items-center gap-3 mb-2">
-                            <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-orange-600 shadow-sm"><Gift size={16} /></div>
-                            <span className="font-bold text-orange-800 text-sm">브랜드사 리워드</span>
+                            <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-slate-400 shadow-sm"><Zap size={16} /></div>
+                            <span className="font-bold text-slate-500 text-sm">Spark Ads</span>
                         </div>
-                        <p className="text-xs text-orange-600/80 leading-relaxed mb-2">우수 인플루언서에게 추가 보상을 지급하여 락인(Lock-in)하세요.</p>
-                        <span className="text-[10px] font-bold text-orange-700 flex items-center gap-1 group-hover:translate-x-1 transition-transform">자세히 보기 <ChevronRight size={10} /></span>
+                        <p className="text-xs text-slate-400 leading-relaxed mb-2">틱톡 공식 광고 관리자 연동 서비스</p>
+                        <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">준비 중입니다 (Coming Soon)</span>
                     </div>
                 </div>
             </div>
+
+            {/* Main Content Area */}
             <div className="w-full lg:w-3/4">
                  <div className="bg-white p-6 md:p-8 rounded-[2rem] shadow-sm border border-slate-200 min-h-[800px]">
                     <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 pb-6 border-b border-slate-100 gap-4">

@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext'; 
 import { 
   Check, ShieldCheck, Lock, CreditCard, Building, ArrowLeft, 
-  HelpCircle, Crown, Sparkles, TrendingUp, Users, Flame, Eye, AlertCircle, Clock 
+  HelpCircle, Crown, Sparkles, TrendingUp, Users, Flame, Eye, AlertCircle, Clock, FileText, X, CheckCircle
 } from 'lucide-react';
 import Navbar from '../components/layout/Navbar';
 import Footer from '../components/layout/Footer';
@@ -58,55 +58,93 @@ const subscriptionPlans = [
   }
 ];
 
-// 2. Add-on Options
-const addOnOptions = [
-  {
-    id: "L3",
-    name: "Micro Creator (L3)",
-    price: "600,000",
-    gmv: "$25K ~ $60K",
-    desc: "가성비 좋은 공동구매/바이럴",
-    followers: "20k-80k"
-  },
-  {
-    id: "L4",
-    name: "Mid-Tier Creator (L4)",
-    price: "1,000,000",
-    gmv: "$60K ~ $150K",
-    desc: "얼굴 노출 & 신뢰도 높은 리뷰",
-    followers: "80k-200k"
-  },
-  {
-    id: "L5",
-    name: "Premium Creator (L5)",
-    price: "2,000,000",
-    gmv: "$150K ~ $400K",
-    desc: "광고 소재 활용 고퀄리티",
-    followers: "200k-500k"
-  },
-  {
-    id: "L6",
-    name: "Top-Tier (L6)",
-    price: "5,000,000",
-    gmv: "$400K +",
-    desc: "압도적 파급력의 메가 인플루언서",
-    followers: "500k+"
-  }
-];
+// [수정됨] 환불 규정 모달 컴포넌트 (onAgree 추가)
+const RefundPolicyModal = ({ isOpen, onClose, onAgree }) => {
+    if (!isOpen) return null;
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="bg-white w-full max-w-2xl rounded-2xl p-8 shadow-2xl relative flex flex-col max-h-[85vh]">
+                <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-900 transition-colors">
+                    <X size={24}/>
+                </button>
+                <h3 className="font-bold text-xl mb-4 border-b pb-4 shrink-0 text-slate-900">
+                    결제 및 환불 규정 (서비스 운영 정책)
+                </h3>
+                
+                <div className="text-sm text-slate-600 space-y-6 overflow-y-auto pr-2 custom-scrollbar flex-1 leading-relaxed">
+                    {/* 1. 결제 및 환불 규정 */}
+                    <section>
+                        <h4 className="font-bold text-slate-900 mb-2 text-base">1. 결제 및 환불 규정</h4>
+                        <ul className="list-disc pl-4 space-y-1.5 bg-slate-50 p-4 rounded-xl">
+                            <li><strong>결제 단위:</strong> 브랜드슬램의 서비스는 효율적인 애셋 구축과 관리를 위해 3개월 단위로만 결제가 가능합니다.</li>
+                            <li><strong>취소 및 환불 불가 기준:</strong> 결제 후 최초 인플루언서 리스팅(1개월 차)이 진행된 시점부터는 취소 및 환불이 절대 불가합니다. 이는 브랜드 상품 분석, 내러티브 생성, 전담 팀 구성 등 사전 투입되는 리소스 비용을 고려한 조치입니다.</li>
+                            <li>단, 브랜드사가 입력한 정보가 서비스 목적과 현저히 맞지 않다고 판단될 경우, 저희 측에서 먼저 취소를 제안하거나 적합한 새로운 서비스를 제안해 드려 리스크를 최소화해 드립니다.</li>
+                        </ul>
+                    </section>
+
+                    {/* 2. 브랜드사 정보 입력 및 가이드라인 */}
+                    <section>
+                        <h4 className="font-bold text-slate-900 mb-2 text-base">2. 브랜드사 정보 입력 및 가이드라인</h4>
+                        <ul className="list-disc pl-4 space-y-1.5">
+                            <li><strong>정확한 정보 제공:</strong> 만족도 높은 결과를 위해 캠페인 전략, 인플루언서 소통 메시지, 주의사항 및 중요 포인트를 최대한 명확하게 작성해 주셔야 합니다.</li>
+                            <li><strong>가이드라인 변경:</strong> 최초 제공된 '밈(Meme) 기반 내러티브 가이드'에서 최초 1회에 한해 변경 가능합니다.</li>
+                            <li><strong>난이도 조절:</strong> 제조사 헤리티지 반영 등 KOC가 수행하기 어려운 고난도 요청은 회수율 저하의 원인이 됩니다. 이 경우 캠페인 종료 후 KOL 전용 서비스로의 전환을 권장합니다.</li>
+                        </ul>
+                    </section>
+
+                    {/* 3. 콘텐츠 교환 (거절 및 재매칭) 기한 */}
+                    <section>
+                        <h4 className="font-bold text-slate-900 mb-2 text-base">3. 콘텐츠 교환 (거절 및 재매칭) 기한</h4>
+                        <ul className="list-disc pl-4 space-y-1.5">
+                            <li><strong>교환 기한:</strong> 대시보드에 인플루언서 리스트 업로드 알림 발송 후 3일 이내(발송일 포함 3일째 자정까지) 확정 혹은 거절을 완료해야 합니다.</li>
+                            <li><strong>기한 엄수:</strong> 인플루언서와의 소통 지연은 업로드율에 직결되므로, 3일 경과 시 리스트는 자동 확정되어 이후 교환이 불가합니다.</li>
+                            <li><strong>교환 범위:</strong> 1차(발주 수량의 30% 이내), 2차(잔여 수량의 30% 이내)로 최대 2회까지 가능합니다.</li>
+                        </ul>
+                    </section>
+
+                    {/* 4. 품질 및 회수율 보장 (AS) */}
+                    <section>
+                        <h4 className="font-bold text-slate-900 mb-2 text-base">4. 품질 및 회수율 보장 (AS)</h4>
+                        <ul className="list-disc pl-4 space-y-1.5">
+                            <li><strong>품질 인식:</strong> 본 서비스는 KOC의 자발적 창작물이므로, 결과물이 가이드라인과 100% 일치하지 않을 수 있음을 사전 인지 바랍니다.</li>
+                            <li><strong>회수율 보장:</strong> 결제 후 3개월 내 회수율이 85% 미만일 경우, 가이드라인 완화를 조건으로 최초 발주 수량의 25%를 재모집하여 최종 회수율을 100%에 근접하도록 관리해 드립니다.</li>
+                        </ul>
+                    </section>
+
+                    {/* 5. 고객 중심 소통 약속 */}
+                    <section>
+                        <h4 className="font-bold text-slate-900 mb-2 text-base">5. 고객 중심 소통 약속</h4>
+                        <p className="bg-indigo-50 p-4 rounded-xl text-indigo-800 font-medium">
+                            브랜드슬램은 브랜드사가 직접 운영하는 것보다 압도적인 품질과 소통 관리를 제공하겠다는 강력한 의지를 가지고 있습니다. 모든 팀원이 캠페인을 실시간으로 모니터링하고 있으니, 궁금하신 점이나 개선 사항은 언제든 고객센터를 통해 적극적으로 소통해 주시기 바랍니다.
+                        </p>
+                    </section>
+                </div>
+                
+                {/* [수정] 동의 버튼 클릭 시 onAgree 호출 후 모달 닫기 */}
+                <button 
+                    onClick={() => { onAgree(); onClose(); }} 
+                    className="w-full mt-6 bg-slate-900 text-white py-4 rounded-xl font-bold shrink-0 hover:bg-slate-800 transition-colors shadow-lg"
+                >
+                    위 내용을 모두 확인하였으며 동의합니다
+                </button>
+            </div>
+        </div>
+    );
+};
 
 export default function Checkout() {
   const { state } = useLocation();
   const navigate = useNavigate();
   
-  // Auth Context 안전하게 접근
   const authContext = useAuth(); 
   const user = authContext ? authContext.user : null;
   
   // --- State Management ---
   const initialPlanId = state?.plan?.id || 'STANDARD';
   const [selectedPlanId, setSelectedPlanId] = useState(initialPlanId);
-  const [selectedAddons, setSelectedAddons] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState('card');
+  const [showRefundModal, setShowRefundModal] = useState(false); 
+  const [isPolicyAgreed, setIsPolicyAgreed] = useState(false); // [추가] 약관 동의 상태
   
   const [brandInfo, setBrandInfo] = useState({
     company: '',
@@ -124,7 +162,6 @@ export default function Checkout() {
   useEffect(() => {
     window.scrollTo(0, 0); 
     
-    // 만약 pricing 페이지에서 넘어온 데이터가 있다면 플랜 설정
     if (state?.plan?.id) {
         setSelectedPlanId(state.plan.id);
     }
@@ -145,23 +182,12 @@ export default function Checkout() {
   const currentPlan = subscriptionPlans.find(p => p.id === selectedPlanId) || subscriptionPlans[1];
   const parsePrice = (priceStr) => parseInt(priceStr.replace(/,/g, ''), 10);
   const basePrice = parsePrice(currentPlan.price);
-  const addonsPrice = selectedAddons.reduce((acc, addonId) => {
-    const addon = addOnOptions.find(opt => opt.id === addonId);
-    return acc + parsePrice(addon.price);
-  }, 0);
+  const addonsPrice = 0; 
   const subtotal = basePrice + addonsPrice;
   const vat = subtotal * 0.1;
   const totalPrice = subtotal + vat;
 
   // --- Handlers ---
-  const toggleAddon = (addonId) => {
-    setSelectedAddons(prev => 
-      prev.includes(addonId) 
-        ? prev.filter(id => id !== addonId) 
-        : [...prev, addonId]
-    );
-  };
-
   const handleInputChange = (e) => {
     setBrandInfo({ ...brandInfo, [e.target.name]: e.target.value });
   };
@@ -169,6 +195,13 @@ export default function Checkout() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (isSubmitting) return;
+
+    // [추가] 2중 안전장치 (버튼이 비활성화되지만 혹시 모를 상황 대비)
+    if (!isPolicyAgreed) {
+        alert("결제 및 환불 규정에 동의해주셔야 결제가 가능합니다.");
+        setShowRefundModal(true);
+        return;
+    }
 
     if (!brandInfo.company || !brandInfo.name || !brandInfo.phone) {
         alert("브랜드 정보를 모두 입력해주세요.");
@@ -184,7 +217,7 @@ export default function Checkout() {
           {
             user_id: user?.id || null, 
             plan_id: selectedPlanId,
-            addons: selectedAddons,
+            addons: [], 
             total_price: totalPrice,
             payment_method: paymentMethod,
             brand_name: brandInfo.company,
@@ -228,6 +261,11 @@ export default function Checkout() {
   return (
     <div className="font-sans antialiased text-slate-900 bg-slate-50 min-h-screen flex flex-col">
       <Navbar />
+      <RefundPolicyModal 
+        isOpen={showRefundModal} 
+        onClose={() => setShowRefundModal(false)}
+        onAgree={() => setIsPolicyAgreed(true)} // [추가] 동의 상태 변경
+      />
       
       <div className="flex-1 pt-44 pb-24 px-4 sm:px-6 lg:px-8">
         <div className="max-w-6xl mx-auto">
@@ -306,65 +344,11 @@ export default function Checkout() {
                 </div>
               </div>
 
-              {/* Step 2: Add-ons */}
-              <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-1.5 h-full bg-indigo-600"></div>
-                <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-bold flex items-center gap-3">
-                    <span className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-sm font-bold">2</span>
-                    성과 부스터 (선택)
-                    </h2>
-                    <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full animate-pulse">
-                        함께 구매시 효과 200% UP
-                    </span>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4">
-                    {addOnOptions.map((addon) => {
-                        const isSelected = selectedAddons.includes(addon.id);
-                        return (
-                            <div 
-                                key={addon.id}
-                                onClick={() => toggleAddon(addon.id)}
-                                className={`cursor-pointer p-4 rounded-2xl border-2 transition-all duration-200 flex items-center justify-between group ${
-                                    isSelected 
-                                    ? 'border-indigo-500 bg-indigo-50/50 shadow-md' 
-                                    : 'border-slate-100 hover:border-indigo-200 hover:bg-slate-50'
-                                }`}
-                            >
-                                <div className="flex items-center gap-4">
-                                    <div className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${
-                                        isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 bg-white'
-                                    }`}>
-                                        {isSelected && <Check size={14} className="text-white" strokeWidth={3} />}
-                                    </div>
-                                    <div>
-                                        <h4 className={`font-bold ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>
-                                            {addon.name}
-                                        </h4>
-                                        <div className="flex items-center gap-2 mt-1 text-xs">
-                                            <span className="text-slate-500 flex items-center gap-1"><Users size={12}/> {addon.followers}</span>
-                                            <span className="text-slate-300">|</span>
-                                            <span className="text-red-500 font-bold flex items-center gap-1"><TrendingUp size={12}/> GMV {addon.gmv}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="text-right">
-                                    <span className={`block font-bold ${isSelected ? 'text-indigo-700' : 'text-slate-900'}`}>
-                                        +{parseInt(addon.price.replace(/,/g, '')).toLocaleString()}원
-                                    </span>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-              </div>
-
-              {/* Step 3: Brand Info Form */}
+              {/* Step 2: Brand Info Form */}
               <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-1.5 h-full bg-slate-900"></div>
                 <h2 className="text-xl font-bold mb-6 flex items-center gap-3">
-                  <span className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-sm font-bold">3</span>
+                  <span className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-sm font-bold">2</span>
                   브랜드 정보 입력
                 </h2>
                 <form className="space-y-5">
@@ -434,11 +418,11 @@ export default function Checkout() {
                 </form>
               </div>
 
-              {/* Step 4: Payment Method */}
+              {/* Step 3: Payment Method */}
               <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-1.5 h-full bg-slate-900"></div>
                 <h2 className="text-xl font-bold mb-6 flex items-center gap-3">
-                  <span className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-sm font-bold">4</span>
+                  <span className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-sm font-bold">3</span>
                   결제 방식 선택
                 </h2>
                 
@@ -521,20 +505,6 @@ export default function Checkout() {
                         <span className="font-bold">{basePrice.toLocaleString()}원</span>
                       </div>
                       
-                      {selectedAddons.length > 0 && (
-                          <div className="space-y-2 mb-3 pb-3 border-b border-slate-100 border-dashed">
-                              {selectedAddons.map(id => {
-                                  const item = addOnOptions.find(opt => opt.id === id);
-                                  return (
-                                      <div key={id} className="flex justify-between items-center text-sm text-indigo-600">
-                                          <span className="flex items-center gap-1"><Sparkles size={12}/> {item.name}</span>
-                                          <span className="font-bold">+{parseInt(item.price.replace(/,/g, '')).toLocaleString()}원</span>
-                                      </div>
-                                  );
-                              })}
-                          </div>
-                      )}
-
                       <div className="flex justify-between items-center mb-2 text-slate-500 text-sm">
                         <span>공급가액 소계</span>
                         <span>{subtotal.toLocaleString()}원</span>
@@ -555,18 +525,36 @@ export default function Checkout() {
                       </div>
                     </div>
 
+                    {/* [수정] 버튼 Disabled 로직 및 텍스트 변경 */}
                     <button 
                       onClick={handleSubmit}
-                      disabled={isSubmitting}
-                      className="w-full py-4 rounded-xl font-bold text-white bg-slate-900 hover:bg-indigo-600 transition-all shadow-lg hover:shadow-indigo-500/30 flex items-center justify-center gap-2 transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={isSubmitting || !isPolicyAgreed}
+                      className={`w-full py-4 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2 transform active:scale-95 
+                        ${!isPolicyAgreed 
+                            ? 'bg-slate-300 text-slate-500 cursor-not-allowed' 
+                            : 'bg-slate-900 text-white hover:bg-indigo-600 hover:shadow-indigo-500/30'
+                        }`}
                     >
-                      {isSubmitting ? '처리 중...' : <><Lock size={18} /> {totalPrice.toLocaleString()}원 결제하기</>}
+                      {isSubmitting ? '처리 중...' : 
+                       !isPolicyAgreed ? '규정 동의가 필요합니다' : 
+                       <><Lock size={18} /> {totalPrice.toLocaleString()}원 결제하기</>}
                     </button>
                     
-                    <div className="text-center">
-                        <p className="text-xs text-slate-400 mb-2">
-                            <span className="font-bold text-slate-600">{viewers}명</span>이 이 상품을 검토 중입니다.
-                        </p>
+                    {/* [수정] 동의 완료 시 체크마크 표시 */}
+                    <div className="flex items-center justify-center gap-2 mt-4 text-xs text-slate-500">
+                        {isPolicyAgreed ? (
+                            <CheckCircle size={14} className="text-green-500"/>
+                        ) : (
+                            <FileText size={14}/>
+                        )}
+                        <span>결제 전 </span>
+                        <button onClick={() => setShowRefundModal(true)} className={`underline font-bold ${isPolicyAgreed ? 'text-green-600' : 'text-indigo-600'} hover:text-indigo-800`}>
+                            {isPolicyAgreed ? '결제 및 환불 규정 동의 완료' : '결제 및 환불 규정'}
+                        </button>
+                        <span>{!isPolicyAgreed && '을 확인해주세요.'}</span>
+                    </div>
+                    
+                    <div className="text-center mt-4">
                         <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
                             <div className="h-full bg-red-500 w-3/4 animate-[width_2s_ease-out]"></div>
                         </div>
