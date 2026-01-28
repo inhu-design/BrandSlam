@@ -1,39 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { X } from 'lucide-react';
 import logoImg from '../../assets/logo.png';
 
-// --- 법적 고지 데이터 (변경 없음) ---
+// --- 법적 고지 데이터 (생략 - 기존과 동일) ---
 const LEGAL_CONTENTS = {
   terms: {
     title: "이용약관 (취소 및 환불 정책)",
     content: `제1조 (취소 및 환불 기준)
-
 1. 결제 후 7일 이내 취소
 계약 체결일(결제일)로부터 7일 이내이며, 인플루언서 리스트가 A(고객사)에게 전달되기 전인 경우에 한하여, 단순 변심에 의한 계약 취소가 가능하며 이 경우 결제 금액 전액을 환불합니다.
-
 2. 결제 후 30일 이내 & 리스트 전달 전
 계약 체결일(결제일)로부터 30일 이내이며, 인플루언서 리스트가 A(고객사)에게 전달되기 전인 경우, 단순 변심에 의한 계약 취소 시 결제 금액의 50%를 환불합니다.
 해당 환불 비율은 이미 투입된 기획, 분석, 운영 리소스 비용을 고려한 것입니다.
-
 3. 인플루언서 리스트 전달 이후
 인플루언서 리스트가 A(고객사)에게 전달된 시점부터는 본 계약에 따른 서비스가 실질적으로 개시된 것으로 간주하며, 그 이후에는 서비스 진행 여부, 콘텐츠 업로드 여부와 관계없이 계약 취소 및 환불은 불가합니다.
 
-
 제2조 (환불 불가 사유)
-
 다음 각 호의 사유에 해당하는 경우에는 본 조 제1항과 관계없이 환불이 불가합니다.
-
 1. A(고객사)의 내부 사정 변경 또는 담당자 변경
 2. 기대치 불일치 또는 성과에 대한 주관적 판단
 3. 가이드라인 변경, 일정 지연, 피드백 미이행
 4. 콘텐츠 스타일, 톤앤매너, 인플루언서 성향에 대한 불만
 
-
 제3조 (콘텐츠 미업로드 및 사후 관리)
-
 본 계약은 성과 보장형 계약이 아니며, 콘텐츠 미업로드 또는 회수율 관련 이슈 발생 시, 환불, 감액 또는 손해배상을 청구할 수 없습니다.
-
 해당 경우 B(브랜드슬램)는 계약서 및 별도 가이드에 따라 교환·재매칭 또는 추가 모집(A/S)을 합리적인 범위 내에서 제공하며, 이는 본 계약상 유일한 보완 조치로 합니다.`
   },
   privacy: {
@@ -122,6 +113,8 @@ const LegalModal = ({ isOpen, onClose, title, content }) => {
 
 const Footer = () => {
   const [activeModal, setActiveModal] = useState(null);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     if (activeModal) {
@@ -132,6 +125,33 @@ const Footer = () => {
     return () => { document.body.style.overflow = 'unset'; };
   }, [activeModal]);
 
+  // [수정] Footer용 스크롤 핸들러 (Navbar와 로직 동일)
+  const handleSectionClick = (e, path) => {
+    if (path.startsWith('/#')) {
+      e.preventDefault();
+      const id = path.replace('/#', '');
+      
+      const scrollToElement = () => {
+        const element = document.getElementById(id);
+        if (element) {
+          const headerOffset = 80;
+          const elementPosition = element.getBoundingClientRect().top;
+          const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+          window.scrollTo({ top: offsetPosition, behavior: "smooth" });
+        }
+      };
+
+      if (location.pathname === '/') {
+        scrollToElement();
+      } else {
+        navigate('/');
+        setTimeout(scrollToElement, 100);
+      }
+    } else {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  };
+
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
   };
@@ -139,15 +159,16 @@ const Footer = () => {
   const footerSections = [
     {
       title: "Product",
+      // [수정] 경로 변경 (#pricing, #cases)
       items: [
-        { name: "캠페인", path: "/pricing" },
-        { name: "고객 사례", path: "/customers" },
-        { name: "프로세스 소개", path: "/features" }
+        
+        { name: "고객 사례", path: "/#cases" },
+        { name: "프로세스 소개", path: "/#process" },
+        { name: "캠페인", path: "/#pricing" }
       ]
     },
     {
       title: "Company",
-      // [수정] 링크 연결 (/about, /management, /consulting)
       items: [
         { name: "회사 소개", path: "/about" },
         { name: "인플루언서 매니지먼트 시스템", path: "/management" },
@@ -203,13 +224,24 @@ const Footer = () => {
                           {item.name}
                         </button>
                       ) : (
-                        <Link 
-                          to={item.path} 
-                          onClick={scrollToTop}
-                          className="hover:text-indigo-600 cursor-pointer transition-colors"
-                        >
-                          {item.name}
-                        </Link>
+                        item.path.startsWith('/#') ? (
+                          // [수정] 해시 링크 처리
+                          <a 
+                            href={item.path} 
+                            onClick={(e) => handleSectionClick(e, item.path)}
+                            className="hover:text-indigo-600 cursor-pointer transition-colors"
+                          >
+                            {item.name}
+                          </a>
+                        ) : (
+                          <Link 
+                            to={item.path} 
+                            onClick={scrollToTop}
+                            className="hover:text-indigo-600 cursor-pointer transition-colors"
+                          >
+                            {item.name}
+                          </Link>
+                        )
                       )}
                     </li>
                   ))}

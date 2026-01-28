@@ -18,7 +18,9 @@ import {
   User,
   Building,
   Phone,
-  Ban
+  Ban,
+  Layers,
+  Zap
 } from 'lucide-react';
 import Navbar from '../components/layout/Navbar';
 import Footer from '../components/layout/Footer';
@@ -29,30 +31,30 @@ const timeSlots = [
   "14:00", "15:00", "16:00"
 ];
 
+// [개편] 상담 카테고리 데이터
 const inquiryCategories = [
   { 
-    id: 'UNLIMITED', 
-    label: 'Unlimited 플랜 도입', 
-    icon: <Crown size={18} />,
-    placeholder: "현재 운영 중인 브랜드 규모와 월평균 희망 콘텐츠 수량 등, 브랜드 특성을 알려주세요. Unlimited 플랜의 구체적인 단가표와 제공 범위가 궁금합니다."
+    id: 'PLAN', 
+    label: '플랜 도입 문의', 
+    icon: <Layers size={18} />,
+    placeholder: "관심 있으신 메인 플랜(Starter, Growth, Scale50)과 현재 브랜드의 상황을 알려주세요. 목표 수량과 캠페인 시작 희망 일정을 포함해주시면 더욱 정확한 상담이 가능합니다."
   },
   { 
-    id: 'GENERAL', 
-    label: '일반 시딩 문의', 
-    icon: <Sparkles size={18} />,
-    placeholder: "어떤 플랜 도입을 고려 중인지, 브랜드의 고민을 알려주세요"
+    id: 'ADDON', 
+    label: 'Add-on 부가 서비스 문의', 
+    icon: <Zap size={18} />,
+    placeholder: "큐레이션 팩, 연락처 팩, Spark Ads 신청 대행 등 관심 있는 부가 서비스와 캠페인 최적화에 대한 고민을 알려주세요."
   },
   { 
     id: 'PARTNER', 
     label: '기타 문의', 
     icon: <Handshake size={18} />,
-    placeholder: "대면 미팅, 제휴 및 협력 등 다양한 문의사항이 있다면 알려주세요"
+    placeholder: "제휴 및 협력, 대면 미팅 등 기타 문의사항이 있다면 자유롭게 입력해주세요."
   }
 ];
 
 // --- Sub-Components ---
 
-// Custom Calendar (Naver Style)
 const CustomCalendar = ({ selectedDate, onDateSelect }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
 
@@ -128,11 +130,16 @@ const Hero = () => (
       <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/80 backdrop-blur-sm border border-indigo-100 text-xs font-bold text-indigo-600 mb-6 shadow-sm">
         <Sparkles size={12} fill="currentColor" /> Premium Consulting
       </div>
-      <h1 className="text-4xl md:text-6xl font-extrabold text-slate-900 tracking-tight mb-6 leading-tight">
-        전문가와 직접<br />
-        <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">성공 전략을 논의하세요</span>
+      
+      {/* [수정] Home.jsx와 동일한 타이포그래피 적용 */}
+      <h1 className="text-5xl md:text-7xl font-extrabold text-slate-900 tracking-normal mb-8 leading-snug drop-shadow-sm">
+        전문가와 직접
+        <span className="block mt-3 md:mt-5 text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600">
+          성공 전략을 논의하세요
+        </span>
       </h1>
-      <p className="max-w-2xl mx-auto text-lg text-slate-500 mb-10">
+      
+      <p className="max-w-2xl mx-auto text-lg md:text-xl text-slate-500 mb-10 leading-relaxed break-keep">
         브랜드의 현재 상황을 진단하고, 가장 효율적인 미국 진출 로드맵을 그려드립니다.
       </p>
     </div>
@@ -266,7 +273,6 @@ export default function Consulting() {
               <p className="text-slate-500">Zoom/Google Meet을 통해 화면을 공유하며 심도 깊은 전략을 논의합니다.</p>
             </button>
 
-            {/* 실시간 채팅 상담 (카카오톡 연동 수정 완료) */}
             <a 
               href="http://pf.kakao.com/_VxmWxon/chat"
               target="_blank"
@@ -299,7 +305,7 @@ export default function Consulting() {
 
               <div className="p-8 md:p-12 space-y-12">
                 
-                {/* Section 0: User Info */}
+                {/* Section 1: User Info */}
                 <section>
                   <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
                     <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold">1</span>
@@ -353,7 +359,7 @@ export default function Consulting() {
 
                 <hr className="border-slate-100" />
 
-                {/* Section 1: Date & Time */}
+                {/* Section 2: Date & Time */}
                 <section className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                   <div>
                     <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
@@ -402,17 +408,12 @@ export default function Consulting() {
                             })}
                         </div>
                     )}
-                    {selectedDate && (
-                        <p className="text-xs text-slate-400 mt-4 flex items-center gap-1">
-                            <span className="w-2 h-2 rounded-full bg-slate-200 inline-block"></span> 마감된 시간은 선택할 수 없습니다.
-                        </p>
-                    )}
                   </div>
                 </section>
 
                 <hr className="border-slate-100" />
 
-                {/* Section 2: Topic & Detail */}
+                {/* Section 4: Topic & Detail (개편 완료) */}
                 <section>
                   <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
                     <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold">4</span>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Menu, X, ArrowRight, LogOut } from 'lucide-react';
 import logoImg from '../../assets/logo.png';
 import { supabase } from '../../lib/supabase';
@@ -9,6 +9,7 @@ const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
+  const location = useLocation(); // 현재 경로 확인용
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -31,9 +32,41 @@ const Navbar = () => {
     };
   }, []);
 
-  const handleNavClick = () => {
-    window.scrollTo({ top: 0, behavior: 'instant' });
-    setIsOpen(false);
+  // [수정] 섹션 이동 핸들러 (메인 페이지 내 스크롤 vs 타 페이지에서 이동)
+  const handleSectionClick = (e, path) => {
+    // 1. 해시 링크(/#id)인 경우 처리
+    if (path.startsWith('/#')) {
+      e.preventDefault();
+      const id = path.replace('/#', '');
+      
+      const scrollToElement = () => {
+        const element = document.getElementById(id);
+        if (element) {
+          const headerOffset = 80; // 고정 헤더 높이만큼 보정
+          const elementPosition = element.getBoundingClientRect().top;
+          const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+      
+          window.scrollTo({
+            top: offsetPosition,
+            behavior: "smooth"
+          });
+        }
+      };
+
+      if (location.pathname === '/') {
+        // 이미 메인 페이지라면 바로 스크롤
+        scrollToElement();
+      } else {
+        // 다른 페이지라면 메인으로 이동 후 스크롤
+        navigate('/');
+        setTimeout(scrollToElement, 100); // DOM 로드 대기
+      }
+      setIsOpen(false);
+    } else {
+      // 2. 일반 링크인 경우
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      setIsOpen(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -47,10 +80,12 @@ const Navbar = () => {
     }
   };
 
+  // [수정] 경로를 ID 앵커로 변경
   const navLinks = [
-    { name: '캠페인', path: '/pricing'},
-    { name: '고객 사례', path: '/customers'},
-    { name: '프로세스 소개', path: '/features' }
+    
+    { name: '고객 사례', path: '/#cases'}, // Success Stories Section ID
+    { name: '프로세스 소개', path: '/#process' }, // (필요 시 /#process 등으로 변경 가능)
+    { name: '캠페인', path: '/#pricing'} // Pricing Section ID
   ];
 
   return (
@@ -63,7 +98,7 @@ const Navbar = () => {
         <div className="relative flex justify-between items-center">
           
           {/* 1. Logo (Left) */}
-          <Link to="/" onClick={handleNavClick} className="flex items-center gap-2 cursor-pointer z-10">
+          <Link to="/" onClick={(e) => handleSectionClick(e, '/')} className="flex items-center gap-2 cursor-pointer z-10">
               {logoImg ? (
                 <img src={logoImg} alt="Brand Slam" className="h-16 w-auto object-contain" />
               ) : (
@@ -71,18 +106,24 @@ const Navbar = () => {
               )}
           </Link>
 
-          {/* 2. Desktop Menu (Center - Absolute Position) */}
+          {/* 2. Desktop Menu (Center) */}
           <div className="hidden md:flex absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 items-center gap-8">
             {navLinks.map((link) => (
-              link.path.startsWith('#') ? (
-                <a key={link.name} href={link.path} className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors">
+              link.path.startsWith('/#') ? (
+                // 해시 링크인 경우 button 혹은 a 태그 사용하되 onClick 핸들러 연결
+                <a 
+                  key={link.name} 
+                  href={link.path} 
+                  onClick={(e) => handleSectionClick(e, link.path)}
+                  className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors cursor-pointer"
+                >
                   {link.name}
                 </a>
               ) : (
                 <Link 
                   key={link.name} 
                   to={link.path} 
-                  onClick={handleNavClick} 
+                  onClick={(e) => handleSectionClick(e, link.path)}
                   className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors"
                 >
                   {link.name}
@@ -94,11 +135,9 @@ const Navbar = () => {
           {/* 3. CTA Buttons (Right) */}
           <div className="hidden md:flex items-center gap-4 z-10">
             {user ? (
-              // 로그인 상태일 때
               <>
                 <Link 
                   to="/dashboard" 
-                  onClick={handleNavClick}
                   className="text-sm font-bold text-indigo-600 hover:text-indigo-800 transition-colors mr-2"
                 >
                   내 캠페인 현황
@@ -112,18 +151,15 @@ const Navbar = () => {
                 </button>
               </>
             ) : (
-              // 비로그인 상태일 때 [수정됨: 대시보드 미리보기 추가]
               <>
                 <Link 
                   to="/dashboard" 
-                  onClick={handleNavClick}
                   className="text-sm font-bold text-indigo-600 hover:text-indigo-800 transition-colors mr-2"
                 >
                   대시보드 미리보기
                 </Link>
                 <Link 
                   to="/login" 
-                  onClick={handleNavClick}
                   className="text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors"
                 >
                   로그인
@@ -133,7 +169,6 @@ const Navbar = () => {
             
             <Link 
               to="/checkout" 
-              onClick={handleNavClick}
               className="bg-black text-white px-5 py-2.5 rounded-full text-sm font-bold hover:bg-gray-800 transition-all hover:scale-105 flex items-center gap-2"
             >
               바로 시작하기
@@ -154,14 +189,21 @@ const Navbar = () => {
       {isOpen && (
         <div className="md:hidden absolute top-full left-0 w-full bg-white border-b border-gray-100 p-4 flex flex-col gap-4 shadow-lg">
           {navLinks.map((link) => (
-             link.path.startsWith('#') ? (
-               <a key={link.name} href={link.path} className="text-sm font-medium text-gray-900 py-2" onClick={() => setIsOpen(false)}>{link.name}</a>
+             link.path.startsWith('/#') ? (
+               <a 
+                 key={link.name} 
+                 href={link.path} 
+                 className="text-sm font-medium text-gray-900 py-2" 
+                 onClick={(e) => handleSectionClick(e, link.path)}
+               >
+                 {link.name}
+               </a>
              ) : (
                <Link 
                 key={link.name} 
                 to={link.path} 
-                onClick={handleNavClick} 
                 className="text-sm font-medium text-gray-900 py-2" 
+                onClick={(e) => handleSectionClick(e, link.path)}
                >
                  {link.name}
                </Link>
@@ -170,14 +212,13 @@ const Navbar = () => {
           <hr className="border-gray-100" />
           
           {user ? (
-            // 모바일 - 로그인 상태
             <>
               <div className="text-center py-2 text-xs text-gray-400">
                 {user.email}님 환영합니다
               </div>
               <Link 
                 to="/dashboard"
-                onClick={handleNavClick}
+                onClick={() => setIsOpen(false)}
                 className="w-full text-center py-3 text-sm font-bold text-indigo-600 bg-indigo-50 rounded-lg"
               >
                 내 캠페인 현황
@@ -191,18 +232,17 @@ const Navbar = () => {
               </button>
             </>
           ) : (
-            // 모바일 - 비로그인 상태 [수정됨: 대시보드 미리보기 추가]
             <>
               <Link 
                 to="/dashboard"
-                onClick={handleNavClick}
+                onClick={() => setIsOpen(false)}
                 className="w-full text-center py-3 text-sm font-bold text-indigo-600 bg-indigo-50 rounded-lg"
               >
                 대시보드 미리보기
               </Link>
               <Link 
                 to="/login"
-                onClick={handleNavClick}
+                onClick={() => setIsOpen(false)}
                 className="w-full text-center py-3 text-sm font-medium text-gray-900 bg-gray-50 rounded-lg"
               >
                 로그인
@@ -212,7 +252,7 @@ const Navbar = () => {
           
           <Link 
             to="/checkout"
-            onClick={handleNavClick}
+            onClick={() => setIsOpen(false)}
             className="w-full text-center py-3 text-sm font-bold text-white bg-black rounded-lg block"
           >
             바로 시작하기
