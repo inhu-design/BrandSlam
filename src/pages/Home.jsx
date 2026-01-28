@@ -15,7 +15,7 @@ import dashboardImg from '../assets/dashboard.png';
 const caseStudies = [
   {
     id: 1,
-    brand: "Celimax",
+    brand: "Ce*****",
     category: "Global K-Beauty",
     videoId: "7471724419216346398", 
     challenge: "런칭 후 글로벌 인지도 및 매출 증대 필요",
@@ -30,7 +30,7 @@ const caseStudies = [
   },
   {
     id: 2,
-    brand: "SKIN&LAB",
+    brand: "SK******",
     category: "High-Function Skincare",
     videoId: "7480532507318930696",
     challenge: "MZ세대 타겟 브랜드 인지도 확보",
@@ -45,7 +45,7 @@ const caseStudies = [
   },
   {
     id: 3,
-    brand: "P.CALM",
+    brand: "P*****",
     category: "Sensitive Care",
     videoId: "7530013023667309879", 
     challenge: "틱톡샵(US) 매출 및 바이럴 증대",
