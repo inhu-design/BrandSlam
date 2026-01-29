@@ -49,7 +49,7 @@ const DEMO_CAMPAIGNS = [
   // 1. 인플루언서 섭외 중 (Contacting)
   {
     id: 'demo-2',
-    plan: 'BASIC',
+    plan: 'Starter',
     status: CampaignStatus.CONTACTING,
     brand_name: 'BrandSlam Demo',
     product_name: 'Daily Sunscreen',
@@ -71,7 +71,7 @@ const DEMO_CAMPAIGNS = [
   // 2. 콘텐츠 업로드 중 (Uploading)
   {
     id: 'demo-1',
-    plan: 'STANDARD',
+    plan: 'Growth',
     status: CampaignStatus.UPLOADING,
     brand_name: 'BrandSlam Demo',
     product_name: 'Vita-C Serum',
@@ -109,7 +109,7 @@ const DEMO_CAMPAIGNS = [
   // 3. 캠페인 완료 (Completed)
   {
     id: 'demo-3',
-    plan: 'PREMIUM',
+    plan: 'Scale50',
     status: CampaignStatus.COMPLETED,
     brand_name: 'BrandSlam Demo',
     product_name: 'Calming Toner',
