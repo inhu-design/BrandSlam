@@ -360,7 +360,7 @@ export default function Checkout() {
                         name="company" 
                         value={brandInfo.company} 
                         onChange={handleInputChange} 
-                        placeholder="Brand Slam" 
+                        placeholder="slam-global" 
                         className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all" 
                         required 
                       />

@@ -96,7 +96,7 @@ const CoreFeatures = () => {
       id: "volume",
       subtitle: "VOLUME & CHOOSE",
       title: "복잡한 기획 없이, 수량만 선택하세요",
-      desc: "콘텐츠 30개가 필요하신가요, 아니면 300개가 필요하신가요? 복잡한 브리프 없이 필요한 수량만 결정하면, Brand Slam이 최적의 크리에이터를 찾아 실행합니다.",
+      desc: "콘텐츠 30개가 필요하신가요, 아니면 300개가 필요하신가요? 복잡한 브리프 없이 필요한 수량만 결정하면, slam-global이 최적의 크리에이터를 찾아 실행합니다.",
       points: ["Basic (30개) ~ Premium (300개)", "간편한 수량 중심 옵션", "규모의 경제 실현"],
       icon: <Package className="text-purple-600" size={32} />,
       theme: "purple",
@@ -185,7 +185,7 @@ const WhyBrandSlam = () => {
         <section className="py-24 bg-white relative">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="text-center mb-16">
-                    <h2 className="text-3xl font-bold text-slate-900 mb-4 tracking-normal">Why Brand Slam?</h2>
+                    <h2 className="text-3xl font-bold text-slate-900 mb-4 tracking-normal">Why slam-global?</h2>
                     <p className="text-slate-500">성공하는 브랜드들이 우리를 선택하는 이유입니다.</p>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -220,7 +220,7 @@ const CTA = () => (
       
       {/* [수정] 반응형 줄바꿈 적용 */}
       <p className="text-xl text-slate-400 mb-12 max-w-2xl mx-auto font-light leading-relaxed">
-        Brand Slam의 모든 기능을 제한 없이.<br className="hidden md:block"/>
+        slam-global의 모든 기능을 제한 없이.<br className="hidden md:block"/>
         카드 등록 없이, 단 3분이면 시작할 수 있습니다.
       </p>
       

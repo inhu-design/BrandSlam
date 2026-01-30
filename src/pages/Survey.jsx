@@ -201,7 +201,7 @@ export default function Survey() {
             <div className="grid gap-6">
                 <div>
                     <label className="block text-sm font-bold text-gray-700 mb-2">브랜드명</label>
-                    <input name="brandName" value={formData.brandName} onChange={handleChange} placeholder="예: Brand Slam" className="w-full p-4 rounded-xl border border-gray-200 focus:border-black outline-none transition-all" />
+                    <input name="brandName" value={formData.brandName} onChange={handleChange} placeholder="예: slam-global" className="w-full p-4 rounded-xl border border-gray-200 focus:border-black outline-none transition-all" />
                 </div>
                 
                 <div>

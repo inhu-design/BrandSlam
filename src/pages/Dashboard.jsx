@@ -11,7 +11,7 @@ import Navbar from '../components/layout/Navbar';
 import Footer from '../components/layout/Footer';
 
 /**
- * [Type Definition] Campaign Status Enum
+ * [Logic 보존] Campaign Status Enum & Helper Functions
  */
 const CampaignStatus = {
   PAYMENT_PENDING: 'PAYMENT_PENDING',
@@ -21,32 +21,19 @@ const CampaignStatus = {
   COMPLETED: 'COMPLETED'
 };
 
-/**
- * [Helper] PII Masking Function
- * 개인정보 보호를 위한 마스킹 처리
- */
 const maskData = (text, type = 'general') => {
   if (!text) return '-';
   if (type === 'email') {
     const [local, domain] = text.split('@');
     return `${local.slice(0, 2)}****@${domain}`;
   }
-  if (type === 'address') {
-    // 구체적 주소 숨김 및 마스킹
-    return "배송사를 통해 전달됨 (비공개)"; 
-  }
-  if (type === 'contact') {
-      return text.slice(0, 3) + "****" + text.slice(-2);
-  }
-  // 일반적인 마스킹 (거주지 등)
+  if (type === 'address') return "배송사를 통해 전달됨 (비공개)"; 
+  if (type === 'contact') return text.slice(0, 3) + "****" + text.slice(-2);
   return text.length > 5 ? text.slice(0, 5) + "****" : "****";
 };
 
-/**
- * [Mock Data] Demo Campaigns - Reordered based on process flow
- */
+// --- [Mock Data: 100% 보존] ---
 const DEMO_CAMPAIGNS = [
-  // 1. 인플루언서 섭외 중 (Contacting)
   {
     id: 'demo-2',
     plan: 'Starter',
@@ -68,7 +55,6 @@ const DEMO_CAMPAIGNS = [
     creators: [],
     contents: []
   },
-  // 2. 콘텐츠 업로드 중 (Uploading)
   {
     id: 'demo-1',
     plan: 'Growth',
@@ -106,7 +92,6 @@ const DEMO_CAMPAIGNS = [
       { id: 10, thumbnail_url: 'https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=400&q=80', views: '12K', creator: '@glass_skin_tips' },
     ]
   },
-  // 3. 캠페인 완료 (Completed)
   {
     id: 'demo-3',
     plan: 'Scale50',
@@ -134,15 +119,15 @@ const DEMO_CAMPAIGNS = [
   }
 ];
 
-// --- Sub-Components ---
+// --- [Sub-Components: 리뉴얼 테마 반영] ---
 
 const StatusBadge = ({ status }) => {
   const styles = {
-    [CampaignStatus.PAYMENT_PENDING]: "bg-slate-100 text-slate-600 border-slate-200",
-    [CampaignStatus.CONTACTING]: "bg-blue-50 text-blue-600 border-blue-100",
-    [CampaignStatus.SHIPPING]: "bg-orange-50 text-orange-600 border-orange-100",
-    [CampaignStatus.UPLOADING]: "bg-purple-50 text-purple-600 border-purple-100",
-    [CampaignStatus.COMPLETED]: "bg-green-50 text-green-600 border-green-100",
+    [CampaignStatus.PAYMENT_PENDING]: "bg-slate-800 text-slate-400 border-slate-700",
+    [CampaignStatus.CONTACTING]: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+    [CampaignStatus.SHIPPING]: "bg-orange-500/10 text-orange-400 border-orange-500/20",
+    [CampaignStatus.UPLOADING]: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+    [CampaignStatus.COMPLETED]: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
   };
   
   const labels = {
@@ -154,20 +139,22 @@ const StatusBadge = ({ status }) => {
   };
 
   return (
-    <span className={`px-3 py-1 rounded-full text-xs font-bold border ${styles[status] || styles[CampaignStatus.PAYMENT_PENDING]}`}>
+    <span className={`px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase border backdrop-blur-md ${styles[status] || styles[CampaignStatus.PAYMENT_PENDING]}`}>
       {labels[status] || status}
     </span>
   );
 };
 
 const MetricCard = ({ icon: Icon, label, value, color }) => (
-  <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
-    <div className={`p-3 rounded-lg ${color}`}>
-      {Icon && <Icon size={20} />}
-    </div>
-    <div>
-      <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">{label}</p>
-      <p className="text-xl font-bold text-slate-900">{value || '-'}</p>
+  <div className="bg-white/5 backdrop-blur-xl p-5 rounded-2xl border border-white/10 shadow-xl group hover:border-white/20 transition-all">
+    <div className="flex items-center gap-4">
+        <div className={`p-3 rounded-xl ${color} shadow-lg group-hover:scale-110 transition-transform`}>
+          {Icon && <Icon size={22} />}
+        </div>
+        <div>
+          <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.2em] mb-1">{label}</p>
+          <p className="text-2xl font-black text-white tracking-tighter">{value || '-'}</p>
+        </div>
     </div>
   </div>
 );
@@ -175,22 +162,23 @@ const MetricCard = ({ icon: Icon, label, value, color }) => (
 const CampaignCard = ({ campaign, onClick, isActive }) => (
   <div 
     onClick={onClick}
-    className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+    className={`p-6 rounded-[2rem] border transition-all duration-500 cursor-pointer relative overflow-hidden group ${
       isActive 
-      ? 'bg-white border-indigo-500 ring-1 ring-indigo-500 shadow-md' 
-      : 'bg-white border-slate-200 hover:border-indigo-300 hover:shadow-sm'
+      ? 'bg-gradient-to-br from-purple-900/40 to-blue-900/40 border-purple-500 shadow-[0_0_30px_rgba(168,85,247,0.2)]' 
+      : 'bg-white/5 border-white/5 hover:border-white/10'
     }`}
   >
-    <div className="flex justify-between items-start mb-2">
+    {isActive && <div className="absolute top-0 right-0 w-20 h-20 bg-purple-500/10 blur-2xl rounded-full"></div>}
+    <div className="flex justify-between items-start mb-4 relative z-10">
       <div className="min-w-0">
-        <span className="text-[10px] font-bold text-indigo-600 mb-0.5 block">{campaign.plan} PLAN</span>
-        <h3 className="font-bold text-slate-900 text-sm truncate pr-2">{campaign.product_name || '상품명 미정'}</h3>
+        <span className="text-[10px] font-black text-cyan-400 mb-1 block tracking-[0.2em] uppercase">{campaign.plan} PLAN</span>
+        <h3 className="font-bold text-white text-base truncate pr-2">{campaign.product_name || '상품명 미정'}</h3>
       </div>
     </div>
-    <div className="flex items-center justify-between mt-2">
-        <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
-            <Calendar size={10} />
-            <span className="truncate">{campaign.start_date || '일정 미정'}</span>
+    <div className="flex items-center justify-between mt-4 relative z-10">
+        <div className="flex items-center gap-2 text-[10px] text-slate-500 font-medium uppercase tracking-widest">
+            <Calendar size={12} />
+            <span>{campaign.start_date || 'TBD'}</span>
         </div>
         <StatusBadge status={campaign.status} />
     </div>
@@ -202,120 +190,106 @@ const CandidateList = ({ candidates, targetCount, matchedCount }) => {
     const progress = Math.min(Math.round((matchedCount / targetCount) * 100), 100);
 
     const handleDownloadCSV = () => {
-        // [Logic] 확정된 상태가 아니면 다운로드 불가
-        // 현재는 'CONTACTING' 상태이므로 확정이 아님을 전제로 함
         alert("납품 리스트가 아직 확정되지 않았습니다. 인플루언서 섭외가 완료되고 확정된 후에 다운로드 가능합니다.");
     };
 
     const handleDeleteCreator = (e, creatorName) => {
         e.stopPropagation();
-        // [UX] 확인 모달 및 30% 제한 안내 메시지
         if (window.confirm(`[인플루언서 교체 안내]\n\n${creatorName} 님을 정말 교체하시겠습니까?\n\n* 섭외 중 단계에서는 제공된 리스트의 30%까지만 교체/삭제가 가능합니다.`)) {
              alert("교체 요청이 접수되었습니다. (데모)");
         }
     };
 
     return (
-        <div className="space-y-6 animate-fade-in-up">
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <div className="flex justify-between items-end mb-3">
+        <div className="space-y-10 animate-fade-in-up">
+            <div className="bg-white/5 backdrop-blur-xl p-8 rounded-[2.5rem] border border-white/10 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/5 blur-[100px] rounded-full"></div>
+                <div className="flex justify-between items-end mb-6 relative z-10">
                     <div>
-                        <h4 className="font-bold text-slate-800 text-lg">섭외 진행 현황</h4>
-                        <p className="text-xs text-slate-500 mt-1">목표 인원 달성 시 자동으로 배송 단계로 넘어갑니다.</p>
+                        <h4 className="font-black text-white text-2xl tracking-tighter">섭외 진행 현황</h4>
+                        <p className="text-sm text-slate-500 mt-2 font-light tracking-tight">목표 인원 달성 시 자동으로 제품 배송 단계로 전환됩니다.</p>
                     </div>
                     <div className="text-right">
-                        <span className="text-3xl font-extrabold text-indigo-600">{progress}%</span>
-                        <span className="text-xs text-slate-400 font-medium ml-1">({matchedCount}/{targetCount})</span>
+                        <span className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400 tracking-tighter">{progress}%</span>
+                        <p className="text-xs text-slate-500 font-black mt-1 uppercase tracking-widest">({matchedCount}/{targetCount})</p>
                     </div>
                 </div>
-                <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
+                <div className="w-full bg-white/5 h-4 rounded-full overflow-hidden border border-white/5 relative z-10">
                     <div 
-                        className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 transition-all duration-1000 ease-out rounded-full relative"
+                        className="h-full bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-400 transition-all duration-1000 ease-out rounded-full relative shadow-[0_0_15px_rgba(34,211,238,0.5)]"
                         style={{ width: `${progress}%` }}
                     >
-                        <div className="absolute top-0 left-0 w-full h-full bg-white/20 animate-[shimmer_2s_infinite]"></div>
+                        <div className="absolute inset-0 bg-white/20 animate-[shimmer_2s_infinite]"></div>
                     </div>
                 </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                    <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                        <UserCheck size={18} className="text-slate-400"/> 섭외 리스트 (실시간)
+            <div className="bg-white/5 backdrop-blur-md rounded-[2.5rem] border border-white/10 overflow-hidden shadow-2xl">
+                <div className="px-8 py-6 border-b border-white/5 flex justify-between items-center bg-white/5">
+                    <h3 className="font-black text-white flex items-center gap-3 tracking-tighter">
+                        <UserCheck size={20} className="text-cyan-400"/> 리스트 (Real-time)
                     </h3>
-                    <div className="flex gap-2">
-                        <button 
-                            onClick={handleDownloadCSV}
-                            className="text-xs font-medium px-3 py-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600 transition-colors flex items-center gap-1"
-                        >
-                            <Download size={12}/> CSV 다운로드
-                        </button>
-                    </div>
+                    <button 
+                        onClick={handleDownloadCSV}
+                        className="text-[10px] font-black tracking-widest uppercase px-4 py-2 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 text-slate-300 transition-all flex items-center gap-2"
+                    >
+                        <Download size={14}/> CSV Export
+                    </button>
                 </div>
                 
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
-                        <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-100">
+                        <thead className="bg-white/5 text-slate-500 font-black uppercase tracking-widest text-[10px] border-b border-white/5">
                             <tr>
-                                <th className="px-6 py-3 w-1/4">인플루언서</th>
-                                <th className="px-6 py-3">플랫폼/팔로워</th>
-                                <th className="px-6 py-3">거주지/연락처</th>
-                                <th className="px-6 py-3">상태</th>
-                                <th className="px-6 py-3 text-right">교체/관리</th>
+                                <th className="px-8 py-5">인플루언서</th>
+                                <th className="px-8 py-5">채널/팔로워</th>
+                                <th className="px-8 py-5">상세정보(Masked)</th>
+                                <th className="px-8 py-5">프로세스</th>
+                                <th className="px-8 py-5 text-right">매니지먼트</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100">
+                        <tbody className="divide-y divide-white/5">
                             {candidates && candidates.map((creator) => (
-                                <tr key={creator.id} className="hover:bg-slate-50/80 transition-colors group">
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-xs">
+                                <tr key={creator.id} className="hover:bg-white/5 transition-all group">
+                                    <td className="px-8 py-6">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-black text-sm shadow-lg group-hover:scale-110 transition-transform">
                                                 {creator.name.charAt(0)}
                                             </div>
                                             <div>
-                                                <p className="font-bold text-slate-800">{creator.name}</p>
-                                                <a href="#" className="text-xs text-indigo-500 hover:underline">{creator.handle}</a>
+                                                <p className="font-bold text-white text-base tracking-tight">{creator.name}</p>
+                                                <a href="#" className="text-xs text-cyan-400/70 hover:text-cyan-400 transition-colors">{creator.handle}</a>
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex flex-col">
-                                            <span className="font-medium text-slate-700">{creator.platform}</span>
-                                            <span className="text-xs text-slate-400">{creator.followers} Followers</span>
+                                    <td className="px-8 py-6">
+                                        <div className="flex flex-col gap-1">
+                                            <span className="font-bold text-slate-300 uppercase tracking-tighter">{creator.platform}</span>
+                                            <span className="text-[10px] text-slate-500 font-black tracking-widest">{creator.followers} FOLLOWERS</span>
                                         </div>
                                     </td>
-                                    {/* [PII] 마스킹 처리된 정보 출력 */}
-                                    <td className="px-6 py-4">
-                                        <div className="flex flex-col gap-0.5">
-                                            <span className="text-slate-600 flex items-center gap-1 text-xs">
-                                                {maskData(creator.location, 'general')}
-                                            </span>
-                                            <span className="text-slate-400 text-[10px]">
-                                                {maskData(creator.contact, 'email')}
-                                            </span>
-                                            <span className="text-slate-400 text-[10px]">
-                                                배송지: {maskData(null, 'address')}
-                                            </span>
+                                    <td className="px-8 py-6">
+                                        <div className="flex flex-col gap-1.5">
+                                            <span className="text-slate-400 text-xs font-light">{maskData(creator.location, 'general')}</span>
+                                            <span className="text-slate-600 text-[10px] font-medium">{maskData(creator.contact, 'email')}</span>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4">
-                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                                            creator.status === 'Approved' ? 'bg-green-50 text-green-600 border-green-100' :
-                                            creator.status === 'Rejected' ? 'bg-red-50 text-red-600 border-red-100' :
-                                            'bg-yellow-50 text-yellow-600 border-yellow-100'
+                                    <td className="px-8 py-6">
+                                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
+                                            creator.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_10px_rgba(52,211,153,0.2)]' :
+                                            creator.status === 'Rejected' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                                            'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
                                         }`}>
-                                            {creator.status === 'Approved' ? '섭외완료' : 
-                                             creator.status === 'Rejected' ? '거절됨' : '검토중'}
+                                            {creator.status === 'Approved' ? '섭외완료' : creator.status === 'Rejected' ? '거절됨' : '검토중'}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4 text-right">
-                                        {/* [UX] 삭제 -> 교환 아이콘 및 개념 변경 */}
+                                    <td className="px-8 py-6 text-right">
                                         <button 
-                                            className="text-slate-400 hover:text-indigo-500 p-2 rounded-full hover:bg-indigo-50 transition-all group-hover:visible"
-                                            title="다른 인플루언서로 교체 요청 (30% 한도 내)"
+                                            className="text-slate-500 hover:text-cyan-400 p-2.5 rounded-xl hover:bg-white/5 transition-all opacity-0 group-hover:opacity-100 shadow-xl"
+                                            title="다른 인플루언서로 교체 요청"
                                             onClick={(e) => handleDeleteCreator(e, creator.name)}
                                         >
-                                            <RefreshCw size={16} />
+                                            <RefreshCw size={18} />
                                         </button>
                                     </td>
                                 </tr>
@@ -331,21 +305,21 @@ const CandidateList = ({ candidates, targetCount, matchedCount }) => {
 // --- Detail Component: Analytics (완료된 캠페인) ---
 const AnalyticsReport = ({ campaign }) => {
     return (
-        <div className="space-y-8 animate-fade-in-up">
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <div className="flex justify-between items-center mb-6">
-                    <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2">
-                        <BarChart2 size={20} className="text-indigo-600" /> 
-                        캠페인 최종 성과 리포트
+        <div className="space-y-10 animate-fade-in-up">
+            <div className="bg-white/5 backdrop-blur-xl p-8 rounded-[3rem] border border-white/10 shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-96 h-96 bg-purple-600/5 blur-[100px] rounded-full"></div>
+                <div className="flex justify-between items-center mb-10 relative z-10">
+                    <h3 className="font-black text-white text-2xl flex items-center gap-3 tracking-tighter uppercase">
+                        <BarChart2 size={28} className="text-purple-400" /> 캠페인 퍼포먼스 리포트
                     </h3>
-                    <button className="text-sm text-slate-500 hover:text-indigo-600 flex items-center gap-1 border px-3 py-1.5 rounded-lg hover:border-indigo-200 transition-colors">
-                        <ExternalLink size={14}/> PDF 다운로드
+                    <button className="text-[10px] font-black tracking-widest uppercase px-5 py-2.5 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 text-slate-300 transition-all flex items-center gap-2">
+                        <ExternalLink size={16}/> Download PDF
                     </button>
                 </div>
 
-                <div className="bg-slate-50 rounded-xl border border-slate-100 p-6 mb-6">
-                    <div className="flex h-64 relative items-end pb-8 pl-8 gap-4">
-                        <div className="absolute top-0 left-0 h-full flex flex-col justify-between text-[10px] text-slate-400 pb-8">
+                <div className="bg-black/20 rounded-[2rem] border border-white/5 p-10 mb-10 relative z-10">
+                    <div className="flex h-72 relative items-end pb-12 pl-12 gap-6">
+                        <div className="absolute top-0 left-0 h-full flex flex-col justify-between text-[10px] text-slate-600 font-black uppercase tracking-[0.2em] pb-12">
                             <span>300K</span>
                             <span>200K</span>
                             <span>100K</span>
@@ -355,14 +329,14 @@ const AnalyticsReport = ({ campaign }) => {
                         {campaign.analytics?.daily_views.map((views, idx) => (
                             <div key={idx} className="flex-1 flex flex-col justify-end group relative h-full">
                                 <div 
-                                    className="w-full bg-indigo-300 hover:bg-indigo-500 transition-all rounded-t-sm relative"
+                                    className="w-full bg-gradient-to-t from-purple-600/40 to-cyan-400/80 hover:to-white transition-all duration-500 rounded-t-xl relative shadow-[0_0_20px_rgba(168,85,247,0.2)]"
                                     style={{ height: `${(views / 300) * 100}%` }}
                                 >
-                                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                                        {views}K Views
+                                    <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-white text-[#020617] text-[10px] font-black px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all whitespace-nowrap z-20 shadow-2xl">
+                                        {views}K VIEWS
                                     </div>
                                 </div>
-                                <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] text-slate-400 whitespace-nowrap">
+                                <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[10px] font-black text-slate-500 tracking-tighter whitespace-nowrap uppercase">
                                     {campaign.analytics?.dates[idx]}
                                 </div>
                             </div>
@@ -370,31 +344,31 @@ const AnalyticsReport = ({ campaign }) => {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
-                        <p className="text-xs text-indigo-600 font-bold mb-1">총 도달(Reach)</p>
-                        <p className="text-2xl font-extrabold text-slate-900">{campaign.kpi_views}</p>
-                        <p className="text-[10px] text-slate-500 mt-1">예상 대비 145% 달성 🚀</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative z-10">
+                    <div className="p-8 bg-purple-500/5 rounded-3xl border border-purple-500/10 group hover:border-purple-500/30 transition-all">
+                        <p className="text-[10px] text-purple-400 font-black uppercase tracking-[0.3em] mb-3">총 도달 (TOTAL REACH)</p>
+                        <p className="text-4xl font-black text-white tracking-tighter">{campaign.kpi_views}</p>
+                        <p className="text-[10px] text-emerald-400 font-bold mt-3 tracking-tight">▲ 예상 대비 145% 초과 달성</p>
                     </div>
-                    <div className="p-4 bg-green-50 rounded-xl border border-green-100">
-                        <p className="text-xs text-green-600 font-bold mb-1">평균 참여율(ER)</p>
-                        <p className="text-2xl font-extrabold text-slate-900">{campaign.analytics?.engagement_rate}</p>
-                        <p className="text-[10px] text-slate-500 mt-1">업계 평균(3.5%) 상회</p>
+                    <div className="p-8 bg-emerald-500/5 rounded-3xl border border-emerald-500/10 group hover:border-emerald-500/30 transition-all">
+                        <p className="text-[10px] text-emerald-400 font-black uppercase tracking-[0.3em] mb-3">참여율 (ENGAGEMENT)</p>
+                        <p className="text-4xl font-black text-white tracking-tighter">{campaign.analytics?.engagement_rate}</p>
+                        <p className="text-[10px] text-slate-500 font-medium mt-3 tracking-tight">글로벌 뷰티 평균(3.5%) 대비 우수</p>
                     </div>
-                    <div className="col-span-1 md:col-span-3 mt-4">
-                        <h4 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
-                            <Trophy size={16} className="text-yellow-500"/> Best Performing Ads (Top 3)
+                    <div className="col-span-1 md:col-span-3 mt-10 border-t border-white/5 pt-10">
+                        <h4 className="text-lg font-black text-white mb-8 flex items-center gap-3 tracking-tighter">
+                            <Trophy size={22} className="text-yellow-400 animate-bounce"/> Best Performing Content
                         </h4>
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-3 gap-8">
                             {campaign.analytics?.top_contents.map((content) => (
-                                <div key={content.id} className="relative aspect-[9/16] rounded-xl overflow-hidden group cursor-pointer border border-slate-200 shadow-sm">
-                                    <img src={content.thumbnail} alt="Top Content" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
-                                    <div className="absolute top-2 left-2 bg-yellow-400 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
+                                <div key={content.id} className="relative aspect-[9/16] rounded-[2rem] overflow-hidden group cursor-pointer border border-white/10 shadow-2xl transition-transform hover:scale-[1.03]">
+                                    <img src={content.thumbnail} alt="Top Content" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                                    <div className="absolute top-4 left-4 bg-yellow-400 text-slate-900 text-[10px] font-black px-4 py-1.5 rounded-full shadow-2xl tracking-[0.2em]">
                                         TOP {content.id}
                                     </div>
-                                    <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/80 to-transparent p-3">
-                                        <p className="text-white text-xs font-bold mb-0.5">{content.creator}</p>
-                                        <p className="text-white/80 text-[10px] flex items-center gap-1"><Eye size={10}/> {content.views}</p>
+                                    <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black via-black/40 to-transparent p-6">
+                                        <p className="text-white text-lg font-black mb-1 tracking-tight">{content.creator}</p>
+                                        <p className="text-cyan-400 text-xs font-bold flex items-center gap-2 uppercase tracking-widest italic"><Eye size={14}/> {content.views}</p>
                                     </div>
                                 </div>
                             ))}
@@ -409,57 +383,56 @@ const AnalyticsReport = ({ campaign }) => {
 // --- Detail Component: Ongoing Campaign (업로드 중) ---
 const OngoingCampaign = ({ campaign }) => {
     return (
-        <div className="space-y-8 animate-fade-in-up">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <MetricCard icon={Eye} label="Total Views" value={campaign.kpi_views} color="bg-blue-50 text-blue-600" />
-                <MetricCard icon={Heart} label="Likes" value={campaign.kpi_likes} color="bg-red-50 text-red-600" />
-                <MetricCard icon={MessageCircle} label="Comments" value={campaign.kpi_comments} color="bg-green-50 text-green-600" />
-                <MetricCard icon={Share2} label="Shares" value={campaign.kpi_shares} color="bg-purple-50 text-purple-600" />
+        <div className="space-y-10 animate-fade-in-up">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <MetricCard icon={Eye} label="Views" value={campaign.kpi_views} color="bg-blue-600/20 text-blue-400" />
+                <MetricCard icon={Heart} label="Likes" value={campaign.kpi_likes} color="bg-red-600/20 text-red-400" />
+                <MetricCard icon={MessageCircle} label="Comments" value={campaign.kpi_comments} color="bg-emerald-600/20 text-emerald-400" />
+                <MetricCard icon={Share2} label="Shares" value={campaign.kpi_shares} color="bg-purple-600/20 text-purple-400" />
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-                    <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                        <Users size={18} className="text-slate-400"/> Engagement Top 10 Creators
+            <div className="bg-white/5 backdrop-blur-md rounded-[2.5rem] border border-white/10 overflow-hidden shadow-2xl">
+                <div className="px-8 py-6 border-b border-white/5 bg-white/5">
+                    <h3 className="font-black text-white flex items-center gap-3 tracking-tighter">
+                        <Users size={20} className="text-cyan-400"/> Engagement Top 10 Creators
                     </h3>
-                    <p className="text-xs text-slate-500 mt-1">성과가 좋은 크리에이터에게 추가 광고를 집행하거나 리워드를 지급해보세요.</p>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
-                        <thead className="bg-white text-slate-500 font-medium border-b border-slate-100">
+                        <thead className="bg-white/5 text-slate-500 font-black uppercase tracking-widest text-[10px] border-b border-white/5">
                             <tr>
-                                <th className="px-6 py-3">Rank</th>
-                                <th className="px-6 py-3">Creator</th>
-                                <th className="px-6 py-3">Views</th>
-                                <th className="px-6 py-3">Status</th>
-                                <th className="px-6 py-3 text-right">Actions</th>
+                                <th className="px-8 py-5">Rank</th>
+                                <th className="px-8 py-5">Creator</th>
+                                <th className="px-8 py-5">Views</th>
+                                <th className="px-8 py-5">Status</th>
+                                <th className="px-8 py-5 text-right">Optimization</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100 bg-white">
+                        <tbody className="divide-y divide-white/5">
                             {campaign.creators.map((creator, idx) => (
-                                <tr key={creator.id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="px-6 py-3 font-bold text-slate-400 w-12">{idx + 1}</td>
-                                    <td className="px-6 py-3">
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-bold text-slate-700">{creator.name}</span>
-                                            <span className="text-[10px] text-slate-400 border px-1 rounded">{creator.platform}</span>
+                                <tr key={creator.id} className="hover:bg-white/5 transition-all">
+                                    <td className="px-8 py-5 font-black text-slate-700 w-16">{idx + 1}</td>
+                                    <td className="px-8 py-5">
+                                        <div className="flex items-center gap-3">
+                                            <span className="font-bold text-white text-base tracking-tight">{creator.name}</span>
+                                            <span className="text-[9px] font-black text-cyan-400 border border-cyan-400/30 px-2 py-0.5 rounded-full uppercase tracking-widest">{creator.platform}</span>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-3 font-bold text-indigo-600">{creator.views}</td>
-                                    <td className="px-6 py-3">
-                                        <span className={`text-[10px] px-2 py-0.5 rounded border font-bold ${
-                                            creator.status === 'Uploaded' ? 'bg-green-50 text-green-600 border-green-100' : 'bg-slate-50 text-slate-500 border-slate-100'
+                                    <td className="px-8 py-5 font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 text-lg">{creator.views}</td>
+                                    <td className="px-8 py-5">
+                                        <span className={`text-[10px] px-3 py-1 rounded-full border font-black uppercase tracking-widest ${
+                                            creator.status === 'Uploaded' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-slate-500/10 text-slate-500 border-white/5'
                                         }`}>
                                             {creator.status}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-3 text-right">
-                                        <div className="flex justify-end gap-2">
-                                            <button className="text-[10px] font-bold px-2 py-1 bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100 transition-colors border border-indigo-100 flex items-center gap-1">
-                                                <Zap size={10} /> Spark Ads
+                                    <td className="px-8 py-5 text-right">
+                                        <div className="flex justify-end gap-3">
+                                            <button className="text-[10px] font-black tracking-widest uppercase px-3 py-1.5 bg-gradient-to-r from-purple-600/20 to-blue-600/20 text-purple-400 rounded-xl hover:shadow-[0_0_15px_rgba(168,85,247,0.3)] border border-purple-500/20 transition-all flex items-center gap-2">
+                                                <Zap size={12} /> Spark Ads
                                             </button>
-                                            <button className="text-[10px] font-bold px-2 py-1 bg-pink-50 text-pink-600 rounded hover:bg-pink-100 transition-colors border border-pink-100 flex items-center gap-1">
-                                                <Gift size={10} /> Credit 지급
+                                            <button className="text-[10px] font-black tracking-widest uppercase px-3 py-1.5 bg-pink-500/10 text-pink-400 rounded-xl border border-pink-500/20 transition-all flex items-center gap-2">
+                                                <Gift size={12} /> Reward
                                             </button>
                                         </div>
                                     </td>
@@ -470,24 +443,24 @@ const OngoingCampaign = ({ campaign }) => {
                 </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-                <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                    <PlayCircle size={18} className="text-slate-400"/> Uploaded Contents Gallery
+            <div className="bg-white/5 backdrop-blur-md rounded-[2.5rem] border border-white/10 p-10 shadow-2xl">
+                <h3 className="font-black text-white mb-10 flex items-center gap-3 tracking-tighter">
+                    <PlayCircle size={24} className="text-purple-400"/> Content Gallery (Auto-Feed)
                 </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
                     {campaign.contents.map((content, idx) => (
-                        <div key={idx} className="relative aspect-[9/16] rounded-xl overflow-hidden bg-slate-100 group cursor-pointer border border-slate-200 shadow-sm hover:shadow-md transition-all">
+                        <div key={idx} className="relative aspect-[9/16] rounded-2xl overflow-hidden bg-white/5 group cursor-pointer border border-white/10 shadow-xl transition-all hover:scale-[1.05]">
                             {content.thumbnail_url ? (
-                                <img src={content.thumbnail_url} alt="Thumbnail" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                                <img src={content.thumbnail_url} alt="Thumbnail" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
                             ) : (
-                                <div className="w-full h-full flex items-center justify-center bg-slate-200 text-slate-400 text-xs">No Image</div>
+                                <div className="w-full h-full flex items-center justify-center bg-white/5 text-slate-700 text-[10px] font-black uppercase tracking-widest">No Signal</div>
                             )}
-                            <div className="absolute top-2 left-2 bg-black/50 backdrop-blur-sm text-white text-[10px] px-2 py-0.5 rounded-full truncate max-w-[80%]">
+                            <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md text-white text-[9px] font-black px-3 py-1 rounded-full border border-white/10 tracking-widest uppercase truncate max-w-[85%]">
                                 {content.creator}
                             </div>
-                            <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/80 to-transparent p-3">
-                                <p className="text-white text-xs font-bold flex items-center gap-1">
-                                    <Eye size={10} /> {content.views || '0'}
+                            <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black via-black/20 to-transparent p-4">
+                                <p className="text-white text-xs font-black flex items-center gap-2 tracking-tight uppercase italic">
+                                    <Eye size={12} className="text-cyan-400" /> {content.views || '0'} VIEWS
                                 </p>
                             </div>
                         </div>
@@ -500,7 +473,7 @@ const OngoingCampaign = ({ campaign }) => {
 
 // --- Main Campaign Detail Container ---
 const CampaignDetail = ({ campaign }) => {
-  if (!campaign) return <div className="text-center py-20 text-slate-400">캠페인을 선택해주세요.</div>;
+  if (!campaign) return <div className="flex flex-col items-center justify-center py-40 text-slate-700 font-black uppercase tracking-[0.3em]"><Package size={48} className="mb-4 opacity-20"/> Select Campaign</div>;
 
   if (campaign.status === CampaignStatus.CONTACTING) {
       return (
@@ -567,73 +540,74 @@ export default function Dashboard() {
     if (newPassword.length < 6) return alert("비밀번호는 6자 이상이어야 합니다.");
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) alert("실패: " + error.message);
-    else { alert("비밀번호가 설정되었습니다."); setIsPasswordMode(false); setNewPassword(''); }
+    else { alert("비밀번호가 성공적으로 변경되었습니다."); setIsPasswordMode(false); setNewPassword(''); }
   };
 
   const handleSparkAdsClick = () => {
-    alert("현재 준비 중인 서비스입니다. (Coming Soon)");
+    alert("본 서비스는 부가 서비스를 구독 중인 브랜드에만 제공됩니다. (현재 준비 중)");
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#020617]"><div className="w-12 h-12 border-4 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin"></div></div>;
 
   const selectedCampaign = campaigns.find(c => c.id === selectedCampaignId);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="min-h-screen bg-[#020617] text-white flex flex-col selection:bg-cyan-500/30">
       <Navbar />
-      {/* [수정] 상단바 제거하고 Navbar 아래 여백 조정 */}
-      <div className={`flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-32 pb-24`}>
-        {/* [수정] 데모 모드 안내 문구 위치 및 디자인 변경 */}
+      
+      <div className="flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-40 pb-32">
         {isDemoMode && (
-            <div className="mb-6 p-3 bg-indigo-50 border border-indigo-100 rounded-lg flex items-center gap-2 text-indigo-700 text-sm animate-fade-in-down">
-                <AlertCircle size={16} />
-                <span>현재 <b>데모 모드</b>입니다. 실제 캠페인을 시작하시면 실시간 데이터를 확인할 수 있습니다.</span>
+            <div className="mb-10 p-5 bg-gradient-to-r from-purple-900/40 to-blue-900/40 border border-purple-500/30 rounded-3xl flex items-center gap-4 text-purple-200 text-sm shadow-[0_0_20px_rgba(168,85,247,0.1)] animate-fade-in-down relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-1 h-full bg-purple-500 animate-pulse"></div>
+                <AlertCircle size={20} className="text-purple-400 shrink-0" />
+                <span className="font-light tracking-tight">현재 시스템 체험을 위한 <b className="font-black text-white uppercase tracking-widest underline decoration-purple-500 underline-offset-4">Demo Mode</b>가 활성화되어 있습니다. 실제 캠페인 계약 시 실시간 데이터 피드가 전송됩니다.</span>
             </div>
         )}
 
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-12 gap-8 relative z-10">
             <div>
-                <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-2">
-                    {user ? `반갑습니다, ${user.email.split('@')[0]} 님 👋` : `반갑습니다, 담당자님 👋`}
+                <h1 className="text-4xl md:text-5xl font-black text-white tracking-tighter mb-3 leading-none uppercase">
+                    {user ? `${user.email.split('@')[0]}'s Dashboard` : `Management Dashboard`}
                 </h1>
-                <p className="text-slate-500">현재 진행 중인 캠페인 현황을 한눈에 확인하세요.</p>
+                <p className="text-slate-500 font-light text-lg tracking-tight">전체 캠페인 진행 상태 및 성과 지표를 실시간으로 모니터링합니다.</p>
             </div>
             {user && (
                 <button 
                     onClick={() => setIsPasswordMode(!isPasswordMode)}
-                    className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors shadow-sm w-fit text-slate-600"
+                    className="flex items-center gap-3 px-6 py-3 bg-white/5 border border-white/10 rounded-2xl text-xs font-black tracking-widest uppercase hover:bg-white/10 transition-all shadow-xl text-slate-300"
                 >
-                    <Settings size={16} /> 계정 설정
+                    <Settings size={18} className="text-slate-500 group-hover:rotate-45 transition-transform" /> Account Settings
                 </button>
             )}
         </div>
+
         {isPasswordMode && user && (
-            <div className="mb-8 bg-white p-6 rounded-2xl shadow-sm border border-indigo-100 animate-fade-in-up max-w-lg">
-                <h3 className="text-sm font-bold mb-3 flex items-center gap-2 text-indigo-900">
-                    <Lock size={16} className="text-indigo-600"/> 비밀번호 재설정
+            <div className="mb-12 bg-white/5 backdrop-blur-3xl p-8 rounded-[2.5rem] shadow-2xl border border-purple-500/30 animate-fade-in-up max-w-xl">
+                <h3 className="text-[10px] font-black tracking-widest uppercase mb-6 flex items-center gap-3 text-purple-400">
+                    <Lock size={18} /> Update Security Key
                 </h3>
-                <div className="flex gap-2">
+                <div className="flex gap-4">
                     <input 
                         type="password" 
-                        placeholder="새 비밀번호 입력 (6자 이상)" 
+                        placeholder="NEW PASSWORD (MIN 6 CHARS)" 
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
-                        className="flex-1 px-4 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500 transition-all"
+                        className="flex-1 px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-sm font-bold text-white outline-none focus:border-purple-500 transition-all uppercase tracking-widest"
                     />
-                    <button onClick={handlePasswordUpdate} className="bg-indigo-600 text-white px-5 py-2 rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors whitespace-nowrap shadow-sm">변경하기</button>
+                    <button onClick={handlePasswordUpdate} className="bg-purple-600 text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-purple-500 transition-all shadow-[0_0_15px_rgba(147,51,234,0.3)]">Update</button>
                 </div>
             </div>
         )}
-        <div className="flex flex-col lg:flex-row gap-6 items-start">
-            {/* Left Sidebar / Menu Column */}
-            <div className="w-full lg:w-1/4 space-y-6">
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between mb-2 px-1">
-                        {/* [UI] 명도 개선: slate-400 -> slate-600 */}
-                        <h2 className="text-sm font-bold text-slate-600 uppercase tracking-wider">My Campaigns</h2>
-                        <span className="text-xs font-medium bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full">{campaigns.length}</span>
+
+        <div className="flex flex-col lg:flex-row gap-10 items-start">
+            {/* Left Sidebar */}
+            <div className="w-full lg:w-1/4 space-y-10 sticky top-40">
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between px-2">
+                        <h2 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em]">Campaign Library</h2>
+                        <span className="text-[10px] font-black bg-white/5 text-slate-400 px-3 py-1 rounded-full border border-white/5">{campaigns.length}</span>
                     </div>
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                         {campaigns.map(campaign => (
                             <CampaignCard 
                                 key={campaign.id} 
@@ -643,65 +617,58 @@ export default function Dashboard() {
                             />
                         ))}
                     </div>
-                    <div onClick={() => navigate('/pricing')} className="p-5 rounded-2xl border-2 border-dashed border-slate-300 text-center hover:border-indigo-400 hover:bg-indigo-50/50 transition-all cursor-pointer group">
-                        <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-2 text-slate-500 group-hover:bg-white group-hover:text-indigo-500 transition-colors">
-                            <Package size={20} />
+                    <div onClick={() => navigate('/#pricing')} className="p-8 rounded-[2.5rem] border-2 border-dashed border-white/5 text-center hover:border-purple-500/50 hover:bg-purple-500/5 transition-all cursor-pointer group relative overflow-hidden">
+                        <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center mx-auto mb-4 text-slate-500 group-hover:text-purple-400 transition-all duration-500 border border-white/5 group-hover:rotate-180">
+                            <Package size={24} />
                         </div>
-                        <p className="text-xs font-bold text-slate-700 group-hover:text-indigo-700">새 캠페인 추가하기</p>
+                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest group-hover:text-white transition-colors">Start New Campaign</p>
                     </div>
                 </div>
                 
-                {/* [Service Section] 성과 부스팅 개편 */}
-                <div className="space-y-3 pt-6 border-t border-slate-200">
-                    <h2 className="text-sm font-bold text-slate-600 uppercase tracking-wider px-1">성과부스팅 (Performance Boosting)</h2>
+                {/* Performance Boosting Section */}
+                <div className="space-y-4 pt-10 border-t border-white/5">
+                    <h2 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] px-2">Performance Boost</h2>
                     
-                    {/* [수정] KOL Boosting Card: Spark Ads와 동일하게 비활성화 처리 */}
-                    <div 
-                        onClick={handleSparkAdsClick}
-                        className="bg-slate-50 p-4 rounded-xl border border-slate-200 cursor-not-allowed opacity-80"
-                    >
-                        <div className="flex items-center gap-3 mb-2">
-                            {/* Icon Color Changed */}
-                            <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-slate-400 shadow-sm"><TrendingUp size={16} /></div>
-                            <span className="font-bold text-slate-500 text-sm">KOL 부스팅</span>
+                    {[
+                        { icon: TrendingUp, title: "KOL BOOSTING", desc: "고성과 인플루언서 추가 섭외" },
+                        { icon: Zap, title: "SPARK ADS", desc: "공식 광고 관리자 자동 연동" }
+                    ].map((item, idx) => (
+                        <div 
+                            key={idx}
+                            onClick={handleSparkAdsClick}
+                            className="bg-white/5 p-6 rounded-[2rem] border border-white/5 cursor-not-allowed group opacity-60"
+                        >
+                            <div className="flex items-center gap-4 mb-3">
+                                <div className="w-10 h-10 rounded-xl bg-black flex items-center justify-center text-slate-700 shadow-xl border border-white/5"><item.icon size={18} /></div>
+                                <span className="font-black text-slate-500 text-xs tracking-tighter uppercase">{item.title}</span>
+                            </div>
+                            <p className="text-[10px] text-slate-700 leading-relaxed mb-4 font-medium tracking-tight">{item.desc}</p>
+                            <span className="text-[9px] font-black text-slate-800 flex items-center gap-2 uppercase tracking-[0.2em] italic">Locked / Coming Soon</span>
                         </div>
-                        <p className="text-xs text-slate-400 leading-relaxed mb-2">성과가 좋은 인플루언서를 유상으로 추가 섭외하여 임팩트를 극대화하세요.</p>
-                        {/* Status Changed to match disabled look */}
-                        <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">준비 중입니다 (Coming Soon)</span>
-                    </div>
-
-                    {/* Spark Ads Card (Coming Soon / Disabled) */}
-                    <div 
-                        onClick={handleSparkAdsClick}
-                        className="bg-slate-50 p-4 rounded-xl border border-slate-200 cursor-not-allowed opacity-80"
-                    >
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-slate-400 shadow-sm"><Zap size={16} /></div>
-                            <span className="font-bold text-slate-500 text-sm">Spark Ads</span>
-                        </div>
-                        <p className="text-xs text-slate-400 leading-relaxed mb-2">틱톡 공식 광고 관리자 연동 서비스</p>
-                        <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">준비 중입니다 (Coming Soon)</span>
-                    </div>
+                    ))}
                 </div>
             </div>
 
             {/* Main Content Area */}
             <div className="w-full lg:w-3/4">
-                 <div className="bg-white p-6 md:p-8 rounded-[2rem] shadow-sm border border-slate-200 min-h-[800px]">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 pb-6 border-b border-slate-100 gap-4">
+                 <div className="bg-white/5 backdrop-blur-2xl p-8 md:p-12 rounded-[4rem] border border-white/10 shadow-[0_0_100px_rgba(0,0,0,0.5)] min-h-[900px] relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent"></div>
+                    <div className="flex flex-col md:flex-row md:items-center justify-between mb-12 pb-10 border-b border-white/5 gap-8 relative z-10">
                         <div>
-                            <div className="flex items-center gap-2 mb-1">
-                                <h2 className="text-2xl font-bold text-slate-900">{selectedCampaign?.product_name || 'Campaign'}</h2>
-                                <span className="text-xs font-bold px-2 py-0.5 bg-slate-100 text-slate-500 rounded">{selectedCampaign?.plan}</span>
+                            <div className="flex items-center gap-4 mb-3">
+                                <h2 className="text-3xl md:text-5xl font-black text-white tracking-tighter uppercase leading-none">{selectedCampaign?.product_name || 'Campaign'}</h2>
+                                <span className="text-[10px] font-black px-4 py-1.5 bg-cyan-500/10 text-cyan-400 rounded-full border border-cyan-400/20 tracking-widest uppercase">{selectedCampaign?.plan}</span>
                             </div>
-                            <p className="text-slate-500 text-sm flex items-center gap-2">
-                                <span className={`w-2 h-2 rounded-full ${selectedCampaign?.status === CampaignStatus.COMPLETED ? 'bg-slate-400' : 'bg-green-500 animate-pulse'}`}></span>
-                                {selectedCampaign?.status === CampaignStatus.COMPLETED ? '데이터 분석 완료' : '실시간 데이터 분석 중'}
+                            <p className="text-slate-500 text-lg font-light flex items-center gap-3 tracking-tight">
+                                <span className={`w-3 h-3 rounded-full ${selectedCampaign?.status === CampaignStatus.COMPLETED ? 'bg-slate-700 shadow-none' : 'bg-cyan-400 animate-pulse shadow-[0_0_10px_rgba(34,211,238,0.8)]'}`}></span>
+                                {selectedCampaign?.status === CampaignStatus.COMPLETED ? 'FINAL REPORT GENERATED' : 'ANALYTIC ENGINE ACTIVE - MONITORING LIVE FEED'}
                             </p>
                         </div>
                         <StatusBadge status={selectedCampaign?.status} />
                     </div>
-                    <CampaignDetail campaign={selectedCampaign} />
+                    <div className="relative z-10">
+                        <CampaignDetail campaign={selectedCampaign} />
+                    </div>
                  </div>
             </div>
         </div>

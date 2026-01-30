@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Menu, X, ArrowRight, LogOut } from 'lucide-react';
+import { Menu, X, ArrowRight, LogOut} from 'lucide-react';
 import logoImg from '../../assets/logo.png';
 import { supabase } from '../../lib/supabase';
 
@@ -9,7 +9,7 @@ const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
-  const location = useLocation(); // 현재 경로 확인용
+  const location = useLocation();
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -32,9 +32,7 @@ const Navbar = () => {
     };
   }, []);
 
-  // [수정] 섹션 이동 핸들러 (메인 페이지 내 스크롤 vs 타 페이지에서 이동)
   const handleSectionClick = (e, path) => {
-    // 1. 해시 링크(/#id)인 경우 처리
     if (path.startsWith('/#')) {
       e.preventDefault();
       const id = path.replace('/#', '');
@@ -42,7 +40,7 @@ const Navbar = () => {
       const scrollToElement = () => {
         const element = document.getElementById(id);
         if (element) {
-          const headerOffset = 80; // 고정 헤더 높이만큼 보정
+          const headerOffset = 90; 
           const elementPosition = element.getBoundingClientRect().top;
           const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
       
@@ -54,16 +52,13 @@ const Navbar = () => {
       };
 
       if (location.pathname === '/') {
-        // 이미 메인 페이지라면 바로 스크롤
         scrollToElement();
       } else {
-        // 다른 페이지라면 메인으로 이동 후 스크롤
         navigate('/');
-        setTimeout(scrollToElement, 100); // DOM 로드 대기
+        setTimeout(scrollToElement, 150);
       }
       setIsOpen(false);
     } else {
-      // 2. 일반 링크인 경우
       window.scrollTo({ top: 0, behavior: 'instant' });
       setIsOpen(false);
     }
@@ -80,105 +75,92 @@ const Navbar = () => {
     }
   };
 
-  // [수정] 경로를 ID 앵커로 변경
   const navLinks = [
-    
-    { name: '고객 사례', path: '/#cases'}, // Success Stories Section ID
-    { name: '프로세스 소개', path: '/#process' }, // (필요 시 /#process 등으로 변경 가능)
-    { name: '캠페인', path: '/#pricing'} // Pricing Section ID
+    { name: '고객 사례', path: '/#cases'},
+    { name: '프로세스', path: '/#process' },
+    { name: '요금제', path: '/#pricing'}
   ];
 
   return (
-    <nav className={`fixed w-full z-50 transition-all duration-300 ${
-      scrolled 
-        ? 'bg-white/90 backdrop-blur-md border-b border-gray-100 py-4 shadow-sm' 
-        : 'bg-transparent py-6'
+    <nav className={`fixed w-full z-50 transition-all duration-500 bg-white/95 backdrop-blur-xl border-b ${
+      scrolled ? 'py-3 border-slate-200 shadow-[0_4px_20px_-5px_rgba(0,0,0,0.05)]' : 'py-5 border-transparent'
     }`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="relative flex justify-between items-center">
           
           {/* 1. Logo (Left) */}
-          <Link to="/" onClick={(e) => handleSectionClick(e, '/')} className="flex items-center gap-2 cursor-pointer z-10">
+          <Link to="/" onClick={(e) => handleSectionClick(e, '/')} className="flex items-center gap-3 cursor-pointer z-10 group">
+
+    
               {logoImg ? (
-                <img src={logoImg} alt="Brand Slam" className="h-16 w-auto object-contain" />
+                <img src={logoImg} alt="slam-global" className="h-10 w-auto object-contain" />
               ) : (
-                <span className="font-bold text-2xl tracking-tighter text-blue-900">BRAND SLAM</span>
+                <span className="font-black text-2xl tracking-tighter text-slate-900 uppercase">Slam Global</span>
               )}
           </Link>
 
           {/* 2. Desktop Menu (Center) */}
-          <div className="hidden md:flex absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 items-center gap-8">
+          <div className="hidden md:flex absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 items-center gap-10">
             {navLinks.map((link) => (
-              link.path.startsWith('/#') ? (
-                // 해시 링크인 경우 button 혹은 a 태그 사용하되 onClick 핸들러 연결
-                <a 
-                  key={link.name} 
-                  href={link.path} 
-                  onClick={(e) => handleSectionClick(e, link.path)}
-                  className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors cursor-pointer"
-                >
-                  {link.name}
-                </a>
-              ) : (
-                <Link 
-                  key={link.name} 
-                  to={link.path} 
-                  onClick={(e) => handleSectionClick(e, link.path)}
-                  className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors"
-                >
-                  {link.name}
-                </Link>
-              )
+              <a 
+                key={link.name} 
+                href={link.path} 
+                onClick={(e) => handleSectionClick(e, link.path)}
+                className="text-xs font-black uppercase tracking-widest text-slate-500 hover:text-indigo-600 transition-all cursor-pointer relative group"
+              >
+                {link.name}
+                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-indigo-600 transition-all group-hover:w-full"></span>
+              </a>
             ))}
           </div>
 
           {/* 3. CTA Buttons (Right) */}
-          <div className="hidden md:flex items-center gap-4 z-10">
+          <div className="hidden md:flex items-center gap-6 z-10">
             {user ? (
-              <>
+              <div className="flex items-center gap-6">
                 <Link 
                   to="/dashboard" 
-                  className="text-sm font-bold text-indigo-600 hover:text-indigo-800 transition-colors mr-2"
+                  className="text-xs font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-800 transition-colors"
                 >
-                  내 캠페인 현황
+                  My Campaign
                 </Link>
                 <button 
                   onClick={handleLogout}
-                  className="text-sm font-medium text-gray-500 hover:text-red-600 transition-colors flex items-center gap-1"
+                  className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                  title="Logout"
                 >
-                  <LogOut size={16} />
-                  로그아웃
+                  <LogOut size={18} />
                 </button>
-              </>
+              </div>
             ) : (
-              <>
+              <div className="flex items-center gap-8">
                 <Link 
                   to="/dashboard" 
-                  className="text-sm font-bold text-indigo-600 hover:text-indigo-800 transition-colors mr-2"
+                  className="text-xs font-black uppercase tracking-widest text-slate-400 hover:text-indigo-600 transition-colors"
                 >
                   대시보드 미리보기
                 </Link>
                 <Link 
                   to="/login" 
-                  className="text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors"
+                  className="text-xs font-black uppercase tracking-widest text-slate-900 hover:text-indigo-600 transition-colors"
                 >
                   로그인
                 </Link>
-              </>
+              </div>
             )}
             
             <Link 
-              to="/checkout" 
-              className="bg-black text-white px-5 py-2.5 rounded-full text-sm font-bold hover:bg-gray-800 transition-all hover:scale-105 flex items-center gap-2"
+              to="/consulting" 
+              className="bg-slate-900 text-white px-8 py-3 rounded-full text-xs font-black uppercase tracking-widest hover:bg-indigo-600 transition-all hover:scale-105 shadow-xl flex items-center gap-2"
             >
               바로 시작하기
-              <ArrowRight size={16} />
+              <ArrowRight size={14} />
             </Link>
           </div>
 
           {/* Mobile Menu Button */}
           <div className="md:hidden z-10">
-            <button onClick={() => setIsOpen(!isOpen)} className="text-gray-900">
+            <button onClick={() => setIsOpen(!isOpen)} className="text-slate-900 p-2">
               {isOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
           </div>
@@ -187,76 +169,65 @@ const Navbar = () => {
 
       {/* Mobile Menu Overlay */}
       {isOpen && (
-        <div className="md:hidden absolute top-full left-0 w-full bg-white border-b border-gray-100 p-4 flex flex-col gap-4 shadow-lg">
+        <div className="md:hidden absolute top-full left-0 w-full bg-white border-b border-slate-200 p-8 flex flex-col gap-6 shadow-2xl animate-fade-in-down">
           {navLinks.map((link) => (
-             link.path.startsWith('/#') ? (
-               <a 
-                 key={link.name} 
-                 href={link.path} 
-                 className="text-sm font-medium text-gray-900 py-2" 
-                 onClick={(e) => handleSectionClick(e, link.path)}
-               >
-                 {link.name}
-               </a>
-             ) : (
-               <Link 
-                key={link.name} 
-                to={link.path} 
-                className="text-sm font-medium text-gray-900 py-2" 
-                onClick={(e) => handleSectionClick(e, link.path)}
-               >
-                 {link.name}
-               </Link>
-             )
+             <a 
+               key={link.name} 
+               href={link.path} 
+               className="text-lg font-black uppercase tracking-widest text-slate-900 py-2 border-b border-slate-50" 
+               onClick={(e) => handleSectionClick(e, link.path)}
+             >
+               {link.name}
+             </a>
           ))}
-          <hr className="border-gray-100" />
           
-          {user ? (
-            <>
-              <div className="text-center py-2 text-xs text-gray-400">
-                {user.email}님 환영합니다
-              </div>
-              <Link 
-                to="/dashboard"
-                onClick={() => setIsOpen(false)}
-                className="w-full text-center py-3 text-sm font-bold text-indigo-600 bg-indigo-50 rounded-lg"
-              >
-                내 캠페인 현황
-              </Link>
-              <button 
-                onClick={handleLogout}
-                className="w-full text-center py-3 text-sm font-medium text-gray-500 hover:text-red-600 hover:bg-gray-50 rounded-lg flex items-center justify-center gap-2"
-              >
-                <LogOut size={16} />
-                로그아웃
-              </button>
-            </>
-          ) : (
-            <>
-              <Link 
-                to="/dashboard"
-                onClick={() => setIsOpen(false)}
-                className="w-full text-center py-3 text-sm font-bold text-indigo-600 bg-indigo-50 rounded-lg"
-              >
-                대시보드 미리보기
-              </Link>
-              <Link 
-                to="/login"
-                onClick={() => setIsOpen(false)}
-                className="w-full text-center py-3 text-sm font-medium text-gray-900 bg-gray-50 rounded-lg"
-              >
-                로그인
-              </Link>
-            </>
-          )}
-          
-          <Link 
-            to="/checkout"
-            onClick={() => setIsOpen(false)}
-            className="w-full text-center py-3 text-sm font-bold text-white bg-black rounded-lg block"
-          >
-            바로 시작하기
-          </Link>
+          <div className="flex flex-col gap-4 mt-4">
+            {user ? (
+              <>
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                  Signed in as: {user.email}
+                </div>
+                <Link 
+                  to="/dashboard"
+                  onClick={() => setIsOpen(false)}
+                  className="w-full text-center py-4 text-xs font-black uppercase tracking-[0.2em] text-indigo-600 bg-indigo-50 rounded-2xl"
+                >
+                  내 캠페인 현황
+                </Link>
+                <button 
+                  onClick={handleLogout}
+                  className="w-full text-center py-4 text-xs font-black uppercase tracking-[0.2em] text-slate-400 bg-slate-50 rounded-2xl flex items-center justify-center gap-2"
+                >
+                  <LogOut size={16} /> 로그아웃
+                </button>
+              </>
+            ) : (
+              <>
+                <Link 
+                  to="/dashboard"
+                  onClick={() => setIsOpen(false)}
+                  className="w-full text-center py-4 text-xs font-black uppercase tracking-[0.2em] text-indigo-600 bg-indigo-50 rounded-2xl"
+                >
+                  대시보드 미리보기
+                </Link>
+                <Link 
+                  to="/login"
+                  onClick={() => setIsOpen(false)}
+                  className="w-full text-center py-4 text-xs font-black uppercase tracking-[0.2em] text-slate-900 bg-slate-100 rounded-2xl"
+                >
+                  로그인
+                </Link>
+              </>
+            )}
+            
+            <Link 
+              to="/consulting"
+              onClick={() => setIsOpen(false)}
+              className="w-full text-center py-5 text-xs font-black uppercase tracking-[0.2em] text-white bg-slate-900 rounded-2xl shadow-xl"
+            >
+              바로 시작하기
+            </Link>
+          </div>
         </div>
       )}
     </nav>

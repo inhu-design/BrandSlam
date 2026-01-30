@@ -196,16 +196,16 @@ const Footer = () => {
                  {logoImg ? (
                    <img 
                      src={logoImg} 
-                     alt="Brand Slam" 
+                     alt="slam-global" 
                      className="h-16 w-auto object-contain" 
                    />
                  ) : (
-                   <span className="font-bold text-xl tracking-tighter text-blue-900">BRAND SLAM</span>
+                   <span className="font-bold text-xl tracking-tighter text-blue-900">slam-global</span>
                  )}
               </Link>
 
               <p className="text-gray-500 text-sm max-w-xs leading-relaxed mt-2">
-                Brand Slam은 글로벌 뷰티 브랜드를 위한 <br className="hidden md:block" />
+                slam-global은 글로벌 뷰티 브랜드를 위한 <br className="hidden md:block" />
                 <span className="font-bold text-gray-900">올인원 인플루언서 마케팅 자동화 솔루션</span> 입니다. 
               </p>
             </div>
@@ -268,7 +268,7 @@ const Footer = () => {
               </div>
 
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-xs text-gray-400 mt-2">
-                <p>© 2026 Brand Slam Inc. All rights reserved.</p>
+                <p>© 2024 Brand Slam Inc. All rights reserved.</p>
               </div>
             </div>
           </div>
