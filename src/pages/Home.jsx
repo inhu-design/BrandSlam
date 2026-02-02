@@ -264,7 +264,58 @@ const WhySection = () => (
     </div>
   </section>
 );
-
+// 2.5 Brand Logo Slider Section
+const BrandLogosSection = () => {
+    const brands = [
+      "23yearsold", "bmsmile", "isntree", "anua", "beplain", "celimax", 
+      "cleardea", "dalba", "deoproce", "easyderm", "genabelle", 
+      "itsskin", "kocostar", "pcalm", 
+      "skinnlab", "troubless", "baerry"
+    ];
+  
+    const doubleBrands = [...brands, ...brands];
+  
+    return (
+      <section className="py-24 bg-[#020617] overflow-hidden border-b border-white/5 relative">
+        <div className="max-w-7xl mx-auto px-4 mb-16 text-center">
+           <span className="text-cyan-400 font-black tracking-[0.2em] uppercase text-xs mb-3 block">
+              Trusted Partners
+           </span>
+           <p className="text-xl md:text-2xl text-white font-bold tracking-tight">
+              <span className="text-slate-500">Global K-Beauty</span> 브랜드들의 선택
+           </p>
+        </div>
+        
+        <div className="relative flex overflow-hidden group">
+          {/* 좌우 페이드 효과 */}
+          <div className="absolute inset-y-0 left-0 w-24 md:w-40 bg-gradient-to-r from-[#020617] to-transparent z-10 pointer-events-none"></div>
+          <div className="absolute inset-y-0 right-0 w-24 md:w-40 bg-gradient-to-l from-[#020617] to-transparent z-10 pointer-events-none"></div>
+  
+          <div className="flex animate-infinite-scroll whitespace-nowrap py-4 items-center">
+            {doubleBrands.map((brand, idx) => (
+              <div key={idx} className="mx-8 md:mx-14 w-32 md:w-40 flex items-center justify-center h-20 cursor-pointer">
+                <img 
+                  src={`/logos/${brand}.png`} 
+                  alt={`${brand} logo`} 
+                  // [ 핵심 수정 사항 ]
+                  // 1. grayscale: 색상 제거
+                  // 2. invert: 색상 반전 (흰 배경->검은 배경 / 검은 글씨->흰 글씨)
+                  // 3. mix-blend-screen: 검은색(배경)은 투명해지고 밝은 색(글씨)만 남음
+                  // 4. opacity: 너무 쨍하지 않게 조절
+                  className="max-w-full max-h-full object-contain grayscale invert mix-blend-screen opacity-70 hover:opacity-100 transition-opacity duration-300"
+                  onError={(e) => {
+                      e.target.style.display = 'none'; 
+                      e.target.parentElement.innerText = brand;
+                      e.target.parentElement.className = 'text-slate-500 font-bold text-xl flex items-center justify-center h-full w-full';
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  };
 // 3. Success Stories Section (Ref 2 이미지의 글로시 카드 반영)
 const SuccessStoriesSection = () => (
     <section id="cases" className="py-32 bg-[#020617]">
@@ -654,6 +705,7 @@ export default function Home() {
       <Navbar /> 
       <Hero />
       <WhySection />
+      <BrandLogosSection />
       <SuccessStoriesSection />
       <ViralGridSection />
       <GuaranteeSection />
