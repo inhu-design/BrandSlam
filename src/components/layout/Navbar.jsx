@@ -83,20 +83,21 @@ const Navbar = () => {
 
   return (
     <nav className={`fixed w-full z-50 transition-all duration-500 bg-white/95 backdrop-blur-xl border-b ${
-      scrolled ? 'py-3 border-slate-200 shadow-[0_4px_20px_-5px_rgba(0,0,0,0.05)]' : 'py-5 border-transparent'
-    }`}>
+      scrolled ? 'py-4 border-slate-200 shadow-sm' : 'py-6 border-transparent'
+    }`}> {/* [변경] py-3/5 -> py-4/6 (높이 약간 증가) */}
+      
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="relative flex justify-between items-center">
           
           {/* 1. Logo (Left) */}
           <Link to="/" onClick={(e) => handleSectionClick(e, '/')} className="flex items-center gap-3 cursor-pointer z-10 group">
-
-    
-              {logoImg ? (
-                <img src={logoImg} alt="slam-global" className="h-10 w-auto object-contain" />
-              ) : (
-                <span className="font-black text-2xl tracking-tighter text-slate-900 uppercase">Slam Global</span>
-              )}
+            {logoImg ? (
+              // [변경] h-10 -> h-12 (로고 이미지 크기 확대)
+              <img src={logoImg} alt="slam-global" className="h-16 w-auto object-contain" />
+            ) : (
+              // [변경] text-2xl -> text-3xl (로고 텍스트 크기 확대)
+              <span className="font-black text-3xl tracking-tighter text-slate-900 uppercase">Slam Global</span>
+            )}
           </Link>
 
           {/* 2. Desktop Menu (Center) */}
@@ -106,7 +107,8 @@ const Navbar = () => {
                 key={link.name} 
                 href={link.path} 
                 onClick={(e) => handleSectionClick(e, link.path)}
-                className="text-xs font-black uppercase tracking-widest text-slate-500 hover:text-indigo-600 transition-all cursor-pointer relative group"
+                // [변경] text-xs -> text-sm (메뉴 폰트 크기 확대)
+                className="text-sm font-black uppercase tracking-widest text-slate-500 hover:text-indigo-600 transition-all cursor-pointer relative group"
               >
                 {link.name}
                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-indigo-600 transition-all group-hover:w-full"></span>
@@ -120,7 +122,8 @@ const Navbar = () => {
               <div className="flex items-center gap-6">
                 <Link 
                   to="/dashboard" 
-                  className="text-xs font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-800 transition-colors"
+                  // [변경] text-xs -> text-sm
+                  className="text-sm font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-800 transition-colors"
                 >
                   My Campaign
                 </Link>
@@ -129,20 +132,23 @@ const Navbar = () => {
                   className="p-2 text-slate-400 hover:text-red-500 transition-colors"
                   title="Logout"
                 >
-                  <LogOut size={18} />
+                  {/* [변경] 아이콘 크기 약간 확대 size={18} -> size={20} */}
+                  <LogOut size={20} />
                 </button>
               </div>
             ) : (
               <div className="flex items-center gap-8">
                 <Link 
                   to="/dashboard" 
-                  className="text-xs font-black uppercase tracking-widest text-slate-400 hover:text-indigo-600 transition-colors"
+                  // [변경] text-xs -> text-sm
+                  className="text-sm font-black uppercase tracking-widest text-slate-400 hover:text-indigo-600 transition-colors"
                 >
                   대시보드 미리보기
                 </Link>
                 <Link 
                   to="/login" 
-                  className="text-xs font-black uppercase tracking-widest text-slate-900 hover:text-indigo-600 transition-colors"
+                  // [변경] text-xs -> text-sm
+                  className="text-sm font-black uppercase tracking-widest text-slate-900 hover:text-indigo-600 transition-colors"
                 >
                   로그인
                 </Link>
@@ -151,17 +157,18 @@ const Navbar = () => {
             
             <Link 
               to="/consulting" 
-              className="bg-slate-900 text-white px-8 py-3 rounded-full text-xs font-black uppercase tracking-widest hover:bg-indigo-600 transition-all hover:scale-105 shadow-xl flex items-center gap-2"
+              // [변경] text-xs -> text-sm, px-8 -> px-9, py-3 -> py-3.5 (버튼 전체 크기 확대)
+              className="bg-slate-900 text-white px-9 py-3.5 rounded-full text-sm font-black uppercase tracking-widest hover:bg-indigo-600 transition-all hover:scale-105 shadow-xl flex items-center gap-2"
             >
               바로 시작하기
-              <ArrowRight size={14} />
+              <ArrowRight size={16} /> {/* 아이콘 크기 미세 조정 */}
             </Link>
           </div>
 
           {/* Mobile Menu Button */}
           <div className="md:hidden z-10">
             <button onClick={() => setIsOpen(!isOpen)} className="text-slate-900 p-2">
-              {isOpen ? <X size={24} /> : <Menu size={24} />}
+              {isOpen ? <X size={28} /> : <Menu size={28} />} {/* 모바일 햄버거 메뉴 아이콘 확대 */}
             </button>
           </div>
         </div>
@@ -174,7 +181,8 @@ const Navbar = () => {
              <a 
                key={link.name} 
                href={link.path} 
-               className="text-lg font-black uppercase tracking-widest text-slate-900 py-2 border-b border-slate-50" 
+               // [변경] text-lg -> text-xl (모바일 메뉴 폰트 확대)
+               className="text-xl font-black uppercase tracking-widest text-slate-900 py-2 border-b border-slate-50" 
                onClick={(e) => handleSectionClick(e, link.path)}
              >
                {link.name}
@@ -184,21 +192,23 @@ const Navbar = () => {
           <div className="flex flex-col gap-4 mt-4">
             {user ? (
               <>
-                <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                <div className="text-sm font-bold text-slate-400 uppercase tracking-widest">
                   Signed in as: {user.email}
                 </div>
                 <Link 
                   to="/dashboard"
                   onClick={() => setIsOpen(false)}
-                  className="w-full text-center py-4 text-xs font-black uppercase tracking-[0.2em] text-indigo-600 bg-indigo-50 rounded-2xl"
+                  // [변경] text-xs -> text-sm
+                  className="w-full text-center py-4 text-sm font-black uppercase tracking-[0.2em] text-indigo-600 bg-indigo-50 rounded-2xl"
                 >
                   내 캠페인 현황
                 </Link>
                 <button 
                   onClick={handleLogout}
-                  className="w-full text-center py-4 text-xs font-black uppercase tracking-[0.2em] text-slate-400 bg-slate-50 rounded-2xl flex items-center justify-center gap-2"
+                  // [변경] text-xs -> text-sm
+                  className="w-full text-center py-4 text-sm font-black uppercase tracking-[0.2em] text-slate-400 bg-slate-50 rounded-2xl flex items-center justify-center gap-2"
                 >
-                  <LogOut size={16} /> 로그아웃
+                  <LogOut size={18} /> 로그아웃
                 </button>
               </>
             ) : (
@@ -206,14 +216,16 @@ const Navbar = () => {
                 <Link 
                   to="/dashboard"
                   onClick={() => setIsOpen(false)}
-                  className="w-full text-center py-4 text-xs font-black uppercase tracking-[0.2em] text-indigo-600 bg-indigo-50 rounded-2xl"
+                  // [변경] text-xs -> text-sm
+                  className="w-full text-center py-4 text-sm font-black uppercase tracking-[0.2em] text-indigo-600 bg-indigo-50 rounded-2xl"
                 >
                   대시보드 미리보기
                 </Link>
                 <Link 
                   to="/login"
                   onClick={() => setIsOpen(false)}
-                  className="w-full text-center py-4 text-xs font-black uppercase tracking-[0.2em] text-slate-900 bg-slate-100 rounded-2xl"
+                  // [변경] text-xs -> text-sm
+                  className="w-full text-center py-4 text-sm font-black uppercase tracking-[0.2em] text-slate-900 bg-slate-100 rounded-2xl"
                 >
                   로그인
                 </Link>
@@ -223,7 +235,8 @@ const Navbar = () => {
             <Link 
               to="/consulting"
               onClick={() => setIsOpen(false)}
-              className="w-full text-center py-5 text-xs font-black uppercase tracking-[0.2em] text-white bg-slate-900 rounded-2xl shadow-xl"
+              // [변경] text-xs -> text-sm
+              className="w-full text-center py-5 text-sm font-black uppercase tracking-[0.2em] text-white bg-slate-900 rounded-2xl shadow-xl"
             >
               바로 시작하기
             </Link>
