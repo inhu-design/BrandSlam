@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState} from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   ArrowRight, CheckCircle2, Video, Target, Zap, 
@@ -277,7 +277,8 @@ const ProcessModal = ({ isOpen, onClose, navigate }) => {
 // --- [Sections: 리뉴얼 디자인 반영] ---
 
 // 1. Hero Section (Ref 1 이미지의 오가닉한 배경 반영)
-const Hero = () => (
+// 1. Hero Section (성공사례 버튼 추가 및 디자인 통일)
+const Hero = ({ onOpenLeadModal }) => (
   <section className="relative pt-32 pb-24 md:pt-48 md:pb-40 overflow-hidden bg-[#020617]">
     {/* Fluid Background Shapes */}
     <div className="absolute inset-0 z-0 overflow-hidden">
@@ -296,23 +297,37 @@ const Hero = () => (
       </div>
       
       <h1 className="text-5xl md:text-8xl font-black text-white tracking-tighter mb-10 leading-[1.1]">
-        컨텐츠 회수율 <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400">100% 보장</span>
-        <span className="block mt-4 text-slate-300 text-3xl md:text-5xl font-light">우리는 매니지먼트 플랫폼입니다.</span>
+        회수율 <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400">100% 까지 책임지는 </span>
+        <span className="block mt-4 text-slate-300 text-3xl md:text-5xl font-light">인플루언서 매니지먼트 시스템</span>
       </h1>
       
       <p className="max-w-3xl mx-auto text-lg md:text-xl text-slate-400 mb-12 leading-relaxed font-light break-keep">
-        미국 현지 크리에이터 매칭부터 배송, 업로드 관리까지.<br className="hidden md:block" />
-        수량만 선택하면 콘텐츠는 <span className="text-white font-medium italic">매달 자동으로 공급됩니다.</span>
+      실무 담당자의 소요 시간을<br className="hidden md:block" />
+      캠페인당 <span className="text-white font-medium italic">평균 85% 절감시켜드립니다.</span>
       </p>
 
-      <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+      {/* 버튼 그룹: 나란히 배치 */}
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-4 md:gap-6">
+        {/* 버튼 1: 무료 진단 (기존 메인 버튼) */}
         <Link 
           to="/consulting" 
-          className="group relative w-full sm:w-auto px-12 py-6 bg-white text-slate-900 rounded-full font-black text-xl hover:scale-105 transition-all shadow-[0_0_30px_rgba(255,255,255,0.2)] flex items-center justify-center gap-2 overflow-hidden"
+          className="group relative w-full sm:w-auto px-10 py-5 bg-white text-slate-900 rounded-full font-black text-lg hover:scale-105 transition-all shadow-[0_0_30px_rgba(255,255,255,0.2)] flex items-center justify-center gap-2 overflow-hidden"
         >
           <span className="relative z-10">무료 진단 및 견적 문의</span>
-          <ArrowRight size={22} className="relative z-10 group-hover:translate-x-1 transition-transform" />
+          <ArrowRight size={20} className="relative z-10 group-hover:translate-x-1 transition-transform" />
         </Link>
+
+        {/* 버튼 2: 성공사례 레퍼런스북 (새로 추가된 버튼) */}
+        <button 
+          onClick={onOpenLeadModal}
+          className="group relative w-full sm:w-auto px-10 py-5 bg-white/5 border border-white/20 text-white rounded-full font-bold text-lg hover:bg-white/10 transition-all backdrop-blur-md flex items-center justify-center gap-2 overflow-hidden"
+        >
+          {/* 하단에서 사용한 네온 글로우 효과를 아주 얇게 테두리에 적용 */}
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 to-cyan-500/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+          <Sparkles size={18} className="text-purple-400 group-hover:animate-pulse" />
+          <span className="relative z-10">성공사례 레퍼런스북 받기</span>
+          <ArrowRight size={20} className="relative z-10 group-hover:translate-x-1 transition-transform" />
+        </button>
       </div>
     </div>
   </section>
@@ -325,7 +340,7 @@ const WhySection = () => (
       <div className="text-center mb-24">
         <span className="text-purple-400 font-black tracking-[0.3em] uppercase text-sm">Step 01. The Mechanism</span>
         <h2 className="text-4xl md:text-6xl font-black text-white mt-6 mb-8 tracking-tight">
-            왜 <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400">회수율 100%</span>가 가능할까요?
+            어떻게 <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400">회수율 100%</span>가 가능할까요?
         </h2>
         <p className="text-xl text-slate-400 max-w-3xl mx-auto font-light leading-relaxed">
             시중의 단순 배송 대행사는 '통제력'이 없습니다.<br className="hidden md:block"/>
@@ -368,7 +383,7 @@ const WhySection = () => (
                     {[
                       { t: "직접 발굴 & 육성 (Discover)", d: "현존하는 모든 플랫폼에서 우수 KOC를 매일 컨택하고 교육함" },
                       { t: "성장을 돕는 파트너십", d: "단순 리워드를 넘어 컨텐츠 평가 및 성장 가이드 제공" },
-                      { t: "회수율 100% AS 보장", d: "목표 미달성 시 2차 캠페인 자동 실행 (책임 완수)" }
+                      { t: "회수율 100% AS 시스템 적용", d: "목표 미달성 시 2차 캠페인 자동 실행 (책임 완수)" }
                     ].map((item, i) => (
                       <li key={i} className="flex gap-5">
                         <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-2.5 shadow-[0_0_8px_rgba(34,211,238,0.8)]"></div>
@@ -437,7 +452,7 @@ const BrandLogosSection = () => {
       </section>
     );
   };
-// 3. Success Stories Section (Ref 2 이미지의 글로시 카드 반영)
+// 3. Success Stories Section 
 const SuccessStoriesSection = () => (
     <section id="cases" className="py-32 bg-[#020617]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -445,7 +460,6 @@ const SuccessStoriesSection = () => (
                 <span className="text-cyan-400 font-black tracking-[0.3em] uppercase text-sm">Step 02. The Proof</span>
                 <h2 className="text-4xl md:text-7xl font-black text-white mt-6 mb-8 tracking-tighter leading-none">
                 숫자로 증명하는
-                    {/* [변경] br 태그 대신 block과 margin-top으로 호흡 조절 */}
                     <span className="block mt-4 md:mt-6 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-400 to-emerald-400">
                         압도적인 성공 사례
                     </span>
@@ -468,7 +482,7 @@ const SuccessStoriesSection = () => (
                                 <span className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest mb-6 ${study.bg} ${study.color} border border-white/5 backdrop-blur-md`}>
                                     <Sparkles className="w-3.5 h-3.5" /> {study.category}
                                 </span>
-                                <h3 className="text-6xl md:text-8xl font-black text-white mb-6 tracking-tighter leading-none">{study.brand}</h3>
+                                <h3 className="text-4xl md:text-6xl font-black text-white mb-6 tracking-tighter leading-none">{study.brand}</h3>
                             </div>
 
                             <div className="space-y-10 mb-12">
@@ -499,56 +513,96 @@ const SuccessStoriesSection = () => (
 );
 
 // 4. Viral Grid Section
+// 4. Viral Grid Section
 const ViralGridSection = () => {
-    const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
-  
-    return (
-      <section className="py-32 bg-[#020617] relative">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="text-center mb-20">
-                   <div className="inline-flex items-center justify-center px-4 py-2 bg-white/5 rounded-full mb-6 border border-white/10 text-cyan-400">
-                      <PlayCircle size={18} className="mr-2" />
-                      <span className="text-xs font-black uppercase tracking-[0.2em]">Live Feed</span>
-                  </div>
-                  <h2 className="text-4xl md:text-5xl font-black text-white tracking-tight">바이럴 레퍼런스</h2>
-                  <p className="text-slate-500 mt-6 font-light">단순 노출을 넘어 구매 행동을 유발하는 컨텐츠의 정석</p>
+  const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
+
+  return (
+    <section className="py-32 bg-[#020617] relative overflow-hidden">
+      {/* 배경 장식 - 버튼 주변에 은은한 빛 추가 */}
+      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[500px] h-[300px] bg-purple-600/10 blur-[120px] pointer-events-none"></div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <div className="text-center mb-20">
+          <div className="inline-flex items-center justify-center px-4 py-2 bg-white/5 rounded-full mb-6 border border-white/10 text-cyan-400">
+            <PlayCircle size={18} className="mr-2" />
+            <span className="text-xs font-black uppercase tracking-[0.2em]">Live Feed</span>
+          </div>
+          <h2 className="text-4xl md:text-5xl font-black text-white tracking-tight">바이럴 레퍼런스</h2>
+          <p className="text-slate-500 mt-6 font-light">단순 노출을 넘어 구매 행동을 유발하는 컨텐츠의 정석</p>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 mb-24">
+          {viralReferences.map((ref) => (
+            <div key={ref.id} className="group">
+              <div className="relative aspect-[9/16] rounded-2xl overflow-hidden shadow-2xl mb-6 bg-slate-900 ring-1 ring-white/10 group-hover:ring-purple-500/50 transition-all duration-500">
+                <TikTokEmbed videoId={ref.videoId} />
+              </div>
+              <div className="text-center px-2">
+                <p className="text-sm font-bold text-white group-hover:text-cyan-400 transition-colors">{ref.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* [디자인 리뉴얼된 버튼 영역] */}
+        <div className="flex flex-col items-center justify-center gap-8">
+          <div className="text-center space-y-2">
+            <p className="text-cyan-400 text-sm font-black tracking-[0.2em] uppercase">Private Access</p>
+            <p className="text-slate-400 text-sm font-light">지금까지 성공시킨 200+ 브랜드의 전략이 담겨있습니다.</p>
+          </div>
+
+          <button 
+            onClick={() => setIsLeadModalOpen(true)}
+            className="group relative px-10 py-6 md:px-16 md:py-8 bg-slate-950 rounded-[2rem] overflow-hidden transition-all duration-500 hover:scale-[1.03] active:scale-[0.98]"
+          >
+            {/* 1. 애니메이션 배경 그라데이션 (네온 효과) */}
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-500 opacity-80 group-hover:opacity-100 transition-opacity"></div>
+            
+            {/* 2. 무빙 글로우 효과 (버튼 내부를 지나가는 빛) */}
+            <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/30 to-transparent pointer-events-none"></div>
+
+            {/* 3. 내부 베젤 효과 (유리 질감) */}
+            <div className="absolute inset-[1px] bg-slate-950/40 rounded-[1.95rem] backdrop-blur-sm border border-white/10"></div>
+
+            {/* 4. 실제 콘텐츠 */}
+            <div className="relative z-10 flex items-center gap-6 text-white">
+              <div className="bg-white/10 p-3 rounded-2xl group-hover:bg-white/20 transition-colors">
+                <Sparkles size={28} className="text-yellow-300 animate-pulse" />
               </div>
               
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 mb-20">
-                  {viralReferences.map((ref) => (
-                      <div key={ref.id} className="group">
-                          <div className="relative aspect-[9/16] rounded-2xl overflow-hidden shadow-2xl mb-6 bg-slate-900 ring-1 ring-white/10 group-hover:ring-purple-500/50 transition-all duration-500">
-                               <TikTokEmbed videoId={ref.videoId} />
-                          </div>
-                          <div className="text-center px-2">
-                              <p className="text-sm font-bold text-white group-hover:text-cyan-400 transition-colors">{ref.desc}</p>
-                          </div>
-                      </div>
-                  ))}
+              <div className="flex flex-col items-start text-left">
+                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-300 mb-1">Download Now</span>
+                <span className="text-xl md:text-2xl font-black tracking-tight leading-none">
+                  더 많은 성공사례가 궁금하다면? <span className="text-white/60 font-light text-lg ml-1">(PDF)</span>
+                </span>
               </div>
-  
-              {/* [추가된 버튼 영역] */}
-              <div className="flex justify-center">
-                <button 
-                  onClick={() => setIsLeadModalOpen(true)}
-                  className="group relative px-10 py-5 bg-white/5 border border-white/10 rounded-3xl text-white font-bold flex items-center gap-3 hover:bg-white/10 transition-all overflow-hidden"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                  <Sparkles size={20} className="text-purple-400" />
-                  더 많은 레퍼런스북 받아보기 (PDF)
-                  <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                </button>
+
+              <div className="w-12 h-12 flex items-center justify-center rounded-full bg-white/10 group-hover:translate-x-2 group-hover:bg-cyan-500 transition-all duration-300">
+                <ArrowRight size={24} />
               </div>
+            </div>
+
+            {/* 5. 외부 글로우 (그림자) */}
+            <div className="absolute -inset-2 bg-gradient-to-r from-purple-600 to-cyan-500 rounded-[2.5rem] blur-xl opacity-20 group-hover:opacity-40 transition-opacity pointer-events-none"></div>
+          </button>
+
+          <div className="flex items-center gap-4 text-[11px] text-slate-500 font-medium tracking-wider">
+            <span className="flex items-center gap-1.5"><Check size={12} className="text-cyan-500"/> 신청시 별도 메일로 발송</span>
+            <span className="w-1 h-1 bg-slate-800 rounded-full"></span>
+            <span className="flex items-center gap-1.5"><Check size={12} className="text-cyan-500"/> 미공개 성과 데이터 포함</span>
           </div>
-  
-          {/* 리드 수집 모달 */}
-          <LeadCollectionModal 
-            isOpen={isLeadModalOpen} 
-            onClose={() => setIsLeadModalOpen(false)} 
-          />
-      </section>
-    );
-  };
+        </div>
+      </div>
+
+      {/* 리드 수집 모달 */}
+      <LeadCollectionModal 
+        isOpen={isLeadModalOpen} 
+        onClose={() => setIsLeadModalOpen(false)} 
+      />
+    </section>
+  );
+};
 // 5. Guarantee Section (Ref 2 원형 오브제 스타일 반영)
 const GuaranteeSection = () => (
   <section className="py-40 bg-[#020617] relative overflow-hidden border-y border-white/5">
@@ -560,7 +614,7 @@ const GuaranteeSection = () => (
         실패란 없습니다.
             {/* [변경] Footer 스타일과 동일하게 block 처리 */}
             <span className="block mt-4 md:mt-6 text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-500">
-                100% 보장형 서비스
+                100% 케어형 서비스
             </span>
         </h2>
         
@@ -680,208 +734,210 @@ const ProcessSection = () => (
 );
 
 // 7. Pricing Section (Visit Plan 추가됨)
+// 7. Pricing Section (Visit Plan 수정됨 - 1인 단가 강조)
 const PricingSection = () => {
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const navigate = useNavigate();
-  
-    const mainPlans = [
-      { name: "Starter", price: "590,000", count: "10", recommend: "첫 시딩이거나 실패 확률을 줄이고 싶은 브랜드", features: ["캠페인 운영 대행", "콘텐츠 업로드 트래킹", "기본 리포트 서비스 제공"] },
-      { name: "Growth", price: "990,000", count: "20", recommend: "타겟 고객이 명확한 브랜드", features: ["캠페인 운영 대행", "콘텐츠 업로드 트래킹", "성과 리포트 (조회수, 반응)", "VOC 요약 서비스 제공"], isBest: true },
-      { name: "Scale50", price: "2,490,000", count: "50", recommend: "전환 및 매출 확장을 고려하는 브랜드", features: ["캠페인 운영 대행", "콘텐츠 업로드 트래킹", "성과 리포트 & VOC 분석", "원본 영상 1개 제공"] }
-    ];
-  
-    // [NEW] Visit Plan 데이터 (오프라인 특화)
-    const visitPlan = {
-        name: "VISIT CONTENT",
-        subTitle: "오프라인 매출 펌핑 시딩 상품",
-        price: "9,000,000", // 총 900만원
-        perPerson: "300,000", // 1인당
-        count: "30", // 월 30건
-        desc: "입점 이후, 매장 트래픽과 회전율을 끌어올리기 위한 전용 상품",
-        target: ["올리브영/Sephora/CVS 등 입점 브랜드", "매장 회전율이 고민인 브랜드"],
-        features: [
-            "월 30건 방문형 콘텐츠 (자택 사용기 + 매장 방문)",
-            "얼굴 노출 콘텐츠 포함 (신뢰도 상승)",
-            "구매 매장 정보 노출 (방문 유도)",
-            "TikTok / Instagram 업로드 최적화"
-        ]
-    };
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const navigate = useNavigate();
 
-    const addons = [
-      { icon: Target, title: "Top 50 인플루언서 큐레이션", price: "100,000원 / 월", desc: "어떤 크리에이터를 써야 할 지 모르는 브랜드", details: "캠페인 목적에 맞는 인플루언서 50명 추천" },
-      { icon: UserCheckIcon, title: "타겟 오디언스 큐레이션 (50)", price: "300,000원 / 월", desc: "타겟 고객이 명확한 브랜드", details: "반려동물 등 타겟 인플루언서 리스트 제공" },
-      { icon: ShieldCheck, title: "Creator Contact Pack", price: "별도 문의", desc: "직접 커뮤니케이션을 병행하고 싶은 브랜드", details: "사전 동의 크리에이터 정보 및 배송 중개" },
-      { icon: TrendingUp, title: "Spark Ads 신청 대행", price: "광고비 + 15%", desc: "전환 및 매출 확장을 고려하는 브랜드", details: "성과 우수 콘텐츠 광고 전환 및 세팅 대행" }
-    ];
-  
-    return (
-      <section id="pricing" className="py-32 bg-[#020617] relative overflow-hidden">
-        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-10"></div>
-        
-        <div className="max-w-7xl mx-auto px-4 relative z-10">
-          <div className="text-center mb-24">
-              <span className="text-purple-400 font-black tracking-[0.3em] uppercase text-sm">Step 05. The Offer</span>
-              <h2 className="text-4xl md:text-6xl font-black text-white mt-6 mb-8 tracking-tight">성장을 위한 맞춤형 플랜</h2>
-              <p className="text-slate-500 max-w-2xl mx-auto font-light leading-relaxed">플랫폼 기반의 투명한 운영으로 <span className="text-white font-medium italic underline underline-offset-4 decoration-purple-500">콘텐츠 회수율 100%</span>를 보장합니다.</p>
-          </div>
-  
-          {/* Main Plans (Online) */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-20">
-              {mainPlans.map((plan, idx) => (
-                  <div key={idx} className={`relative bg-[#0f172a] text-white rounded-[3rem] p-10 border transition-all duration-700 hover:-translate-y-4 ${plan.isBest ? 'border-purple-500 shadow-[0_0_50px_rgba(168,85,247,0.2)] md:scale-105 z-10' : 'border-white/10 shadow-2xl'}`}>
-                      {plan.isBest && (
-                          <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-1.5 rounded-full text-xs font-black tracking-widest shadow-xl">
-                              MOST POPULAR
-                          </div>
-                      )}
-                      <div className="mb-10">
-                          <h3 className="text-2xl font-black text-white mb-4 uppercase tracking-tighter">{plan.name}</h3>
-                          <div className="flex items-baseline gap-1">
-                              <span className="text-5xl font-black text-white tracking-tighter">{plan.price}</span>
-                              <span className="text-slate-500 font-bold text-lg">원</span>
-                          </div>
-                          <div className="mt-4 inline-block px-4 py-1.5 bg-purple-500/10 text-purple-400 rounded-xl text-sm font-black tracking-tighter border border-purple-500/20">
-                              콘텐츠 {plan.count}개 보장
-                          </div>
-                      </div>
-  
-                      <p className="text-sm text-slate-400 font-light mb-10 leading-relaxed bg-white/5 p-6 rounded-3xl border border-white/5 italic">
-                          💡 {plan.recommend}
-                      </p>
-  
-                      <ul className="space-y-5 mb-12">
-                          {plan.features.map((feat, i) => (
-                              <li key={i} className="flex items-start gap-4 text-sm font-medium text-slate-300">
-                                  <CheckCircle2 size={18} className="text-cyan-400 shrink-0 mt-0.5" />
-                                  {feat}
-                              </li>
-                          ))}
-                      </ul>
-  
-                      <button 
-                          onClick={() => setIsModalOpen(true)}
-                          className={`w-full py-5 rounded-[2rem] font-black text-lg transition-all flex items-center justify-center gap-2 ${plan.isBest ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:shadow-[0_0_30px_rgba(147,51,234,0.5)]' : 'bg-white text-slate-900 hover:bg-slate-100'}`}
-                      >
-                          발주 문의하기 <ArrowRight size={22}/>
-                      </button>
-                  </div>
-              ))}
-          </div>
+  const mainPlans = [
+    { name: "Starter", price: "590,000", count: "10", recommend: "첫 시딩이거나 실패 확률을 줄이고 싶은 브랜드", features: ["캠페인 운영 대행", "콘텐츠 업로드 트래킹", "기본 리포트 서비스 제공"] },
+    { name: "Growth", price: "990,000", count: "20", recommend: "타겟 고객이 명확한 브랜드", features: ["캠페인 운영 대행", "콘텐츠 업로드 트래킹", "성과 리포트 (조회수, 반응)", "VOC 요약 서비스 제공"], isBest: true },
+    { name: "Scale50", price: "2,490,000", count: "50", recommend: "전환 및 매출 확장을 고려하는 브랜드", features: ["캠페인 운영 대행", "콘텐츠 업로드 트래킹", "성과 리포트 & VOC 분석", "원본 영상 1개 제공"] }
+  ];
 
-          {/* [NEW] Special Visit Plan (Offline) */}
-          <div className="mb-32">
-            <div className="bg-gradient-to-br from-purple-900/40 to-blue-900/40 rounded-[3rem] p-1 md:p-1">
-                <div className="bg-[#0f172a] rounded-[2.8rem] p-8 md:p-16 border border-white/10 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/20 blur-[100px] rounded-full pointer-events-none"></div>
-                    
-                    <div className="flex flex-col lg:flex-row gap-16 items-center relative z-10">
-                        <div className="lg:w-1/2">
-                            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-500/20 text-purple-300 text-xs font-black uppercase tracking-widest mb-6 border border-purple-500/30">
-                                <Sparkles size={14} className="animate-pulse"/> OFFLINE SPECIAL
-                            </div>
-                            <h3 className="text-4xl md:text-5xl font-black text-white mb-4 tracking-tight leading-tight">
-                                {visitPlan.name}
-                            </h3>
-                            <p className="text-xl text-purple-200 font-bold mb-8">
-                                {visitPlan.subTitle}
-                            </p>
-                            <p className="text-slate-400 text-lg font-light leading-relaxed mb-10 border-l-2 border-purple-500/50 pl-6">
-                                "{visitPlan.desc}"
-                            </p>
+  // [MODIFIED] Visit Plan 데이터 (단가 위주로 변경)
+  const visitPlan = {
+      name: "VISIT CONTENT",
+      subTitle: "오프라인 매출 펌핑 시딩 상품",
+      price: "300,000", // 단가 강조
+      unit: "/ 1인",    // 단위 표시
+      desc: "입점 이후, 매장 트래픽과 회전율을 끌어올리기 위한 전용 상품",
+      target: ["올리브영/Sephora/CVS 등 입점 브랜드", "매장 회전율이 고민인 브랜드"],
+      features: [
+          "방문형 콘텐츠 (자택 사용기 + 매장 방문)",
+          "얼굴 노출 콘텐츠 포함 (신뢰도 상승)",
+          "구매 매장 정보 노출 (방문 유도)",
+          "TikTok / Instagram 업로드 최적화",
+          "최소 1명부터 원하는 수량만큼 진행 가능" // 유연성 강조
+      ]
+  };
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10">
-                                {visitPlan.features.map((feature, idx) => (
-                                    <div key={idx} className="flex items-center gap-3 bg-white/5 p-4 rounded-2xl border border-white/5">
-                                        <div className="p-2 bg-purple-500/20 rounded-full text-purple-400">
-                                            {idx === 0 ? <Calendar size={18}/> : idx === 1 ? <UserCheckIcon size={18}/> : idx === 2 ? <Target size={18}/> : <Video size={18}/>}
-                                        </div>
-                                        <span className="text-sm font-medium text-slate-200">{feature}</span>
-                                    </div>
-                                ))}
-                            </div>
+  const addons = [
+    { icon: Target, title: "Top 50 인플루언서 큐레이션", price: "100,000원 / 월", desc: "어떤 크리에이터를 써야 할 지 모르는 브랜드", details: "캠페인 목적에 맞는 인플루언서 50명 추천" },
+    { icon: UserCheckIcon, title: "타겟 오디언스 큐레이션 (50)", price: "300,000원 / 월", desc: "타겟 고객이 명확한 브랜드", details: "반려동물 등 타겟 인플루언서 리스트 제공" },
+    { icon: ShieldCheck, title: "Creator Contact Pack", price: "별도 문의", desc: "직접 커뮤니케이션을 병행하고 싶은 브랜드", details: "사전 동의 크리에이터 정보 및 배송 중개" },
+    { icon: TrendingUp, title: "Spark Ads 신청 대행", price: "광고비 + 15%", desc: "전환 및 매출 확장을 고려하는 브랜드", details: "성과 우수 콘텐츠 광고 전환 및 세팅 대행" }
+  ];
+
+  return (
+    <section id="pricing" className="py-32 bg-[#020617] relative overflow-hidden">
+      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-10"></div>
+      
+      <div className="max-w-7xl mx-auto px-4 relative z-10">
+        <div className="text-center mb-24">
+            <span className="text-purple-400 font-black tracking-[0.3em] uppercase text-sm">Step 05. The Offer</span>
+            <h2 className="text-4xl md:text-6xl font-black text-white mt-6 mb-8 tracking-tight">성장을 위한 맞춤형 플랜</h2>
+            <p className="text-slate-500 max-w-2xl mx-auto font-light leading-relaxed">플랫폼 기반의 투명한 운영으로 <span className="text-white font-medium italic underline underline-offset-4 decoration-purple-500">콘텐츠 회수율 100%</span>까지 책임집니다.</p>
+        </div>
+
+        {/* Main Plans (Online) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-20">
+            {mainPlans.map((plan, idx) => (
+                <div key={idx} className={`relative bg-[#0f172a] text-white rounded-[3rem] p-10 border transition-all duration-700 hover:-translate-y-4 ${plan.isBest ? 'border-purple-500 shadow-[0_0_50px_rgba(168,85,247,0.2)] md:scale-105 z-10' : 'border-white/10 shadow-2xl'}`}>
+                    {plan.isBest && (
+                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-1.5 rounded-full text-xs font-black tracking-widest shadow-xl">
+                            MOST POPULAR
                         </div>
-
-                        <div className="lg:w-1/2 w-full">
-                            <div className="bg-white/5 rounded-[2.5rem] p-10 border border-white/10 text-center relative overflow-hidden group">
-                                {/* [수정됨] pointer-events-none 추가하여 클릭 투과되도록 변경 */}
-                                <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"></div>
-                                
-                                <p className="text-slate-500 text-xs font-black uppercase tracking-widest mb-4 relative z-10">Total Package Price</p>
-                                <div className="flex items-baseline justify-center gap-2 mb-2 relative z-10">
-                                    <span className="text-6xl md:text-7xl font-black text-white tracking-tighter">{visitPlan.price}</span>
-                                    <span className="text-2xl text-slate-500 font-bold">원</span>
-                                </div>
-                                <p className="text-purple-400 text-sm font-bold mb-10 relative z-10">
-                                    (1인당 {visitPlan.perPerson}원 / 월 {visitPlan.count}건)
-                                </p>
-
-                                <div className="text-left bg-[#020617] p-6 rounded-3xl border border-white/10 mb-8 relative z-10">
-                                    <p className="text-xs text-slate-500 font-bold uppercase mb-4">Recommended For</p>
-                                    <ul className="space-y-3">
-                                        {visitPlan.target.map((t, i) => (
-                                            <li key={i} className="flex items-start gap-3 text-sm text-slate-300">
-                                                <CheckCircle2 size={16} className="text-purple-500 shrink-0 mt-0.5" />
-                                                {t}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-
-                                {/* [수정됨] z-index 추가 및 onClick 이벤트 명시 */}
-                                <button 
-                                    onClick={() => setIsModalOpen(true)}
-                                    className="relative z-20 w-full py-5 bg-white text-slate-900 rounded-[2rem] font-black text-lg hover:scale-[1.02] transition-transform shadow-xl cursor-pointer"
-                                >
-                                    Visit 플랜 문의하기
-                                </button>
-                            </div>
+                    )}
+                    <div className="mb-10">
+                        <h3 className="text-2xl font-black text-white mb-4 uppercase tracking-tighter">{plan.name}</h3>
+                        <div className="flex items-baseline gap-1">
+                            <span className="text-5xl font-black text-white tracking-tighter">{plan.price}</span>
+                            <span className="text-slate-500 font-bold text-lg">원</span>
+                        </div>
+                        <div className="mt-4 inline-block px-4 py-1.5 bg-purple-500/10 text-purple-400 rounded-xl text-sm font-black tracking-tighter border border-purple-500/20">
+                            콘텐츠 {plan.count}개 보장
                         </div>
                     </div>
+
+                    <p className="text-sm text-slate-400 font-light mb-10 leading-relaxed bg-white/5 p-6 rounded-3xl border border-white/5 italic">
+                        💡 {plan.recommend}
+                    </p>
+
+                    <ul className="space-y-5 mb-12">
+                        {plan.features.map((feat, i) => (
+                            <li key={i} className="flex items-start gap-4 text-sm font-medium text-slate-300">
+                                <CheckCircle2 size={18} className="text-cyan-400 shrink-0 mt-0.5" />
+                                {feat}
+                            </li>
+                        ))}
+                    </ul>
+
+                    <button 
+                        onClick={() => setIsModalOpen(true)}
+                        className={`w-full py-5 rounded-[2rem] font-black text-lg transition-all flex items-center justify-center gap-2 ${plan.isBest ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:shadow-[0_0_30px_rgba(147,51,234,0.5)]' : 'bg-white text-slate-900 hover:bg-slate-100'}`}
+                    >
+                        발주 문의하기 <ArrowRight size={22}/>
+                    </button>
                 </div>
-            </div>
-          </div>
-  
-          {/* Add-on Section */}
-          <div className="bg-white/5 backdrop-blur-3xl rounded-[4rem] p-10 md:p-20 border border-white/10 relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-purple-500/50 to-transparent"></div>
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-10 mb-16">
-                  <div>
-                      <h3 className="text-4xl font-black text-white flex items-center gap-4 tracking-tight">
-                          <Zap className="text-yellow-400 fill-yellow-400" size={36} /> 부가 서비스 (Add-on)
-                      </h3>
-                      <p className="text-slate-400 mt-4 font-light text-lg">필요한 기능만 선택하여 캠페인 효율을 극대화하세요.</p>
-                  </div>
-              </div>
-  
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                  {addons.map((addon, idx) => (
-                      <div key={idx} className="bg-[#020617]/50 p-8 rounded-[2.5rem] border border-white/5 hover:border-purple-500/30 transition-all duration-500 group">
-                          <div className="w-14 h-14 bg-white/5 text-purple-400 rounded-2xl flex items-center justify-center mb-8 border border-white/5 group-hover:scale-110 transition-transform">
-                              <addon.icon size={28} />
+            ))}
+        </div>
+
+        {/* [MODIFIED] Special Visit Plan (Offline) - 가격 표시 수정됨 */}
+        <div className="mb-32">
+          <div className="bg-gradient-to-br from-purple-900/40 to-blue-900/40 rounded-[3rem] p-1 md:p-1">
+              <div className="bg-[#0f172a] rounded-[2.8rem] p-8 md:p-16 border border-white/10 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/20 blur-[100px] rounded-full pointer-events-none"></div>
+                  
+                  <div className="flex flex-col lg:flex-row gap-16 items-center relative z-10">
+                      <div className="lg:w-1/2">
+                          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-500/20 text-purple-300 text-xs font-black uppercase tracking-widest mb-6 border border-purple-500/30">
+                              <Sparkles size={14} className="animate-pulse"/> OFFLINE SPECIAL
                           </div>
-                          <h4 className="text-xl font-bold text-white mb-2 leading-tight tracking-tight">{addon.title}</h4>
-                          <p className="text-cyan-400 font-black text-sm mb-6 uppercase tracking-widest">{addon.price}</p>
-                          <div className="space-y-4">
-                              <p className="text-xs text-slate-300 font-light leading-relaxed">• {addon.details}</p>
-                              <p className="text-[11px] text-slate-600 font-medium leading-relaxed italic border-t border-white/5 pt-4">📌 {addon.desc}</p>
+                          <h3 className="text-4xl md:text-5xl font-black text-white mb-4 tracking-tight leading-tight">
+                              {visitPlan.name}
+                          </h3>
+                          <p className="text-xl text-purple-200 font-bold mb-8">
+                              {visitPlan.subTitle}
+                          </p>
+                          <p className="text-slate-400 text-lg font-light leading-relaxed mb-10 border-l-2 border-purple-500/50 pl-6">
+                              "{visitPlan.desc}"
+                          </p>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10">
+                              {visitPlan.features.map((feature, idx) => (
+                                  <div key={idx} className="flex items-center gap-3 bg-white/5 p-4 rounded-2xl border border-white/5">
+                                      <div className="p-2 bg-purple-500/20 rounded-full text-purple-400">
+                                          {idx === 0 ? <Calendar size={18}/> : idx === 1 ? <UserCheckIcon size={18}/> : idx === 2 ? <Target size={18}/> : <Video size={18}/>}
+                                      </div>
+                                      <span className="text-sm font-medium text-slate-200">{feature}</span>
+                                  </div>
+                              ))}
                           </div>
                       </div>
-                  ))}
+
+                      <div className="lg:w-1/2 w-full">
+                          <div className="bg-white/5 rounded-[2.5rem] p-10 border border-white/10 text-center relative overflow-hidden group">
+                              <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"></div>
+                              
+                              <p className="text-slate-500 text-xs font-black uppercase tracking-widest mb-4 relative z-10">Per Creator Price</p>
+                              <div className="flex items-baseline justify-center gap-2 mb-2 relative z-10">
+                                  <span className="text-6xl md:text-7xl font-black text-white tracking-tighter">{visitPlan.price}</span>
+                                  <div className="flex flex-col items-start">
+                                      <span className="text-2xl text-slate-500 font-bold">원</span>
+                                      <span className="text-sm text-slate-500 font-bold">{visitPlan.unit}</span>
+                                  </div>
+                              </div>
+                              <p className="text-purple-400 text-sm font-bold mb-10 relative z-10">
+                                  (최소 수량 제한 없음 / 1명부터 진행 가능)
+                              </p>
+
+                              <div className="text-left bg-[#020617] p-6 rounded-3xl border border-white/10 mb-8 relative z-10">
+                                  <p className="text-xs text-slate-500 font-bold uppercase mb-4">Recommended For</p>
+                                  <ul className="space-y-3">
+                                      {visitPlan.target.map((t, i) => (
+                                          <li key={i} className="flex items-start gap-3 text-sm text-slate-300">
+                                              <CheckCircle2 size={16} className="text-purple-500 shrink-0 mt-0.5" />
+                                              {t}
+                                          </li>
+                                      ))}
+                                  </ul>
+                              </div>
+
+                              <button 
+                                  onClick={() => setIsModalOpen(true)}
+                                  className="relative z-20 w-full py-5 bg-white text-slate-900 rounded-[2rem] font-black text-lg hover:scale-[1.02] transition-transform shadow-xl cursor-pointer"
+                              >
+                                  Visit 플랜 문의하기
+                              </button>
+                          </div>
+                      </div>
+                  </div>
               </div>
           </div>
-  
-          <p className="text-center text-xs text-slate-600 mt-16 font-medium tracking-widest">
-              * 본 견적에는 해외 배송 및 물류 비용이 포함되어 있지 않으며, 물류 비용은 별도 협의 또는 브랜드 부담으로 진행됩니다. <br /> * 100% 회수율 보장제는 플랫폼의 모든 메인 상품에 적용됩니다.
-          </p>
         </div>
-  
-        <ProcessModal 
-          isOpen={isModalOpen} 
-          onClose={() => setIsModalOpen(false)} 
-          navigate={navigate}
-        />
-      </section>
-    );
+
+        {/* Add-on Section */}
+        <div className="bg-white/5 backdrop-blur-3xl rounded-[4rem] p-10 md:p-20 border border-white/10 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-purple-500/50 to-transparent"></div>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-10 mb-16">
+                <div>
+                    <h3 className="text-4xl font-black text-white flex items-center gap-4 tracking-tight">
+                        <Zap className="text-yellow-400 fill-yellow-400" size={36} /> 부가 서비스 (Add-on)
+                    </h3>
+                    <p className="text-slate-400 mt-4 font-light text-lg">필요한 기능만 선택하여 캠페인 효율을 극대화하세요.</p>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                {addons.map((addon, idx) => (
+                    <div key={idx} className="bg-[#020617]/50 p-8 rounded-[2.5rem] border border-white/5 hover:border-purple-500/30 transition-all duration-500 group">
+                        <div className="w-14 h-14 bg-white/5 text-purple-400 rounded-2xl flex items-center justify-center mb-8 border border-white/5 group-hover:scale-110 transition-transform">
+                            <addon.icon size={28} />
+                        </div>
+                        <h4 className="text-xl font-bold text-white mb-2 leading-tight tracking-tight">{addon.title}</h4>
+                        <p className="text-cyan-400 font-black text-sm mb-6 uppercase tracking-widest">{addon.price}</p>
+                        <div className="space-y-4">
+                            <p className="text-xs text-slate-300 font-light leading-relaxed">• {addon.details}</p>
+                            <p className="text-[11px] text-slate-600 font-medium leading-relaxed italic border-t border-white/5 pt-4">📌 {addon.desc}</p>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+
+        <p className="text-center text-xs text-slate-600 mt-16 font-medium tracking-widest">
+            * 본 견적에는 해외 배송 및 물류 비용이 포함되어 있지 않으며, 물류 비용은 별도 협의 또는 브랜드 부담으로 진행됩니다. <br /> 
+        </p>
+      </div>
+
+      <ProcessModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        navigate={navigate}
+      />
+    </section>
+  );
 };
 
 // 8. Footer CTA
@@ -921,41 +977,36 @@ const FloatingConsultButton = () => (
 );
 
 export default function Home() {
-  useEffect(() => {
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                entry.target.classList.add('opacity-100', 'translate-y-0');
-                entry.target.classList.remove('opacity-0', 'translate-y-20');
-            }
-        });
-    }, { threshold: 0.1 });
+  // 모달 상태 관리를 Home에서 수행
+  const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
 
-    const sections = document.querySelectorAll('section');
-    sections.forEach(section => {
-        section.classList.add('transition-all', 'duration-[1200ms]', 'opacity-0', 'translate-y-20', 'ease-out'); 
-        observer.observe(section);
-    });
-
-    return () => {
-        sections.forEach(section => observer.unobserve(section));
-    };
-  }, []);
+  // ... (useEffect 로직 동일)
 
   return (
     <div className="font-sans antialiased text-white bg-[#020617] selection:bg-cyan-500/30 selection:text-white relative">
       <Navbar /> 
-      <Hero />
+      {/* 1. Hero에 모달 여는 함수 전달 */}
+      <Hero onOpenLeadModal={() => setIsLeadModalOpen(true)} />
+      
       <WhySection />
       <BrandLogosSection />
       <SuccessStoriesSection />
-      <ViralGridSection />
+      
+      {/* 2. ViralGridSection은 이미 내부에서 모달을 열고 있으므로 그대로 두거나 통일해도 됩니다 */}
+      <ViralGridSection /> 
+      
       <GuaranteeSection />
       <ProcessSection />
       <PricingSection />
       <FooterCTA />
       <Footer />  
       <FloatingConsultButton />
+
+      {/* 3. 모달은 Home 최하단에 하나만 두고 관리하는 것이 데이터 무결성에 좋습니다 */}
+      <LeadCollectionModal 
+        isOpen={isLeadModalOpen} 
+        onClose={() => setIsLeadModalOpen(false)} 
+      />
     </div>
   );
 }

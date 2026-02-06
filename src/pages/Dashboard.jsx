@@ -5,16 +5,16 @@ import {
   Package, Clock, Truck, UserCheck, AlertCircle, 
   Lock, Settings, BarChart3, Users, PlayCircle, Eye, Heart, MessageCircle, Share2, 
   ChevronRight, Calendar, ExternalLink, Zap, Trash2, CheckCircle2, MoreHorizontal,
-  Plane, Gift, TrendingUp, BarChart2, Trophy, RefreshCw, AlertTriangle, Download
+  Plane, Gift, TrendingUp, BarChart2, Trophy, RefreshCw, AlertTriangle, Download,
+  FileText, CreditCard, Printer, Video, ShieldCheck, X
 } from 'lucide-react';
 import Navbar from '../components/layout/Navbar'; 
 import Footer from '../components/layout/Footer';
-
 /**
  * [Logic 보존] Campaign Status Enum & Helper Functions
  */
 const CampaignStatus = {
-  PAYMENT_PENDING: 'PAYMENT_PENDING',
+  PAYMENT_PENDING: 'PAYMENT_PENDING', // [New] 계약 및 입금 대기
   CONTACTING: 'CONTACTING',
   SHIPPING: 'SHIPPING',
   UPLOADING: 'UPLOADING',
@@ -32,8 +32,23 @@ const maskData = (text, type = 'general') => {
   return text.length > 5 ? text.slice(0, 5) + "****" : "****";
 };
 
-// --- [Mock Data: 100% 보존] ---
+// --- [Mock Data] ---
 const DEMO_CAMPAIGNS = [
+  {
+    id: 'demo-invoice',
+    plan: 'Scale50',
+    status: CampaignStatus.PAYMENT_PENDING, // [New] 이 캠페인을 선택하면 송장 화면이 나옵니다.
+    brand_name: 'BrandSlam Demo',
+    product_name: 'Volume Up Shampoo',
+    start_date: '2026-02-10', // 예정
+    end_date: '2026-05-10',
+    target_creators: 50,
+    matched_creators: 0,
+    kpi_views: '-', kpi_likes: '-', kpi_comments: '-', kpi_shares: '-',
+    candidates: [],
+    creators: [],
+    contents: []
+  },
   {
     id: 'demo-2',
     plan: 'Starter',
@@ -123,7 +138,7 @@ const DEMO_CAMPAIGNS = [
 
 const StatusBadge = ({ status }) => {
   const styles = {
-    [CampaignStatus.PAYMENT_PENDING]: "bg-slate-800 text-slate-400 border-slate-700",
+    [CampaignStatus.PAYMENT_PENDING]: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
     [CampaignStatus.CONTACTING]: "bg-blue-500/10 text-blue-400 border-blue-500/20",
     [CampaignStatus.SHIPPING]: "bg-orange-500/10 text-orange-400 border-orange-500/20",
     [CampaignStatus.UPLOADING]: "bg-purple-500/10 text-purple-400 border-purple-500/20",
@@ -131,7 +146,7 @@ const StatusBadge = ({ status }) => {
   };
   
   const labels = {
-    [CampaignStatus.PAYMENT_PENDING]: "입금 대기",
+    [CampaignStatus.PAYMENT_PENDING]: "계약/입금 대기",
     [CampaignStatus.CONTACTING]: "인플루언서 섭외 중",
     [CampaignStatus.SHIPPING]: "제품 발송 중",
     [CampaignStatus.UPLOADING]: "콘텐츠 업로드 중",
@@ -184,6 +199,271 @@ const CampaignCard = ({ campaign, onClick, isActive }) => (
     </div>
   </div>
 );
+
+// --- [New Component] Invoice Detail View (계약서/송장) ---
+const InvoiceDetail = ({ campaign }) => {
+    const [isConfirmed, setIsConfirmed] = useState(false);
+
+    // 가상의 송장 데이터 생성 (Campaign props 기반)
+    const invoiceData = {
+        invoiceNo: `INV-2026-${campaign.id.toUpperCase()}`,
+        date: new Date().toISOString().split('T')[0],
+        status: isConfirmed ? "WAITING_PAYMENT" : "PENDING_CONFIRM",
+        provider: {
+            name: "주식회사 브랜드슬램",
+            ceo: "장**",
+            regNo: "284-44-*****",
+            address: "서울시 용산구 한강대로 000, 00층",
+            contact: "contact@slam.global"
+        },
+        client: {
+            name: "주식회사 데일리스킨케어", // 데모용 가상 기업
+            ceo: "김**",
+            regNo: "123-45-67890",
+            address: "경기도 성남시 분당구 판교로 000",
+            email: "manager@dailyskincare.com"
+        },
+        items: [
+            {
+                id: 1,
+                name: `BrandSlam ${campaign.plan.toUpperCase()} PLAN`,
+                desc: `${campaign.product_name} 글로벌 캠페인 운영 및 매니지먼트`,
+                period: "3개월 (약정)",
+                qty: 1,
+                price: 2490000 
+            }
+        ],
+        paymentTerms: {
+            totalSupply: 2490000,
+            vat: 249000,
+            totalAmount: 2739000,
+            installments: [
+                { seq: 1, name: "선금 (50%)", amount: 1369500, dueDate: "즉시 (계약 확정 시)", status: "UNPAID" },
+                { seq: 2, name: "잔금 (50%)", amount: 1369500, dueDate: "캠페인 2개월 차", status: "SCHEDULED" }
+            ]
+        },
+        bankInfo: {
+            bank: "SC제일은행",
+            account: "357-20-******",
+            holder: "주식회사 브랜드슬램"
+        }
+    };
+
+    return (
+        <div className="space-y-10 animate-fade-in-up">
+            {/* 1. Process Tracker */}
+            <div className="bg-white/5 backdrop-blur-xl p-8 rounded-[2.5rem] border border-white/10">
+                <h4 className="font-black text-white text-xl mb-8 flex items-center gap-3 tracking-tighter">
+                    <CreditCard size={24} className="text-yellow-400"/> 계약 및 결제 프로세스
+                </h4>
+                <div className="relative">
+                    <div className="absolute top-1/2 left-0 w-full h-0.5 bg-white/10 -z-10"></div>
+                    <div className="flex justify-between w-full max-w-4xl mx-auto">
+                        {[
+                            { id: 1, label: "발주 문의", icon: MessageCircle, done: true },
+                            { id: 2, label: "화상 미팅", icon: Video, done: true },
+                            { id: 3, label: "계약/송장", icon: FileText, active: true },
+                            { id: 4, label: "입금 확인", icon: CreditCard, done: false },
+                            { id: 5, label: "착수", icon: CheckCircle2, done: false }
+                        ].map((step) => (
+                            <div key={step.id} className="flex flex-col items-center gap-3 bg-[#020617] px-2 z-10">
+                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border-2 transition-all ${
+                                    step.active 
+                                    ? "bg-yellow-500 border-yellow-500 text-slate-900 shadow-[0_0_15px_rgba(234,179,8,0.5)] scale-110" 
+                                    : step.done 
+                                        ? "bg-slate-800 border-slate-700 text-slate-400"
+                                        : "bg-slate-900 border-slate-800 text-slate-600"
+                                }`}>
+                                    <step.icon size={20} strokeWidth={step.active ? 3 : 2} />
+                                </div>
+                                <span className={`text-[10px] font-bold uppercase tracking-widest ${step.active ? "text-yellow-400" : "text-slate-500"}`}>
+                                    {step.label}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            {/* 2. Notification Area */}
+            {!isConfirmed ? (
+                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-3xl p-6 flex items-start gap-4 animate-pulse-slow">
+                    <AlertTriangle className="text-yellow-500 shrink-0 mt-1" size={24} />
+                    <div>
+                        <h4 className="font-bold text-yellow-400 text-lg mb-1">계약 내용 확인이 필요합니다.</h4>
+                        <p className="text-slate-300 text-sm font-light">
+                            아래 인보이스 및 계약 내용을 확인하신 후, 하단의 <strong>'계약 내용 확정하기'</strong> 버튼을 눌러주세요.<br/>
+                            확정 후 입금이 확인되면 캠페인이 즉시 시작됩니다.
+                        </p>
+                    </div>
+                </div>
+            ) : (
+                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-3xl p-6 flex items-center gap-4">
+                    <CheckCircle2 className="text-emerald-500 shrink-0" size={24} />
+                    <div>
+                        <h4 className="font-bold text-emerald-400 text-lg">계약이 확정되었습니다.</h4>
+                        <p className="text-emerald-200/70 text-sm font-light">아래 계좌로 선금을 입금해주시면 담당 매니저가 배정됩니다.</p>
+                    </div>
+                </div>
+            )}
+
+            {/* 3. Invoice Paper (White Theme in Dark Mode) */}
+            <div className="bg-white text-slate-900 rounded-sm shadow-2xl p-8 md:p-16 max-w-4xl mx-auto relative overflow-hidden">
+                {!isConfirmed && (
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-slate-200/50 font-black text-9xl -rotate-45 pointer-events-none select-none z-0 whitespace-nowrap">
+                        DRAFT / VIEW ONLY
+                    </div>
+                )}
+
+                {/* Header */}
+                <div className="flex justify-between items-start border-b-2 border-slate-900 pb-8 mb-10 relative z-10">
+                    <div>
+                        <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">INVOICE</h1>
+                        <p className="text-slate-500 mt-2 font-medium">견적서 / 임시 송장</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-xs text-slate-400 uppercase tracking-widest font-bold">Invoice No.</p>
+                        <p className="text-lg font-bold text-slate-900 mb-2">{invoiceData.invoiceNo}</p>
+                        <p className="text-xs text-slate-400 uppercase tracking-widest font-bold">Date</p>
+                        <p className="text-md font-medium text-slate-900">{invoiceData.date}</p>
+                    </div>
+                </div>
+
+                {/* Supplier & Client */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-12 relative z-10">
+                    <div>
+                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 border-b border-slate-100 pb-2">Supplier (공급자)</h3>
+                        <div className="text-sm text-slate-700 space-y-1.5">
+                            <p className="font-bold text-lg text-slate-900">{invoiceData.provider.name}</p>
+                            <p>대표이사: {invoiceData.provider.ceo}</p>
+                            <p>사업자등록번호: {invoiceData.provider.regNo}</p>
+                            <p>{invoiceData.provider.address}</p>
+                            <p className="text-indigo-600 font-medium">{invoiceData.provider.contact}</p>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 border-b border-slate-100 pb-2">Bill To (받는 분)</h3>
+                        <div className="text-sm text-slate-700 space-y-1.5">
+                            <p className="font-bold text-lg text-slate-900">{invoiceData.client.name}</p>
+                            <p>대표이사: {invoiceData.client.ceo}</p>
+                            <p>사업자등록번호: {invoiceData.client.regNo}</p>
+                            <p>{invoiceData.client.address}</p>
+                            <p>{invoiceData.client.email}</p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Items */}
+                <table className="w-full mb-12 relative z-10 text-sm">
+                    <thead>
+                        <tr className="bg-slate-50 border-y-2 border-slate-900 text-slate-500">
+                            <th className="py-4 px-4 text-left font-bold uppercase tracking-wider">Description</th>
+                            <th className="py-4 px-4 text-center font-bold uppercase tracking-wider">Qty</th>
+                            <th className="py-4 px-4 text-right font-bold uppercase tracking-wider">Unit Price</th>
+                            <th className="py-4 px-4 text-right font-bold uppercase tracking-wider">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody className="text-slate-700">
+                        {invoiceData.items.map((item) => (
+                            <tr key={item.id} className="border-b border-slate-100">
+                                <td className="py-5 px-4">
+                                    <p className="font-bold text-slate-900 text-base">{item.name}</p>
+                                    <p className="text-xs text-slate-500 mt-1">{item.desc}</p>
+                                    <p className="text-xs text-indigo-600 mt-1 font-medium bg-indigo-50 inline-block px-2 py-0.5 rounded">기간: {item.period}</p>
+                                </td>
+                                <td className="py-5 px-4 text-center">{item.qty}</td>
+                                <td className="py-5 px-4 text-right text-slate-500">{item.price.toLocaleString()}</td>
+                                <td className="py-5 px-4 text-right font-bold text-slate-900">{(item.price * item.qty).toLocaleString()}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+
+                {/* Summary & Payment Info */}
+                <div className="flex flex-col md:flex-row justify-between items-start gap-12 relative z-10">
+                    <div className="w-full md:w-1/2">
+                        <h4 className="font-bold text-slate-900 mb-4 border-b-2 border-slate-900 pb-2 inline-block">Payment Terms</h4>
+                        <div className="space-y-4">
+                            {invoiceData.paymentTerms.installments.map((inst, idx) => (
+                                <div key={idx} className={`p-4 rounded-lg border ${inst.status === 'UNPAID' ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-slate-200 opacity-60'}`}>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <span className={`font-bold ${inst.status === 'UNPAID' ? 'text-indigo-700' : 'text-slate-500'}`}>
+                                            {inst.name}
+                                        </span>
+                                        <span className={`text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide ${inst.status === 'UNPAID' ? 'bg-indigo-200 text-indigo-800' : 'bg-slate-100 text-slate-400'}`}>
+                                            {inst.status === 'UNPAID' ? 'PAY NOW' : 'SCHEDULED'}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between items-baseline">
+                                        <span className="text-xl font-black text-slate-900">{inst.amount.toLocaleString()} <span className="text-sm font-normal text-slate-500">KRW</span></span>
+                                    </div>
+                                    <p className="text-xs text-slate-500 mt-2 flex items-center gap-1"><Clock size={12}/> 납부 기한: {inst.dueDate}</p>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="mt-8 p-5 bg-slate-900 text-white rounded-xl shadow-lg">
+                            <p className="text-xs text-slate-400 mb-2 font-bold uppercase tracking-widest">Bank Information</p>
+                            <p className="font-bold text-lg mb-1 flex items-center gap-2">
+                                <span className="text-yellow-400">{invoiceData.bankInfo.bank}</span> 
+                                {invoiceData.bankInfo.account}
+                            </p>
+                            <p className="text-sm text-slate-400">예금주: {invoiceData.bankInfo.holder}</p>
+                        </div>
+                    </div>
+
+                    <div className="w-full md:w-5/12">
+                        <div className="bg-slate-50 p-8 rounded-2xl border border-slate-200">
+                            <div className="flex justify-between mb-3 text-slate-500 text-sm">
+                                <span>Subtotal (공급가액)</span>
+                                <span>{invoiceData.paymentTerms.totalSupply.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between mb-6 text-slate-500 text-sm">
+                                <span>VAT (10%)</span>
+                                <span>{invoiceData.paymentTerms.vat.toLocaleString()}</span>
+                            </div>
+                            <div className="border-t-2 border-slate-200 my-4 pt-6 flex justify-between items-center">
+                                <span className="font-black text-xl text-slate-900">Total</span>
+                                <span className="font-black text-3xl text-indigo-600">{invoiceData.paymentTerms.totalAmount.toLocaleString()}</span>
+                            </div>
+                            <p className="text-xs text-right text-slate-400 mt-2">* KRW (원) 기준</p>
+                        </div>
+                        
+                        <div className="mt-12 text-right relative">
+                            <p className="font-serif font-bold text-xl text-slate-900 pr-10 z-10 relative">주식회사 브랜드슬램 대표이사 (인)</p>
+                            <div className="absolute -top-6 right-0 w-20 h-20 border-4 border-red-600 rounded-full opacity-60 flex items-center justify-center rotate-12 mix-blend-multiply">
+                                <span className="text-red-600 font-black text-xs tracking-tighter">SlamGlobal</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* 4. Action Buttons */}
+            <div className="flex flex-col md:flex-row justify-center gap-4 pb-20">
+                <button className="flex items-center justify-center gap-2 px-8 py-4 bg-white/5 border border-white/10 text-slate-300 rounded-2xl font-bold hover:bg-white/10 transition-all uppercase tracking-widest text-sm">
+                    <Download size={18} /> PDF Download
+                </button>
+                <button className="flex items-center justify-center gap-2 px-8 py-4 bg-white/5 border border-white/10 text-slate-300 rounded-2xl font-bold hover:bg-white/10 transition-all uppercase tracking-widest text-sm">
+                    <Printer size={18} /> Print
+                </button>
+                
+                {!isConfirmed && (
+                    <button 
+                        onClick={() => {
+                            if(window.confirm("계약 내용을 모두 확인하였으며, 이에 동의하십니까?")) {
+                                setIsConfirmed(true);
+                            }
+                        }}
+                        className="flex items-center justify-center gap-2 px-10 py-4 bg-yellow-500 text-slate-900 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-yellow-400 shadow-[0_0_30px_rgba(234,179,8,0.4)] transition-all hover:-translate-y-1"
+                    >
+                        <ShieldCheck size={20} /> Confirm Contract
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+};
 
 // --- Detail Component: Candidate List (섭외 중) ---
 const CandidateList = ({ candidates, targetCount, matchedCount }) => {
@@ -475,6 +755,11 @@ const OngoingCampaign = ({ campaign }) => {
 const CampaignDetail = ({ campaign }) => {
   if (!campaign) return <div className="flex flex-col items-center justify-center py-40 text-slate-700 font-black uppercase tracking-[0.3em]"><Package size={48} className="mb-4 opacity-20"/> Select Campaign</div>;
 
+  // [New] 송장 화면 분기 처리
+  if (campaign.status === CampaignStatus.PAYMENT_PENDING) {
+      return <InvoiceDetail campaign={campaign} />;
+  }
+
   if (campaign.status === CampaignStatus.CONTACTING) {
       return (
           <CandidateList 
@@ -661,7 +946,8 @@ export default function Dashboard() {
                             </div>
                             <p className="text-slate-500 text-lg font-light flex items-center gap-3 tracking-tight">
                                 <span className={`w-3 h-3 rounded-full ${selectedCampaign?.status === CampaignStatus.COMPLETED ? 'bg-slate-700 shadow-none' : 'bg-cyan-400 animate-pulse shadow-[0_0_10px_rgba(34,211,238,0.8)]'}`}></span>
-                                {selectedCampaign?.status === CampaignStatus.COMPLETED ? 'FINAL REPORT GENERATED' : 'ANALYTIC ENGINE ACTIVE - MONITORING LIVE FEED'}
+                                {selectedCampaign?.status === CampaignStatus.COMPLETED ? 'FINAL REPORT GENERATED' : 
+                                 selectedCampaign?.status === CampaignStatus.PAYMENT_PENDING ? 'WAITING FOR CONFIRMATION' : 'ANALYTIC ENGINE ACTIVE - MONITORING LIVE FEED'}
                             </p>
                         </div>
                         <StatusBadge status={selectedCampaign?.status} />
