@@ -87,7 +87,7 @@ const LeadCollectionModal = ({ isOpen, onClose }) => {
                 onChange={(e) => setFormData({...formData, phone: e.target.value})}
               />
               <input 
-                required type="email" placeholder="이메일 주소 (자료 받을 곳)" 
+                required type="email" placeholder="회사 이메일 주소" 
                 className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white focus:border-purple-500 outline-none"
                 onChange={(e) => setFormData({...formData, email: e.target.value})}
               />
