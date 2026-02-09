@@ -742,7 +742,7 @@ const PricingSection = () => {
   const mainPlans = [
     { name: "Starter", price: "590,000", count: "10", recommend: "첫 시딩이거나 실패 확률을 줄이고 싶은 브랜드", features: ["캠페인 운영 대행", "콘텐츠 업로드 트래킹", "기본 리포트 서비스 제공"] },
     { name: "Growth", price: "990,000", count: "20", recommend: "타겟 고객이 명확한 브랜드", features: ["캠페인 운영 대행", "콘텐츠 업로드 트래킹", "성과 리포트 (조회수, 반응)", "VOC 요약 서비스 제공"], isBest: true },
-    { name: "Scale50", price: "2,490,000", count: "50", recommend: "전환 및 매출 확장을 고려하는 브랜드", features: ["캠페인 운영 대행", "콘텐츠 업로드 트래킹", "성과 리포트 & VOC 분석", "원본 영상 1개 제공"] }
+    { name: "Scale50", price: "2,390,000", count: "50", recommend: "전환 및 매출 확장을 고려하는 브랜드", features: ["캠페인 운영 대행", "콘텐츠 업로드 트래킹", "성과 리포트 & VOC 분석", "원본 영상 1개 제공"] }
   ];
 
   // [MODIFIED] Visit Plan 데이터 (단가 위주로 변경)
