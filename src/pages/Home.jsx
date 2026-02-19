@@ -122,7 +122,7 @@ const caseStudies = [
     brand: "C사",
     category: "Global K-Beauty",
     videoId: "7471724419216346398", 
-    challenge: "런칭 후 글로벌 인지도 및 매출 증대 필요",
+    challenge: "공동 런칭 후 매출0인 상황에서 월매출 20억이상의 히트상품으로",
     solution: "현지 감성에 맞춘 챌린지 시딩 및 인플루언서 매니지먼트",
     results: [
       { label: "누적 조회수", value: "2M+" },
@@ -297,8 +297,8 @@ const Hero = ({ onOpenLeadModal }) => (
       </div>
       
       <h1 className="text-5xl md:text-8xl font-black text-white tracking-tighter mb-10 leading-[1.1]">
-        회수율 <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400">100% 까지 책임지는 </span>
-        <span className="block mt-4 text-slate-300 text-3xl md:text-5xl font-light">인플루언서 매니지먼트 시스템</span>
+        미국 시딩은 <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400">브랜드슬램 </span>
+        <span className="block mt-4 text-slate-300 text-3xl md:text-5xl font-light">직접 운영하는 글로벌 콘텐츠 시스템</span>
       </h1>
       
       <p className="max-w-3xl mx-auto text-lg md:text-xl text-slate-400 mb-12 leading-relaxed font-light break-keep">
@@ -340,11 +340,11 @@ const WhySection = () => (
       <div className="text-center mb-24">
         <span className="text-purple-400 font-black tracking-[0.3em] uppercase text-sm">Step 01. The Mechanism</span>
         <h2 className="text-4xl md:text-6xl font-black text-white mt-6 mb-8 tracking-tight">
-            어떻게 <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400">회수율 100%</span>가 가능할까요?
+            왜 미국 시딩은 <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400">SLAM GLOBAL</span>과 해야 할까요?
         </h2>
         <p className="text-xl text-slate-400 max-w-3xl mx-auto font-light leading-relaxed">
-            시중의 단순 배송 대행사는 '통제력'이 없습니다.<br className="hidden md:block"/>
-            슬램 글로벌은 <span className="text-white font-medium underline underline-offset-8 decoration-purple-500">엔터테인먼트 매니지먼트 시스템</span>을 도입했습니다.
+            경험 많은 팀과 함께 하세요.<br className="hidden md:block"/>
+            슬램 글로벌은 <span className="text-white font-medium underline underline-offset-8 decoration-purple-500">미국에서 누적 5억뷰와 놀라운 매출 성과</span>를 달성했습니다.
         </p>
       </div>
 
@@ -613,14 +613,14 @@ const GuaranteeSection = () => (
         <h2 className="text-5xl md:text-8xl font-black text-white mb-10 tracking-tighter leading-none">
         실패란 없습니다.
             {/* [변경] Footer 스타일과 동일하게 block 처리 */}
-            <span className="block mt-4 md:mt-6 text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-500">
-                100% 케어형 서비스
+            <span className="block mt-4 md:mt-6 text-transparent text-6xl bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-500">
+            155% 케어형 매니지먼트 서비스
             </span>
         </h2>
         
         <p className="text-xl md:text-2xl text-slate-400 mb-16 font-light leading-relaxed max-w-3xl mx-auto">
-            1차 배송 후 목표 수량 미달성 시,<br/>
-            <span className="text-white font-medium underline underline-offset-4 decoration-emerald-500">남은 %를 채울 때까지 2차 무료 모집</span>을 진행합니다.
+        배송 전 30% 교체 보장,<br/>
+            <span className="text-white font-medium underline underline-offset-4 decoration-emerald-500">배송 후 미달 시 25% 추가 제공</span>을 보장합니다.
         </p>
 
         <div className="bg-white/5 backdrop-blur-2xl border border-white/10 p-10 md:p-12 rounded-[3rem] max-w-3xl mx-auto mb-16 text-left relative overflow-hidden group">
@@ -632,12 +632,12 @@ const GuaranteeSection = () => (
                 <div>
                     <h4 className="font-black text-2xl text-white mb-4">책임 보장제 상세 안내</h4>
                     <p className="text-slate-400 text-base font-light leading-relaxed">
-                        우리는 양적, 질적 목표 달성을 최우선으로 합니다. 
-                        만약 1차 캠페인에서 컨텐츠 수량이 부족할 경우, <b>추가 용역비 없이 즉시 2차 캠페인을 가동</b>합니다. 
-                        브랜드의 성공이 곧 우리의 성과이기 때문입니다.
-                        <br/><br/>
-                        
-                    </p>
+    우리는 캠페인 목표 수량 달성을 최우선으로 합니다.
+    1차 진행 시 배송 전 최대, <span className="font-bold text-emerald-500 text-lg">30% 추가 납품</span> 을 제공하며, 
+    배송 후 목표 수량 미달 시 <span className="font-bold text-cyan-500 text-lg">최대 25% 추가 케어 보충</span> 이 가능합니다. 
+    브랜드의 성공이 곧 우리의 성과이기 때문입니다. 
+
+</p>
                 </div>
             </div>
         </div>
@@ -742,7 +742,7 @@ const PricingSection = () => {
   const mainPlans = [
     { name: "Starter", price: "590,000", count: "10", recommend: "첫 시딩이거나 실패 확률을 줄이고 싶은 브랜드", features: ["캠페인 운영 대행", "콘텐츠 업로드 트래킹", "기본 리포트 서비스 제공"] },
     { name: "Growth", price: "990,000", count: "20", recommend: "타겟 고객이 명확한 브랜드", features: ["캠페인 운영 대행", "콘텐츠 업로드 트래킹", "성과 리포트 (조회수, 반응)", "VOC 요약 서비스 제공"], isBest: true },
-    { name: "Scale50", price: "2,390,000", count: "50", recommend: "전환 및 매출 확장을 고려하는 브랜드", features: ["캠페인 운영 대행", "콘텐츠 업로드 트래킹", "성과 리포트 & VOC 분석", "원본 영상 1개 제공"] }
+    { name: "Scale50", price: "2,3 90,000", count: "50", recommend: "전환 및 매출 확장을 고려하는 브랜드", features: ["캠페인 운영 대행", "콘텐츠 업로드 트래킹", "성과 리포트 & VOC 분석", "원본 영상 1개 제공"] }
   ];
 
   // [MODIFIED] Visit Plan 데이터 (단가 위주로 변경)

@@ -806,11 +806,13 @@ export default function Dashboard() {
           setSelectedCampaignId(data[0].id);
           setIsDemoMode(false);
         } else {
-          setCampaigns(DEMO_CAMPAIGNS);
-          setSelectedCampaignId(DEMO_CAMPAIGNS[0].id);
-          setIsDemoMode(true);
+          // [수정됨] 로그인 유저이나 캠페인이 없는 경우: Empty State 처리를 위한 상태 세팅
+          setCampaigns([]);
+          setSelectedCampaignId(null);
+          setIsDemoMode(false); 
         }
       } else {
+        // [수정됨] 비로그인 유저: 데모 모드 노출
         setCampaigns(DEMO_CAMPAIGNS);
         setSelectedCampaignId(DEMO_CAMPAIGNS[0].id);
         setIsDemoMode(true);
@@ -820,7 +822,6 @@ export default function Dashboard() {
 
     fetchData();
   }, [navigate]);
-
   const handlePasswordUpdate = async () => {
     if (newPassword.length < 6) return alert("비밀번호는 6자 이상이어야 합니다.");
     const { error } = await supabase.auth.updateUser({ password: newPassword });
@@ -936,26 +937,46 @@ export default function Dashboard() {
 
             {/* Main Content Area */}
             <div className="w-full lg:w-3/4">
-                 <div className="bg-white/5 backdrop-blur-2xl p-8 md:p-12 rounded-[4rem] border border-white/10 shadow-[0_0_100px_rgba(0,0,0,0.5)] min-h-[900px] relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent"></div>
-                    <div className="flex flex-col md:flex-row md:items-center justify-between mb-12 pb-10 border-b border-white/5 gap-8 relative z-10">
-                        <div>
-                            <div className="flex items-center gap-4 mb-3">
-                                <h2 className="text-3xl md:text-5xl font-black text-white tracking-tighter uppercase leading-none">{selectedCampaign?.product_name || 'Campaign'}</h2>
-                                <span className="text-[10px] font-black px-4 py-1.5 bg-cyan-500/10 text-cyan-400 rounded-full border border-cyan-400/20 tracking-widest uppercase">{selectedCampaign?.plan}</span>
-                            </div>
-                            <p className="text-slate-500 text-lg font-light flex items-center gap-3 tracking-tight">
-                                <span className={`w-3 h-3 rounded-full ${selectedCampaign?.status === CampaignStatus.COMPLETED ? 'bg-slate-700 shadow-none' : 'bg-cyan-400 animate-pulse shadow-[0_0_10px_rgba(34,211,238,0.8)]'}`}></span>
-                                {selectedCampaign?.status === CampaignStatus.COMPLETED ? 'FINAL REPORT GENERATED' : 
-                                 selectedCampaign?.status === CampaignStatus.PAYMENT_PENDING ? 'WAITING FOR CONFIRMATION' : 'ANALYTIC ENGINE ACTIVE - MONITORING LIVE FEED'}
-                            </p>
+                {campaigns.length === 0 && !isDemoMode ? (
+                    // [신규] 구매 유도 빈 화면 (Empty State CTA)
+                    <div className="bg-white/5 backdrop-blur-2xl p-8 md:p-12 rounded-[4rem] border border-white/10 shadow-[0_0_100px_rgba(0,0,0,0.5)] min-h-[700px] flex flex-col items-center justify-center relative overflow-hidden text-center animate-fade-in-up">
+                        <div className="w-32 h-32 bg-gradient-to-br from-purple-500/10 to-blue-500/10 rounded-full flex items-center justify-center mb-8 border border-white/10 shadow-[0_0_50px_rgba(168,85,247,0.1)]">
+                            <Package size={48} className="text-purple-400 opacity-80" />
                         </div>
-                        <StatusBadge status={selectedCampaign?.status} />
+                        <h2 className="text-3xl md:text-4xl font-black text-white tracking-tighter mb-4">진행 중인 캠페인이 없습니다</h2>
+                        <p className="text-slate-400 mb-12 text-lg font-light tracking-tight max-w-md">
+                            글로벌 인플루언서와 함께하는 첫 번째 브랜드 캠페인을 런칭하고 실시간 데이터 인사이트를 경험해보세요.
+                        </p>
+                        <button 
+                            onClick={() => navigate('/#pricing')} 
+                            className="px-10 py-5 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-2xl font-black text-lg shadow-[0_0_30px_rgba(168,85,247,0.4)] hover:scale-105 transition-all uppercase tracking-widest flex items-center gap-3"
+                        >
+                            <Zap size={24} /> Start New Campaign
+                        </button>
                     </div>
-                    <div className="relative z-10">
-                        <CampaignDetail campaign={selectedCampaign} />
+                ) : (
+                    // 기존 Campaign Detail 컨테이너
+                    <div className="bg-white/5 backdrop-blur-2xl p-8 md:p-12 rounded-[4rem] border border-white/10 shadow-[0_0_100px_rgba(0,0,0,0.5)] min-h-[900px] relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent"></div>
+                        <div className="flex flex-col md:flex-row md:items-center justify-between mb-12 pb-10 border-b border-white/5 gap-8 relative z-10">
+                            <div>
+                                <div className="flex items-center gap-4 mb-3">
+                                    <h2 className="text-3xl md:text-5xl font-black text-white tracking-tighter uppercase leading-none">{selectedCampaign?.product_name || 'Campaign'}</h2>
+                                    <span className="text-[10px] font-black px-4 py-1.5 bg-cyan-500/10 text-cyan-400 rounded-full border border-cyan-400/20 tracking-widest uppercase">{selectedCampaign?.plan}</span>
+                                </div>
+                                <p className="text-slate-500 text-lg font-light flex items-center gap-3 tracking-tight">
+                                    <span className={`w-3 h-3 rounded-full ${selectedCampaign?.status === CampaignStatus.COMPLETED ? 'bg-slate-700 shadow-none' : 'bg-cyan-400 animate-pulse shadow-[0_0_10px_rgba(34,211,238,0.8)]'}`}></span>
+                                    {selectedCampaign?.status === CampaignStatus.COMPLETED ? 'FINAL REPORT GENERATED' : 
+                                     selectedCampaign?.status === CampaignStatus.PAYMENT_PENDING ? 'WAITING FOR CONFIRMATION' : 'ANALYTIC ENGINE ACTIVE - MONITORING LIVE FEED'}
+                                </p>
+                            </div>
+                            <StatusBadge status={selectedCampaign?.status} />
+                        </div>
+                        <div className="relative z-10">
+                            <CampaignDetail campaign={selectedCampaign} />
+                        </div>
                     </div>
-                 </div>
+                )}
             </div>
         </div>
       </div>
