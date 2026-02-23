@@ -209,11 +209,9 @@ export default function Consulting() {
 
   const handleSubmit = async () => {
     if (!isFormValid || isSubmitting) return;
-    if (!user) {
-      alert('로그인이 만료되었거나 로그인이 필요한 서비스입니다. 다시 로그인해 주세요.');
-       navigate('/login');
-      return; 
-    }
+    
+    // [제거됨] 비회원도 접근 가능해야 하므로 로그인 체크 로직 삭제
+    // if (!user) { ... }
     
     setIsSubmitting(true);
 
@@ -224,7 +222,8 @@ export default function Consulting() {
         .from('consulting_requests')
         .insert([
           {
-            user_id: user.id, 
+            // [수정됨] 로그인 유저면 id를, 비회원이면 null을 삽입 (옵셔널 체이닝 활용)
+            user_id: user?.id || null, 
             name: userInfo.name,
             company: userInfo.company,
             phone: userInfo.phone,
@@ -245,7 +244,7 @@ export default function Consulting() {
 
     } catch (error) {
       console.error('Error inserting data:', error);
-      alert('예약 처리 중 오류가 발생했습니다. 이미 마감된 시간일 수 있습니다.');
+      alert('예약 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
     } finally {
       setIsSubmitting(false);
     }

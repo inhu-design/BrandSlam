@@ -12,24 +12,25 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  // 1. 매직 링크 로그인 (신규/기존 모두 가능)
-  const handleMagicLogin = async (e) => {
+// 1. 매직 링크 로그인 (신규/기존 모두 가능)
+const handleMagicLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: window.location.origin + '/dashboard', 
+        // 기존: window.location.origin + '/dashboard', 
+        // 수정: 메인 페이지로 리다이렉트 (404 방지용)
+        emailRedirectTo: window.location.origin, 
       },
     });
-
+  
     if (error) alert(error.message);
     else setSent(true);
     
     setLoading(false);
   };
-
   // 2. 비밀번호 로그인 (비번 설정한 유저만)
   const handlePasswordLogin = async (e) => {
     e.preventDefault();

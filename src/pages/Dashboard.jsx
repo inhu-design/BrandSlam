@@ -781,6 +781,19 @@ const CampaignDetail = ({ campaign }) => {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  // Navbar '요금제'와 동일: / 로 이동 후 #pricing 섹션으로 스크롤
+  const goToPricing = () => {
+    const scrollToPricing = () => {
+      const el = document.getElementById('pricing');
+      if (el) {
+        const headerOffset = 90;
+        const top = el.getBoundingClientRect().top + window.pageYOffset - headerOffset;
+        window.scrollTo({ top, behavior: 'smooth' });
+      }
+    };
+    navigate('/');
+    setTimeout(scrollToPricing, 150);
+  };
   const [user, setUser] = useState(null);
   const [campaigns, setCampaigns] = useState([]);
   const [selectedCampaignId, setSelectedCampaignId] = useState(null);
@@ -903,7 +916,7 @@ export default function Dashboard() {
                             />
                         ))}
                     </div>
-                    <div onClick={() => navigate('/#pricing')} className="p-8 rounded-[2.5rem] border-2 border-dashed border-white/5 text-center hover:border-purple-500/50 hover:bg-purple-500/5 transition-all cursor-pointer group relative overflow-hidden">
+                    <div onClick={goToPricing} className="p-8 rounded-[2.5rem] border-2 border-dashed border-white/5 text-center hover:border-purple-500/50 hover:bg-purple-500/5 transition-all cursor-pointer group relative overflow-hidden">
                         <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center mx-auto mb-4 text-slate-500 group-hover:text-purple-400 transition-all duration-500 border border-white/5 group-hover:rotate-180">
                             <Package size={24} />
                         </div>
@@ -948,7 +961,7 @@ export default function Dashboard() {
                             글로벌 인플루언서와 함께하는 첫 번째 브랜드 캠페인을 런칭하고 실시간 데이터 인사이트를 경험해보세요.
                         </p>
                         <button 
-                            onClick={() => navigate('/#pricing')} 
+                            onClick={goToPricing} 
                             className="px-10 py-5 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-2xl font-black text-lg shadow-[0_0_30px_rgba(168,85,247,0.4)] hover:scale-105 transition-all uppercase tracking-widest flex items-center gap-3"
                         >
                             <Zap size={24} /> Start New Campaign
