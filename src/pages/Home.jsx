@@ -1,9 +1,9 @@
-import React, { useState} from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   ArrowRight, CheckCircle2, Video, Target, Zap, 
   TrendingUp, ShieldCheck, BarChart3, MessageCircle, 
-  Calendar, Check, XCircle, ChevronDown, PlayCircle, Star, Globe, X, FileText, Sparkles, CreditCard, PhoneCall,
+  Calendar, Check, XCircle, ChevronDown, PlayCircle, Star, Globe, X, FileText, Sparkles, CreditCard,
   UserCheck as UserCheckIcon
 } from 'lucide-react';
 import Navbar from '../components/layout/Navbar'; 
@@ -210,7 +210,6 @@ const TikTokEmbed = ({ videoId, title, autoplay = false }) => {
   );
 };
 
-
 const ProcessModal = ({ isOpen, onClose, navigate }) => {
   if (!isOpen) return null;
 
@@ -276,8 +275,6 @@ const ProcessModal = ({ isOpen, onClose, navigate }) => {
 
 // --- [Sections: 리뉴얼 디자인 반영] ---
 
-// 1. Hero Section (Ref 1 이미지의 오가닉한 배경 반영)
-// 1. Hero Section (성공사례 버튼 추가 및 디자인 통일)
 const Hero = ({ onOpenLeadModal }) => (
   <section className="relative pt-32 pb-24 md:pt-48 md:pb-40 overflow-hidden bg-[#020617]">
     {/* Fluid Background Shapes */}
@@ -322,7 +319,6 @@ const Hero = ({ onOpenLeadModal }) => (
           onClick={onOpenLeadModal}
           className="group relative w-full sm:w-auto px-10 py-5 bg-white/5 border border-white/20 text-white rounded-full font-bold text-lg hover:bg-white/10 transition-all backdrop-blur-md flex items-center justify-center gap-2 overflow-hidden"
         >
-          {/* 하단에서 사용한 네온 글로우 효과를 아주 얇게 테두리에 적용 */}
           <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 to-cyan-500/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
           <Sparkles size={18} className="text-purple-400 group-hover:animate-pulse" />
           <span className="relative z-10">성공사례 레퍼런스북 받기</span>
@@ -333,7 +329,6 @@ const Hero = ({ onOpenLeadModal }) => (
   </section>
 );
 
-// 2. Why Section (Ref 3 원칙 테마 반영)
 const WhySection = () => (
   <section className="py-32 bg-[#020617] border-y border-white/5 relative overflow-hidden">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
@@ -400,59 +395,72 @@ const WhySection = () => (
     </div>
   </section>
 );
-// 2.5 Brand Logo Slider Section
+
+// 1. LogoRow 컴포넌트를 BrandLogosSection 바깥으로 완전히 분리합니다.
+const LogoRow = ({ items, direction = "normal", speed = "30s" }) => (
+  <div className="relative flex overflow-hidden group">
+    <div 
+      className={`flex whitespace-nowrap py-4 items-center ${direction === "reverse" ? "animate-infinite-scroll-reverse" : "animate-infinite-scroll"}`}
+      style={{ animationDuration: speed }}
+    >
+      {[...items, ...items].map((brand, idx) => (
+        <div key={idx} className="mx-8 md:mx-14 w-32 md:w-40 flex items-center justify-center h-20 cursor-pointer">
+          <img 
+            src={`/logos/${brand}.png`} 
+            alt={`${brand} logo`} 
+            className="max-w-full max-h-full object-contain grayscale invert mix-blend-screen opacity-50 hover:opacity-100 transition-opacity duration-300"
+            onError={(e) => {
+              e.target.style.display = 'none'; 
+              e.target.parentElement.innerText = brand;
+              e.target.parentElement.className = 'text-slate-500 font-bold text-xl flex items-center justify-center h-full w-full';
+            }}
+          />
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+
+// 2. 메인 컴포넌트
 const BrandLogosSection = () => {
-    const brands = [
-      "23yearsold", "isntree", "anua", "celimax", 
-      "cleardea", "dalba", "deoproce", "easyderm", 
-      "itsskin", "kocostar", "pcalm", 
-      "skinnlab", "baerry", "pyunkangyul"
-    ];
-  
-    const doubleBrands = [...brands, ...brands];
-  
-    return (
-      <section className="py-24 bg-[#020617] overflow-hidden border-b border-white/5 relative">
-        <div className="max-w-7xl mx-auto px-4 mb-16 text-center">
-           <span className="text-cyan-400 font-black tracking-[0.2em] uppercase text-xs mb-3 block">
-              Trusted Partners
-           </span>
-           <p className="text-xl md:text-2xl text-white font-bold tracking-tight">
-              <span className="text-slate-500">Global K-Beauty</span> 브랜드들의 선택
-           </p>
+  const brands = [
+    "23yearsold", "isntree", "anua", "celimax", 
+    "cleardea", "dalba", "deoproce", "easyderm", 
+    "itsskin", "kocostar", "pcalm", 
+    "skinnlab", "baerry", "pyunkangyul"
+  ];
+
+  const shuffleArray = (array) => [...array].sort(() => Math.random() - 0.5);
+
+  const row1 = shuffleArray(brands);
+  const row2 = shuffleArray(brands);
+  const row3 = shuffleArray(brands);
+
+  return (
+    <section className="py-24 bg-[#020617] overflow-hidden border-b border-white/5 relative">
+      <div className="max-w-7xl mx-auto px-4 mb-16 text-center">
+        <span className="text-cyan-400 font-black tracking-[0.2em] uppercase text-xs mb-3 block">
+          Trusted Partners
+        </span>
+        <p className="text-xl md:text-2xl text-white font-bold tracking-tight">
+          <span className="text-slate-500">Global K-Beauty</span> 브랜드들의 선택
+        </p>
+      </div>
+      
+      <div className="relative">
+        <div className="absolute inset-y-0 left-0 w-24 md:w-60 bg-gradient-to-r from-[#020617] to-transparent z-10 pointer-events-none"></div>
+        <div className="absolute inset-y-0 right-0 w-24 md:w-60 bg-gradient-to-l from-[#020617] to-transparent z-10 pointer-events-none"></div>
+
+        <div className="flex flex-col gap-4">
+          <LogoRow items={row1} direction="normal" speed="40s" />
+          <LogoRow items={row2} direction="reverse" speed="35s" />
+          <LogoRow items={row3} direction="normal" speed="45s" />
         </div>
-        
-        <div className="relative flex overflow-hidden group">
-          {/* 좌우 페이드 효과 */}
-          <div className="absolute inset-y-0 left-0 w-24 md:w-40 bg-gradient-to-r from-[#020617] to-transparent z-10 pointer-events-none"></div>
-          <div className="absolute inset-y-0 right-0 w-24 md:w-40 bg-gradient-to-l from-[#020617] to-transparent z-10 pointer-events-none"></div>
-  
-          <div className="flex animate-infinite-scroll whitespace-nowrap py-4 items-center">
-            {doubleBrands.map((brand, idx) => (
-              <div key={idx} className="mx-8 md:mx-14 w-32 md:w-40 flex items-center justify-center h-20 cursor-pointer">
-                <img 
-                  src={`/logos/${brand}.png`} 
-                  alt={`${brand} logo`} 
-                  // [ 핵심 수정 사항 ]
-                  // 1. grayscale: 색상 제거
-                  // 2. invert: 색상 반전 (흰 배경->검은 배경 / 검은 글씨->흰 글씨)
-                  // 3. mix-blend-screen: 검은색(배경)은 투명해지고 밝은 색(글씨)만 남음
-                  // 4. opacity: 너무 쨍하지 않게 조절
-                  className="max-w-full max-h-full object-contain grayscale invert mix-blend-screen opacity-70 hover:opacity-100 transition-opacity duration-300"
-                  onError={(e) => {
-                      e.target.style.display = 'none'; 
-                      e.target.parentElement.innerText = brand;
-                      e.target.parentElement.className = 'text-slate-500 font-bold text-xl flex items-center justify-center h-full w-full';
-                  }}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-    );
-  };
-// 3. Success Stories Section 
+      </div>
+    </section>
+  );
+};
 const SuccessStoriesSection = () => (
     <section id="cases" className="py-32 bg-[#020617]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -512,14 +520,11 @@ const SuccessStoriesSection = () => (
     </section>
 );
 
-// 4. Viral Grid Section
-// 4. Viral Grid Section
 const ViralGridSection = () => {
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
 
   return (
     <section className="py-32 bg-[#020617] relative overflow-hidden">
-      {/* 배경 장식 - 버튼 주변에 은은한 빛 추가 */}
       <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[500px] h-[300px] bg-purple-600/10 blur-[120px] pointer-events-none"></div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
@@ -545,7 +550,6 @@ const ViralGridSection = () => {
           ))}
         </div>
 
-        {/* [디자인 리뉴얼된 버튼 영역] */}
         <div className="flex flex-col items-center justify-center gap-8">
           <div className="text-center space-y-2">
             <p className="text-cyan-400 text-sm font-black tracking-[0.2em] uppercase">Private Access</p>
@@ -556,16 +560,10 @@ const ViralGridSection = () => {
             onClick={() => setIsLeadModalOpen(true)}
             className="group relative px-10 py-6 md:px-16 md:py-8 bg-slate-950 rounded-[2rem] overflow-hidden transition-all duration-500 hover:scale-[1.03] active:scale-[0.98]"
           >
-            {/* 1. 애니메이션 배경 그라데이션 (네온 효과) */}
             <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-500 opacity-80 group-hover:opacity-100 transition-opacity"></div>
-            
-            {/* 2. 무빙 글로우 효과 (버튼 내부를 지나가는 빛) */}
             <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/30 to-transparent pointer-events-none"></div>
-
-            {/* 3. 내부 베젤 효과 (유리 질감) */}
             <div className="absolute inset-[1px] bg-slate-950/40 rounded-[1.95rem] backdrop-blur-sm border border-white/10"></div>
 
-            {/* 4. 실제 콘텐츠 */}
             <div className="relative z-10 flex items-center gap-6 text-white">
               <div className="bg-white/10 p-3 rounded-2xl group-hover:bg-white/20 transition-colors">
                 <Sparkles size={28} className="text-yellow-300 animate-pulse" />
@@ -583,7 +581,6 @@ const ViralGridSection = () => {
               </div>
             </div>
 
-            {/* 5. 외부 글로우 (그림자) */}
             <div className="absolute -inset-2 bg-gradient-to-r from-purple-600 to-cyan-500 rounded-[2.5rem] blur-xl opacity-20 group-hover:opacity-40 transition-opacity pointer-events-none"></div>
           </button>
 
@@ -595,7 +592,6 @@ const ViralGridSection = () => {
         </div>
       </div>
 
-      {/* 리드 수집 모달 */}
       <LeadCollectionModal 
         isOpen={isLeadModalOpen} 
         onClose={() => setIsLeadModalOpen(false)} 
@@ -603,7 +599,7 @@ const ViralGridSection = () => {
     </section>
   );
 };
-// 5. Guarantee Section (Ref 2 원형 오브제 스타일 반영)
+
 const GuaranteeSection = () => (
   <section className="py-40 bg-[#020617] relative overflow-hidden border-y border-white/5">
      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gradient-to-r from-purple-600/10 to-blue-600/10 rounded-full blur-[160px] pointer-events-none"></div>
@@ -612,7 +608,6 @@ const GuaranteeSection = () => (
         <span className="text-emerald-400 font-black tracking-[0.3em] uppercase text-sm mb-8 block">Step 03. The Promise</span>
         <h2 className="text-5xl md:text-8xl font-black text-white mb-10 tracking-tighter leading-none">
         실패란 없습니다.
-            {/* [변경] Footer 스타일과 동일하게 block 처리 */}
             <span className="block mt-4 md:mt-6 text-transparent text-6xl bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-500">
             155% 케어형 매니지먼트 서비스
             </span>
@@ -657,7 +652,6 @@ const GuaranteeSection = () => (
   </section>
 );
 
-// 6. Process Section (Ref 3 다크 카드 스타일 반영)
 const ProcessSection = () => (
     <section id="process" className="py-32 bg-[#020617] relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -665,7 +659,6 @@ const ProcessSection = () => (
                 <span className="text-purple-400 font-black tracking-[0.3em] uppercase text-sm">Step 04. Total Control</span>
                 <h2 className="text-4xl md:text-6xl font-black text-white mt-6 mb-8 tracking-tight">
                 모든 과정은
-                    {/* [변경] 줄바꿈 및 여백 추가 */}
                     <span className="block mt-2 md:mt-4">
                         <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400">대시보드</span>에서 투명하게.
                     </span>
@@ -697,7 +690,6 @@ const ProcessSection = () => (
                 <div className="lg:w-1/2">
                     <h3 className="text-3xl md:text-5xl font-black text-white mb-8 tracking-tight leading-tight">
                     실무자의 시간을 아껴주는
-                        {/* [변경] Smart Management 줄바꿈 및 강조 */}
                         <span className="block mt-3 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400 italic">
                             Smart Management.
                         </span>
@@ -733,8 +725,6 @@ const ProcessSection = () => (
     </section>
 );
 
-// 7. Pricing Section (Visit Plan 추가됨)
-// 7. Pricing Section (Visit Plan 수정됨 - 1인 단가 강조)
 const PricingSection = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const navigate = useNavigate();
@@ -745,12 +735,11 @@ const PricingSection = () => {
     { name: "Scale50", price: "2,390,000", count: "50", recommend: "전환 및 매출 확장을 고려하는 브랜드", features: ["캠페인 운영 대행", "콘텐츠 업로드 트래킹", "성과 리포트 & VOC 분석", "원본 영상 1개 제공"] }
   ];
 
-  // [MODIFIED] Visit Plan 데이터 (단가 위주로 변경)
   const visitPlan = {
       name: "VISIT CONTENT",
       subTitle: "오프라인 매출 펌핑 시딩 상품",
-      price: "300,000", // 단가 강조
-      unit: "/ 1인",    // 단위 표시
+      price: "300,000",
+      unit: "/ 1인",
       desc: "입점 이후, 매장 트래픽과 회전율을 끌어올리기 위한 전용 상품",
       target: ["올리브영/Sephora/CVS 등 입점 브랜드", "매장 회전율이 고민인 브랜드"],
       features: [
@@ -758,7 +747,7 @@ const PricingSection = () => {
           "얼굴 노출 콘텐츠 포함 (신뢰도 상승)",
           "구매 매장 정보 노출 (방문 유도)",
           "TikTok / Instagram 업로드 최적화",
-          "최소 1명부터 원하는 수량만큼 진행 가능" // 유연성 강조
+          "최소 1명부터 원하는 수량만큼 진행 가능"
       ]
   };
 
@@ -780,7 +769,6 @@ const PricingSection = () => {
             <p className="text-slate-500 max-w-2xl mx-auto font-light leading-relaxed">플랫폼 기반의 투명한 운영으로 <span className="text-white font-medium italic underline underline-offset-4 decoration-purple-500">콘텐츠 회수율 100%</span>까지 책임집니다.</p>
         </div>
 
-        {/* Main Plans (Online) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-20">
             {mainPlans.map((plan, idx) => (
                 <div key={idx} className={`relative bg-[#0f172a] text-white rounded-[3rem] p-10 border transition-all duration-700 hover:-translate-y-4 ${plan.isBest ? 'border-purple-500 shadow-[0_0_50px_rgba(168,85,247,0.2)] md:scale-105 z-10' : 'border-white/10 shadow-2xl'}`}>
@@ -823,7 +811,6 @@ const PricingSection = () => {
             ))}
         </div>
 
-        {/* [MODIFIED] Special Visit Plan (Offline) - 가격 표시 수정됨 */}
         <div className="mb-32">
           <div className="bg-gradient-to-br from-purple-900/40 to-blue-900/40 rounded-[3rem] p-1 md:p-1">
               <div className="bg-[#0f172a] rounded-[2.8rem] p-8 md:p-16 border border-white/10 relative overflow-hidden">
@@ -897,7 +884,6 @@ const PricingSection = () => {
           </div>
         </div>
 
-        {/* Add-on Section */}
         <div className="bg-white/5 backdrop-blur-3xl rounded-[4rem] p-10 md:p-20 border border-white/10 relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-purple-500/50 to-transparent"></div>
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-10 mb-16">
@@ -940,7 +926,6 @@ const PricingSection = () => {
   );
 };
 
-// 8. Footer CTA
 const FooterCTA = () => (
     <section className="py-40 bg-[#020617] text-center relative border-t border-white/5">
         <div className="absolute inset-0 bg-gradient-to-b from-transparent to-purple-900/10 pointer-events-none"></div>
@@ -963,50 +948,26 @@ const FooterCTA = () => (
     </section>
 );
 
-// [추가] 플로팅 상담 버튼 (다크 테마 리뉴얼)
-const FloatingConsultButton = () => (
-    <Link 
-        to="/consulting" 
-        className="fixed bottom-10 right-10 z-50 flex items-center justify-center w-20 h-20 bg-gradient-to-br from-purple-600 to-blue-600 text-white rounded-full shadow-[0_0_30px_rgba(147,51,234,0.4)] hover:scale-110 transition-all duration-500 group"
-    >
-        <PhoneCall size={32} className="group-hover:animate-wiggle" />
-        <div className="absolute right-full mr-6 bg-white/5 backdrop-blur-xl text-white text-sm font-black py-3 px-6 rounded-2xl opacity-0 group-hover:opacity-100 transition-all duration-500 whitespace-nowrap pointer-events-none border border-white/10 tracking-[0.2em] uppercase">
-            상담 예약하기
-        </div>
-    </Link>
-);
-
 export default function Home() {
-  // 모달 상태 관리를 Home에서 수행
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
-
-  // ... (useEffect 로직 동일)
 
   return (
     <div className="font-sans antialiased text-white bg-[#020617] selection:bg-cyan-500/30 selection:text-white relative">
       <Navbar /> 
-      {/* 1. Hero에 모달 여는 함수 전달 */}
       <Hero onOpenLeadModal={() => setIsLeadModalOpen(true)} />
-      
       <WhySection />
-      <BrandLogosSection />
+      
+      {/* 3줄로 수정된 브랜드 로고 섹션 렌더링 */}
+      <BrandLogosSection /> 
+      
       <SuccessStoriesSection />
-      
-      {/* 2. ViralGridSection은 이미 내부에서 모달을 열고 있으므로 그대로 두거나 통일해도 됩니다 */}
       <ViralGridSection /> 
-      
       <GuaranteeSection />
       <ProcessSection />
       <PricingSection />
       <FooterCTA />
       <Footer />  
-      <FloatingConsultButton />
-
-      {/* 3. 모달은 Home 최하단에 하나만 두고 관리하는 것이 데이터 무결성에 좋습니다 */}
-      <LeadCollectionModal 
-        isOpen={isLeadModalOpen} 
-        onClose={() => setIsLeadModalOpen(false)} 
-      />
+      <LeadCollectionModal isOpen={isLeadModalOpen} onClose={() => setIsLeadModalOpen(false)} />
     </div>
   );
 }

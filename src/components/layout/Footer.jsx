@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { X } from 'lucide-react';
 import logoImg from '../../assets/logo.png';
+import kakaoLogo from '../../assets/kakaotalk.png'; // 카카오 로고 이미지 추가
 
-// --- 법적 고지 데이터 (생략 - 기존과 동일) ---
+// --- 법적 고지 데이터 ---
 const LEGAL_CONTENTS = {
   terms: {
     title: "이용약관 (취소 및 환불 정책)",
@@ -82,7 +83,7 @@ const LegalModal = ({ isOpen, onClose, title, content }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col relative">
         <div className="flex justify-between items-center p-6 border-b border-gray-100">
           <h3 className="text-xl font-bold text-gray-900">{title}</h3>
@@ -111,6 +112,27 @@ const LegalModal = ({ isOpen, onClose, title, content }) => {
   );
 };
 
+// --- [추가] 플로팅 상담 버튼 컴포넌트 ---
+const FloatingConsultButton = () => (
+  <a 
+      href="http://pf.kakao.com/_VxmWxon/chat" 
+      target="_blank" 
+      rel="noopener noreferrer"
+      className="fixed bottom-10 right-10 z-[60] flex items-center justify-center w-20 h-20 bg-gradient-to-br from-slate-900 to-black text-[#FEE500] rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] hover:shadow-[0_20px_60px_rgba(254,229,0,0.15)] ring-1 ring-white/10 hover:ring-yellow-400/50 hover:scale-110 transition-all duration-500 group"
+  >
+      <img
+          src={kakaoLogo}
+          alt="카카오톡"
+          width={48}
+          height={48}
+          className="group-hover:rotate-12 transition-transform duration-500"
+      />
+      <div className="absolute right-full mr-4 bg-slate-900/80 backdrop-blur-md text-white text-[10px] font-black py-2 px-4 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-500 whitespace-nowrap border border-white/10 tracking-[0.2em]">
+          실시간 톡상담
+      </div>
+  </a>
+);
+
 const Footer = () => {
   const [activeModal, setActiveModal] = useState(null);
   const navigate = useNavigate();
@@ -125,7 +147,6 @@ const Footer = () => {
     return () => { document.body.style.overflow = 'unset'; };
   }, [activeModal]);
 
-  // [수정] Footer용 스크롤 핸들러 (Navbar와 로직 동일)
   const handleSectionClick = (e, path) => {
     if (path.startsWith('/#')) {
       e.preventDefault();
@@ -160,7 +181,6 @@ const Footer = () => {
     {
       title: "Product",
       items: [
-        
         { name: "고객 사례", path: "/#cases" },
         { name: "프로세스", path: "/#process" },
         { name: "요금제", path: "/#pricing" }
@@ -186,7 +206,7 @@ const Footer = () => {
 
   return (
     <>
-      <footer className="bg-white pt-20 pb-10 border-t border-gray-100 text-sans">
+      <footer className="bg-white pt-20 pb-10 border-t border-gray-100 text-sans relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 mb-16">
             
@@ -224,7 +244,6 @@ const Footer = () => {
                         </button>
                       ) : (
                         item.path.startsWith('/#') ? (
-                          // [수정] 해시 링크 처리
                           <a 
                             href={item.path} 
                             onClick={(e) => handleSectionClick(e, item.path)}
@@ -273,6 +292,9 @@ const Footer = () => {
           </div>
         </div>
       </footer>
+
+      {/* 모든 페이지 공통 플로팅 버튼 */}
+      <FloatingConsultButton />
 
       <LegalModal 
         isOpen={!!activeModal}
