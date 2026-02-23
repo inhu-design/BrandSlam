@@ -209,6 +209,11 @@ export default function Consulting() {
 
   const handleSubmit = async () => {
     if (!isFormValid || isSubmitting) return;
+    if (!user) {
+      alert('로그인이 만료되었거나 로그인이 필요한 서비스입니다. 다시 로그인해 주세요.');
+       navigate('/login');
+      return; 
+    }
     
     setIsSubmitting(true);
 

@@ -875,7 +875,7 @@ export default function Dashboard() {
                 <div className="flex gap-4">
                     <input 
                         type="password" 
-                        placeholder="NEW PASSWORD (MIN 6 CHARS)" 
+                        placeholder="NEW PASSWORD (6글자 이상)" 
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
                         className="flex-1 px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-sm font-bold text-white outline-none focus:border-purple-500 transition-all uppercase tracking-widest"

@@ -159,12 +159,11 @@ const Footer = () => {
   const footerSections = [
     {
       title: "Product",
-      // [수정] 경로 변경 (#pricing, #cases)
       items: [
         
         { name: "고객 사례", path: "/#cases" },
-        { name: "프로세스 소개", path: "/#process" },
-        { name: "캠페인", path: "/#pricing" }
+        { name: "프로세스", path: "/#process" },
+        { name: "요금제", path: "/#pricing" }
       ]
     },
     {
