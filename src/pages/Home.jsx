@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { 
   ArrowRight, CheckCircle2, Video, Target, Zap, 
   TrendingUp, ShieldCheck, BarChart3, MessageCircle, 
-  Calendar, Check, XCircle, ChevronDown, PlayCircle, Star, Globe, X, FileText, Sparkles, CreditCard,
+  Calendar, Check, XCircle, ChevronDown, PlayCircle, Star, Globe, X, FileText, Sparkles, CreditCard, Clock,
   UserCheck as UserCheckIcon
 } from 'lucide-react';
 import Navbar from '../components/layout/Navbar'; 
@@ -656,32 +656,96 @@ const ProcessSection = () => (
     <section id="process" className="py-32 bg-[#020617] relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-24">
-                <span className="text-purple-400 font-black tracking-[0.3em] uppercase text-sm">Step 04. Total Control</span>
+                <span className="text-purple-400 font-black tracking-[0.3em] uppercase text-sm">Step 04. Clear Timeline</span>
                 <h2 className="text-4xl md:text-6xl font-black text-white mt-6 mb-8 tracking-tight">
-                모든 과정은
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400">"콘텐츠 언제 올라와?"</span>
                     <span className="block mt-2 md:mt-4">
-                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400">대시보드</span>에서 투명하게.
+                        모든 과정을, 미리 다 알려드립니다.
                     </span>
                 </h2>
-                <p className="text-lg text-slate-400 leading-relaxed max-w-3xl mx-auto font-light">
+                <p className="text-xl text-slate-300 leading-relaxed max-w-3xl mx-auto">
                     계약부터 성과 확인까지, 더 이상 복잡한 메일은 필요 없습니다.<br/>
-                    슬램 글로벌만의 <span className="text-white font-medium">One-Stop Management System</span>을 경험하세요.
+                    슬램 글로벌만의 <span className="text-white font-semibold">One-Stop Management System</span>으로<br className="hidden sm:inline"/>
+                    <span className="text-white font-semibold">대시보드에서 투명하게</span> 확인하세요.
                 </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-32">
+            {/* Overall timeline summary */}
+            <div className="flex justify-center mb-16">
+                <div className="inline-flex flex-wrap justify-center items-center gap-x-4 gap-y-2 bg-white/[0.06] border border-white/15 rounded-2xl px-10 py-5 backdrop-blur-sm">
+                    <Clock size={20} className="text-purple-400 flex-shrink-0" />
+                    <span className="text-white text-base font-medium">
+                        캠페인 시작 → 발송 2주 전후 <span className="text-purple-300 font-bold">컨텐츠 업로드 시작</span>
+                    </span>
+                    <span className="text-white/30 hidden sm:inline text-lg"></span>
+                </div>
+            </div>
+
+            {/* 5-step vertical timeline */}
+            <div className="max-w-3xl mx-auto mb-32 relative">
+                <div className="absolute left-[31px] top-8 bottom-8 w-px bg-gradient-to-b from-purple-500/50 via-blue-500/50 to-emerald-500/50 hidden md:block"></div>
+                <div className="absolute left-[23px] top-6 bottom-6 w-px bg-gradient-to-b from-purple-500/50 via-blue-500/50 to-emerald-500/50 md:hidden"></div>
+
                 {[
-                    { icon: MessageCircle, title: "1. 발주 문의 & 미팅", desc: "전문가와 1:1 상담을 통해\n최적의 캠페인 전략을 수립합니다." },
-                    { icon: FileText, title: "2. 계약서 & 송장 생성", desc: "마이페이지를 통해\n계약서/송장이 자동 생성됩니다." },
-                    { icon: CreditCard, title: "3. 결제 및 착수", desc: "입금 확인 즉시 크리에이터\n모집 및 제품 발송이 시작됩니다." },
-                    { icon: BarChart3, title: "4. 실시간 성과 확인", desc: "배송 현황부터 영상 URL까지\n실시간으로 트래킹하세요." }
+                    {
+                        icon: Sparkles,
+                        title: "캠페인 시작",
+                        desc: "바로 구매 / 플랜 추천 / 화상 상담",
+                        detail: "캠페인 목표와 예산에 맞는 최적의 플랜을 선택하고 바로 시작하세요.",
+                        gradient: "from-purple-500 to-purple-600"
+                    },
+                    {
+                        icon: Target,
+                        title: "캠페인 세팅",
+                        desc: "제품, 컨텐츠 가이드라인 협의",
+                        detail: "브랜드 톤앤매너에 맞는 콘텐츠 방향성을 함께 설정합니다.",
+                        gradient: "from-purple-500 to-blue-500"
+                    },
+                    {
+                        icon: UserCheckIcon,
+                        title: "인플루언서 선정 및 제품 발송",
+                        desc: "캠페인에 최적화된 크리에이터를 매칭하고 제품을 발송합니다.",
+                        duration: "",
+                        gradient: "from-blue-500 to-blue-600"
+                    },
+                    {
+                        icon: Video,
+                        title: "콘텐츠 업로드 시작",
+                        desc: "크리에이터가 제품을 수령하고 리뷰 콘텐츠를 제작 및 업로드합니다.",
+                        duration: "제품 발송 후 약 2주 후부터 시작",
+                        gradient: "from-blue-500 to-cyan-500"
+                    },
+                    {
+                        icon: TrendingUp,
+                        title: "성과 관리 및 인게이지먼트 분석",
+                        desc: "조회수, 좋아요, 댓글 등 콘텐츠 성과를 실시간으로 모니터링합니다.",
+                        duration: "",
+                        gradient: "from-cyan-500 to-emerald-500"
+                    }
                 ].map((step, idx) => (
-                    <div key={idx} className="bg-white/5 p-10 rounded-[2.5rem] border border-white/5 relative group hover:-translate-y-2 transition-all duration-500 backdrop-blur-md">
-                        <div className="w-16 h-16 bg-gradient-to-br from-purple-500/20 to-blue-500/20 text-purple-400 rounded-2xl flex items-center justify-center mb-8 border border-white/10 group-hover:scale-110 transition-transform">
-                            <step.icon size={30} />
+                    <div key={idx} className="relative flex items-start gap-5 md:gap-8 mb-8 last:mb-0 group">
+                        {/* Step number circle */}
+                        <div className={`relative z-10 flex-shrink-0 w-12 h-12 md:w-16 md:h-16 rounded-full bg-gradient-to-br ${step.gradient} flex items-center justify-center shadow-lg shadow-purple-500/20 ring-4 ring-[#020617]`}>
+                            <span className="text-white font-black text-base md:text-xl">{idx + 1}</span>
                         </div>
-                        <h3 className="font-bold text-xl text-white mb-4 tracking-tight">{step.title}</h3>
-                        <p className="text-slate-500 text-sm leading-relaxed font-light whitespace-pre-line">{step.desc}</p>
+
+                        {/* Content card */}
+                        <div className="flex-1 bg-white/[0.05] hover:bg-white/[0.09] border border-white/10 hover:border-white/20 rounded-2xl p-6 md:p-8 transition-all duration-500 group-hover:-translate-y-1">
+                            <div className="flex flex-wrap items-center gap-3 mb-4">
+                                <step.icon size={22} className="text-purple-400" />
+                                <h3 className="font-bold text-xl md:text-2xl text-white tracking-tight">{step.title}</h3>
+                                {step.duration && (
+                                    <span className="ml-auto bg-emerald-500/15 text-emerald-400 text-sm font-bold px-4 py-2 rounded-full border border-emerald-500/30 flex items-center gap-2 whitespace-nowrap">
+                                        <Clock size={14} />
+                                        {step.duration}
+                                    </span>
+                                )}
+                            </div>
+                            <p className="text-slate-200 text-base leading-relaxed mb-1">{step.desc}</p>
+                            {step.detail && (
+                                <p className="text-slate-400 text-sm leading-relaxed">{step.detail}</p>
+                            )}
+                        </div>
                     </div>
                 ))}
             </div>
