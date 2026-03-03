@@ -4,7 +4,7 @@ import {
   ArrowRight, CheckCircle2, Video, Target, Zap, 
   TrendingUp, ShieldCheck, BarChart3, MessageCircle, 
   Calendar, Check, XCircle, ChevronDown, PlayCircle, Star, Globe, X, FileText, Sparkles, CreditCard, Clock,
-  UserCheck as UserCheckIcon
+  UserCheck as UserCheckIcon, ClipboardList, Settings2, Rocket
 } from 'lucide-react';
 import Navbar from '../components/layout/Navbar'; 
 import Footer from '../components/layout/Footer';
@@ -237,10 +237,10 @@ const ProcessModal = ({ isOpen, onClose, navigate }) => {
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-12 relative">
             {[
-              { icon: MessageCircle, title: "1. 발주 문의", desc: "웹사이트에서\n문의 접수" },
-              { icon: Video, title: "2. 화상 미팅", desc: "전문가와 상담 및\n캠페인 전략 수립" },
-              { icon: FileText, title: "3. 계약/송장", desc: "마이페이지에서\n계약서 및 송장 확인" },
-              { icon: Zap, title: "4. 입금/착수", desc: "계좌 이체 후\n프로젝트 즉시 시작" }
+              { icon: ClipboardList, title: "1. 발주 문의", desc: "구매, 진단, 상담을 통해\n최적의 플랜 선택" },
+              { icon: CreditCard, title: "2. 플랜 결제", desc: "계좌 이체 후\n프로젝트 즉시 시작" },
+              { icon: Settings2, title: "3. 캠페인 세팅", desc: "캠페인 세팅을 통해\n제품, 컨텐츠 가이드 협의" },
+              { icon: Rocket, title: "4. 캠페인 착수", desc: "정해진 날짜에 맞춰서\n캠페인 착수 및 운영" }
             ].map((step, idx) => (
               <div key={idx} className="bg-white/5 p-6 rounded-3xl border border-white/10 text-center relative z-10 backdrop-blur-sm group hover:bg-white/10 transition-colors">
                 <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-blue-500 text-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">

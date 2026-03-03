@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowRight, ArrowLeft, Check, Sparkles, ClipboardList,
-  Target, BarChart3, MessageCircle,
+  Target, BarChart3, MessageCircle, MapPin,
   Zap, Star, CheckCircle2, Brain, TrendingUp, Globe, Search
 } from 'lucide-react';
 import Navbar from '../components/layout/Navbar';
@@ -45,7 +45,7 @@ const RECOMMENDATIONS = {
       '콘텐츠 업로드 트래킹',
       '기본 리포트 서비스 제공',
     ],
-    cta: { label: 'Starter 플랜 시작하기', to: '/' },
+    cta: { label: 'Starter 플랜 시작하기', to: '/checkout', planId: 'Starter' },
     secondary: { label: '전문가 상담 예약', href: GOOGLE_CALENDAR_URL },
   },
   '150만원 이하': {
@@ -67,7 +67,7 @@ const RECOMMENDATIONS = {
       '성과 리포트 (조회수, 반응)',
       'VOC 요약 서비스 제공',
     ],
-    cta: { label: 'Growth 플랜 시작하기', to: '/' },
+    cta: { label: 'Growth 플랜 시작하기', to: '/checkout', planId: 'Growth' },
     secondary: { label: '전문가 상담 예약', href: GOOGLE_CALENDAR_URL },
   },
   '150만원 이상': {
@@ -89,9 +89,30 @@ const RECOMMENDATIONS = {
       '성과 리포트 & VOC 분석',
       '원본 영상 1개 제공',
     ],
-    cta: { label: 'Scale50 플랜 시작하기', to: '/' },
+    cta: { label: 'Scale50 플랜 시작하기', to: '/checkout', planId: 'Scale50' },
     secondary: { label: '전문가 상담 예약', href: GOOGLE_CALENDAR_URL },
   },
+};
+
+const VISIT_RECOMMENDATION = {
+  type: 'plan',
+  tagColor: 'text-amber-400 bg-amber-500/15 border-amber-500/30',
+  tag: 'Visit Content 추천 · 방문형',
+  planId: 'Visit',
+  title: 'Visit Content',
+  price: '300,000',
+  unit: '원 / 인당',
+  subtitle: '오프라인 매장·팝업스토어에 최적화된 방문형 콘텐츠',
+  description: '인플루언서가 직접 매장이나 팝업스토어를 방문하여 현장감 있는 콘텐츠를 제작합니다. 오프라인 채널과 온라인 바이럴을 동시에 공략할 수 있는 특별 플랜입니다.',
+  gradient: 'from-amber-500 to-orange-500',
+  features: [
+    '인플루언서 매장/팝업 직접 방문',
+    '현장 체험 기반 리얼 콘텐츠 제작',
+    '방문 인원 자유 설정 (인당 과금)',
+    '오프라인-온라인 연계 바이럴 효과',
+  ],
+  cta: { label: 'Visit 플랜 시작하기', to: '/checkout', planId: 'Visit' },
+  secondary: { label: '전문가 상담 예약', href: GOOGLE_CALENDAR_URL },
 };
 
 const ToggleChip = ({ label, selected, onClick }) => (
@@ -161,6 +182,7 @@ const ANALYSIS_STEPS = [
 ];
 
 export default function Diagnosis() {
+  const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -175,6 +197,7 @@ export default function Diagnosis() {
     productLink: '',
     categories: [], categoriesOther: '',
     salesChannels: [], salesChannelsOther: '',
+    popupPlan: '',
     budget: '',
   });
 
@@ -208,6 +231,7 @@ export default function Diagnosis() {
         product_link: formData.productLink,
         categories: [...formData.categories, formData.categoriesOther && `기타: ${formData.categoriesOther}`].filter(Boolean),
         sales_channels: [...formData.salesChannels, formData.salesChannelsOther && `기타: ${formData.salesChannelsOther}`].filter(Boolean),
+        popup_plan: formData.popupPlan,
         budget: formData.budget,
       }]);
     } catch { /* 데이터 저장 실패해도 결과는 정상 노출 */ }
@@ -228,13 +252,14 @@ export default function Diagnosis() {
     switch (step) {
       case 1: return formData.brandName && formData.contactName && formData.email && formData.phone;
       case 2: return formData.countries.length > 0 && formData.goals.length > 0 && formData.duration;
-      case 3: return formData.challenges.length > 0 && formData.categories.length > 0;
+      case 3: return formData.challenges.length > 0 && formData.categories.length > 0 && !!formData.popupPlan;
       case 4: return !!formData.budget;
       default: return false;
     }
   };
 
   const rec = RECOMMENDATIONS[formData.budget];
+  const showVisit = formData.popupPlan === '예' || formData.salesChannels.includes('오프라인');
 
   const renderStep = () => {
     switch (step) {
@@ -339,13 +364,24 @@ export default function Diagnosis() {
                   placeholder="직접 입력해주세요" className="w-full px-5 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-600 focus:outline-none focus:border-purple-500/50 text-sm mt-2" />
               )}
             </div>
-          </div>
+
+            <div>
+              <SectionLabel number="9" title="팝업 서비스 진행 계획" subtitle="오프라인 팝업스토어나 매장 방문 콘텐츠 서비스에 관심이 있으신가요?" />
+              <div className="space-y-3">
+                {['예', '아니오'].map(opt => (
+                  <RadioOption key={opt} label={opt} selected={formData.popupPlan === opt} onClick={() => set('popupPlan')(opt)} />
+                ))}
+              </div>
+
+              </div>
+            </div>
+
         );
 
       case 4:
         return (
           <div className="space-y-8">
-            <SectionLabel number="9" title="월 예산 범위" subtitle="캠페인에 투자할 수 있는 월 예산 범위를 선택해주세요." />
+            <SectionLabel number="10" title="월 예산 범위" subtitle="캠페인에 투자할 수 있는 월 예산 범위를 선택해주세요." />
             <div className="space-y-4">
               {BUDGETS.map(b => (
                 <RadioOption key={b} label={b} selected={formData.budget === b} onClick={() => set('budget')(b)} />
@@ -507,6 +543,7 @@ export default function Diagnosis() {
                 <div className="space-y-3">
                   <Link
                     to={rec.cta.to}
+                    state={{ plan: rec.cta.planId }}
                     className={`w-full py-4 rounded-2xl font-bold text-white text-lg bg-gradient-to-r ${rec.gradient} hover:opacity-90 transition-all hover:-translate-y-0.5 shadow-lg flex items-center justify-center gap-2`}
                   >
                     {rec.cta.label} <ArrowRight size={20} />
@@ -526,6 +563,75 @@ export default function Diagnosis() {
               </div>
             </div>
 
+            {/* Visit plan recommendation */}
+            {showVisit && (
+              <div className="bg-white/[0.04] border border-amber-500/20 rounded-3xl overflow-hidden mb-8">
+                <div className="p-6 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-b border-amber-500/10">
+                  <div className="flex items-center gap-3 mb-2">
+                    <MapPin size={20} className="text-amber-400" />
+                    <span className="text-sm font-bold text-amber-400 uppercase tracking-wider">추가 추천</span>
+                  </div>
+                  <p className="text-slate-300 text-sm">
+                    {formData.popupPlan === '예' && formData.salesChannels.includes('오프라인')
+                      ? '팝업 서비스 계획과 오프라인 채널 운영을 고려하여 Visit Content 플랜을 추가 추천드립니다.'
+                      : formData.popupPlan === '예'
+                        ? '팝업 서비스 진행 계획에 맞춰 Visit Content 플랜을 추가 추천드립니다.'
+                        : '오프라인 채널을 운영 중이시므로 Visit Content 플랜을 추가 추천드립니다.'
+                    }
+                  </p>
+                </div>
+
+                <div className={`p-8 bg-gradient-to-r ${VISIT_RECOMMENDATION.gradient} relative overflow-hidden`}>
+                  <div className="absolute top-0 right-0 w-40 h-40 bg-white opacity-10 rounded-full -mr-12 -mt-12 blur-2xl"></div>
+                  <div className="relative z-10">
+                    <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full border mb-4 ${VISIT_RECOMMENDATION.tagColor}`}>
+                      <Star size={12} /> {VISIT_RECOMMENDATION.tag}
+                    </span>
+                    <h2 className="text-2xl md:text-3xl font-black text-white mb-2">{VISIT_RECOMMENDATION.title}</h2>
+                    <div className="flex items-baseline gap-2 mb-2">
+                      <span className="text-4xl font-black text-white">{VISIT_RECOMMENDATION.price}</span>
+                      <span className="text-lg text-white/70 font-medium">{VISIT_RECOMMENDATION.unit}</span>
+                    </div>
+                    <p className="text-white/80 text-base font-medium">{VISIT_RECOMMENDATION.subtitle}</p>
+                  </div>
+                </div>
+
+                <div className="p-8">
+                  <p className="text-slate-300 text-base leading-relaxed mb-8">{VISIT_RECOMMENDATION.description}</p>
+
+                  <div className="space-y-4 mb-8">
+                    {VISIT_RECOMMENDATION.features.map((feat, i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <div className="p-1 rounded-full bg-amber-500/20 text-amber-400 flex-shrink-0">
+                          <Check size={14} strokeWidth={3} />
+                        </div>
+                        <span className="text-white text-base font-medium">{feat}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="space-y-3">
+                    <Link
+                      to={VISIT_RECOMMENDATION.cta.to}
+                      state={{ plan: VISIT_RECOMMENDATION.cta.planId }}
+                      className={`w-full py-4 rounded-2xl font-bold text-white text-lg bg-gradient-to-r ${VISIT_RECOMMENDATION.gradient} hover:opacity-90 transition-all hover:-translate-y-0.5 shadow-lg flex items-center justify-center gap-2`}
+                    >
+                      {VISIT_RECOMMENDATION.cta.label} <ArrowRight size={20} />
+                    </Link>
+
+                    <a
+                      href={VISIT_RECOMMENDATION.secondary.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full py-4 rounded-2xl font-bold text-slate-300 text-base bg-white/5 border border-white/10 hover:bg-white/10 transition-all flex items-center justify-center gap-2"
+                    >
+                      <MessageCircle size={18} /> {VISIT_RECOMMENDATION.secondary.label}
+                    </a>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Summary of submitted info */}
             <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6">
               <h4 className="text-sm font-bold text-slate-400 mb-4 uppercase tracking-wider">제출된 진단 정보 요약</h4>
@@ -542,7 +648,7 @@ export default function Diagnosis() {
             {/* Restart */}
             <div className="text-center mt-10">
               <button
-                onClick={() => { setShowResult(false); setStep(1); setFormData(prev => ({ ...prev, budget: '' })); }}
+                onClick={() => { setShowResult(false); setStep(1); setFormData(prev => ({ ...prev, popupPlan: '', budget: '' })); }}
                 className="text-slate-500 hover:text-slate-300 text-sm font-medium transition-colors"
               >
                 다시 진단하기
@@ -563,8 +669,13 @@ export default function Diagnosis() {
 
           {/* Header */}
           <div className="text-center mb-12">
-            <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-white/5 border border-white/10 text-xs font-black text-purple-400 mb-6 tracking-[0.2em] uppercase">
-              <Sparkles size={14} className="animate-pulse" /> Free Diagnosis
+            <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 text-slate-500 hover:text-white text-sm font-medium mb-6 transition-colors">
+              <ArrowLeft size={18} /> 돌아가기
+            </button>
+            <div className="flex justify-center mb-6">
+              <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-white/5 border border-white/10 text-xs font-black text-purple-400 tracking-[0.2em] uppercase">
+                <Sparkles size={14} className="animate-pulse" /> Free Diagnosis
+              </div>
             </div>
             <h1 className="text-3xl md:text-5xl font-black tracking-tight mb-6">
               무료 캠페인 진단

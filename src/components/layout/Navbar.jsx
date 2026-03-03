@@ -75,10 +75,13 @@ const Navbar = () => {
     }
   };
 
+  const FAQ_URL = 'https://spiral-playground-cff.notion.site/306259eb52488045a8b1f4ec3b64dfe9';
+
   const navLinks = [
     { name: '고객 사례', path: '/#cases'},
     { name: '프로세스', path: '/#process' },
-    { name: '요금제', path: '/#pricing'}
+    { name: '요금제', path: '/#pricing'},
+    { name: 'FAQ', href: FAQ_URL }
   ];
 
   return (
@@ -103,16 +106,28 @@ const Navbar = () => {
           {/* 2. Desktop Menu (Center) */}
           <div className="hidden md:flex absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 items-center gap-10">
             {navLinks.map((link) => (
-              <a 
-                key={link.name} 
-                href={link.path} 
-                onClick={(e) => handleSectionClick(e, link.path)}
-                // [변경] text-xs -> text-sm (메뉴 폰트 크기 확대)
-                className="text-sm font-black uppercase tracking-widest text-slate-500 hover:text-indigo-600 transition-all cursor-pointer relative group"
-              >
-                {link.name}
-                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-indigo-600 transition-all group-hover:w-full"></span>
-              </a>
+              link.href ? (
+                <a
+                  key={link.name}
+                  href={link.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm font-black uppercase tracking-widest text-slate-500 hover:text-indigo-600 transition-all cursor-pointer relative group"
+                >
+                  {link.name}
+                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-indigo-600 transition-all group-hover:w-full"></span>
+                </a>
+              ) : (
+                <a 
+                  key={link.name} 
+                  href={link.path} 
+                  onClick={(e) => handleSectionClick(e, link.path)}
+                  className="text-sm font-black uppercase tracking-widest text-slate-500 hover:text-indigo-600 transition-all cursor-pointer relative group"
+                >
+                  {link.name}
+                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-indigo-600 transition-all group-hover:w-full"></span>
+                </a>
+              )
             ))}
           </div>
 
@@ -178,15 +193,27 @@ const Navbar = () => {
       {isOpen && (
         <div className="md:hidden absolute top-full left-0 w-full bg-white border-b border-slate-200 p-8 flex flex-col gap-6 shadow-2xl animate-fade-in-down">
           {navLinks.map((link) => (
-             <a 
-               key={link.name} 
-               href={link.path} 
-               // [변경] text-lg -> text-xl (모바일 메뉴 폰트 확대)
-               className="text-xl font-black uppercase tracking-widest text-slate-900 py-2 border-b border-slate-50" 
-               onClick={(e) => handleSectionClick(e, link.path)}
-             >
-               {link.name}
-             </a>
+            link.href ? (
+              <a
+                key={link.name}
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xl font-black uppercase tracking-widest text-slate-900 py-2 border-b border-slate-50"
+                onClick={() => setIsOpen(false)}
+              >
+                {link.name}
+              </a>
+            ) : (
+              <a 
+                key={link.name} 
+                href={link.path} 
+                className="text-xl font-black uppercase tracking-widest text-slate-900 py-2 border-b border-slate-50" 
+                onClick={(e) => handleSectionClick(e, link.path)}
+              >
+                {link.name}
+              </a>
+            )
           ))}
           
           <div className="flex flex-col gap-4 mt-4">

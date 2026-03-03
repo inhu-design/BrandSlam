@@ -57,7 +57,7 @@ export default function Consulting() {
             
             {/* Box 1: 바로 구매하기 */}
             <Link 
-              to="/" // 실제 구매 페이지 경로로 수정 필요
+              to="/checkout"
               className="group relative p-10 rounded-[3rem] border-2 border-white/5 bg-white/5 backdrop-blur-md hover:border-purple-500 transition-all duration-500 overflow-hidden text-left shadow-2xl block"
             >
               <div className="flex justify-between items-start mb-8">

@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Mail, Lock, Loader2, ChevronLeft } from 'lucide-react'; // ChevronLeft 아이콘 추가
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo = location.state?.from || '/dashboard';
+  const returnState = location.state?.checkoutState || null;
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [activeTab, setActiveTab] = useState('magic'); // 'magic' or 'password'
@@ -22,7 +25,9 @@ const handleMagicLogin = async (e) => {
       options: {
         // 기존: window.location.origin + '/dashboard', 
         // 수정: 메인 페이지로 리다이렉트 (404 방지용)
-        emailRedirectTo: window.location.origin, 
+        emailRedirectTo: returnTo !== '/dashboard'
+          ? `${window.location.origin}${returnTo}${returnState?.plan ? `?plan=${typeof returnState.plan === 'object' ? returnState.plan.id : returnState.plan}` : ''}`
+          : window.location.origin, 
       },
     });
   
@@ -44,7 +49,7 @@ const handleMagicLogin = async (e) => {
     if (error) {
       alert("로그인 실패: 이메일이나 비밀번호를 확인해주세요.\n(아직 비밀번호를 설정하지 않았다면 '간편 로그인'을 이용하세요)");
     } else {
-      navigate('/dashboard'); // 성공 시 바로 이동
+      navigate(returnTo, { state: returnState });
     }
     setLoading(false);
   };

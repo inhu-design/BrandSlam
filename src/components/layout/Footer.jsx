@@ -65,7 +65,21 @@ B는 다음 사항에 대해 책임을 지지 않습니다.
   - 시장 환경 변화에 따른 성과 차이
   - 브랜드 내부 사정에 따른 일정 변경
 
-본 서비스는 마케팅 운영 지원 서비스이며, 최종 매출 및 성과 책임은 A에게 귀속됩니다.`
+본 서비스는 마케팅 운영 지원 서비스이며, 최종 매출 및 성과 책임은 A에게 귀속됩니다.
+
+
+제7조 (콘텐츠 레퍼런스 활용)
+
+1. 캠페인 수행 과정에서 인플루언서(크리에이터)가 제작·업로드한 콘텐츠는 SLAM GLOBAL의 서비스 소개, 포트폴리오, 마케팅 자료 등 레퍼런스 목적으로 활용될 수 있습니다.
+
+2. 레퍼런스 활용 범위는 다음을 포함합니다.
+  - SLAM GLOBAL 웹사이트, 소셜 미디어, 제안서 등에서의 사례 소개
+  - 잠재 고객 대상 서비스 설명 시 캠페인 결과물 예시로 사용
+  - 기타 SLAM GLOBAL의 서비스 홍보 및 브랜드 신뢰도 구축을 위한 활용
+
+3. 본 조항에 따른 레퍼런스 활용에 대해 별도의 비용은 발생하지 않으며, A는 서비스 이용 신청 시 이에 동의한 것으로 간주합니다.
+
+4. A가 레퍼런스 활용을 원하지 않는 경우, 서면(이메일 포함)으로 B에게 통보할 수 있으며, B는 합리적인 기간 내에 해당 콘텐츠의 레퍼런스 사용을 중단합니다.`
   },
   privacy: {
     title: "개인정보처리방침",
@@ -221,8 +235,8 @@ const FloatingConsultButton = () => (
       <img
           src={kakaoLogo}
           alt="카카오톡"
-          width={48}
-          height={48}
+          width={56}
+          height={56}
           className="group-hover:rotate-12 transition-transform duration-500"
       />
       <div className="absolute right-full mr-4 bg-slate-900/80 backdrop-blur-md text-white text-[10px] font-black py-2 px-4 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-500 whitespace-nowrap border border-white/10 tracking-[0.2em]">
@@ -289,7 +303,8 @@ const Footer = () => {
       items: [
         { name: "회사 소개", path: "/about" },
         { name: "인플루언서 매니지먼트 시스템", path: "/management" },
-        { name: "문의하기", path: "/consulting" }
+        { name: "문의하기", path: "/consulting" },
+        { name: "FAQ", href: "https://spiral-playground-cff.notion.site/306259eb52488045a8b1f4ec3b64dfe9" }
       ]
     },
     {
@@ -340,6 +355,15 @@ const Footer = () => {
                         >
                           {item.name}
                         </button>
+                      ) : item.href ? (
+                        <a 
+                          href={item.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="hover:text-indigo-600 cursor-pointer transition-colors"
+                        >
+                          {item.name}
+                        </a>
                       ) : (
                         item.path.startsWith('/#') ? (
                           <a 

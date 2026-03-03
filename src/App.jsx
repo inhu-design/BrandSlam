@@ -12,6 +12,7 @@ import Dashboard from './pages/Dashboard';
 import About from './pages/About';
 import Management from './pages/Management';
 import Diagnosis from './pages/Diagnosis';
+import Checkout from './pages/Checkout';
 
 
 function App() {
@@ -26,6 +27,7 @@ function App() {
           <Route path="/about" element={<About />} />
           <Route path="/management" element={<Management />} />
           <Route path="/diagnosis" element={<Diagnosis />} />
+          <Route path="/checkout" element={<Checkout />} />
           
         </Routes>
       </AuthProvider>
