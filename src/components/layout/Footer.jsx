@@ -230,16 +230,14 @@ const FloatingConsultButton = () => (
       href="http://pf.kakao.com/_VxmWxon/chat" 
       target="_blank" 
       rel="noopener noreferrer"
-      className="fixed bottom-10 right-10 z-[60] flex items-center justify-center w-20 h-20 bg-gradient-to-br from-slate-900 to-black text-[#FEE500] rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] hover:shadow-[0_20px_60px_rgba(254,229,0,0.15)] ring-1 ring-white/10 hover:ring-yellow-400/50 hover:scale-110 transition-all duration-500 group"
+      className="fixed bottom-10 right-10 z-[60] group"
   >
       <img
           src={kakaoLogo}
           alt="카카오톡"
-          width={56}
-          height={56}
-          className="group-hover:rotate-12 transition-transform duration-500"
+          className="w-16 h-16 drop-shadow-[0_8px_24px_rgba(0,0,0,0.25)] group-hover:rotate-12 transition-transform duration-500"
       />
-      <div className="absolute right-full mr-4 bg-slate-900/80 backdrop-blur-md text-white text-[10px] font-black py-2 px-4 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-500 whitespace-nowrap border border-white/10 tracking-[0.2em]">
+      <div className="absolute right-full mr-4 top-1/2 -translate-y-1/2 bg-slate-900/80 backdrop-blur-md text-white text-[10px] font-black py-2 px-4 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-500 whitespace-nowrap border border-white/10 tracking-[0.2em]">
           실시간 톡상담
       </div>
   </a>
