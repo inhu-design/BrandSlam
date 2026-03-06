@@ -13,7 +13,7 @@ import About from './pages/About';
 import Management from './pages/Management';
 import Diagnosis from './pages/Diagnosis';
 import Checkout from './pages/Checkout';
-
+import CampaignSetup from './pages/CampaignSetup';
 
 function App() {
   return (
@@ -24,6 +24,7 @@ function App() {
           <Route path="/login" element={<Login />} />    
           <Route path="/consulting" element={<Consulting />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/campaign-setup/:campaignId" element={<CampaignSetup />} />
           <Route path="/about" element={<About />} />
           <Route path="/management" element={<Management />} />
           <Route path="/diagnosis" element={<Diagnosis />} />

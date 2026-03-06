@@ -831,6 +831,7 @@ const PricingSection = () => {
             <span className="text-purple-400 font-black tracking-[0.3em] uppercase text-sm">Step 05. The Offer</span>
             <h2 className="text-4xl md:text-6xl font-black text-white mt-6 mb-8 tracking-tight">성장을 위한 맞춤형 플랜</h2>
             <p className="text-slate-500 max-w-2xl mx-auto font-light leading-relaxed">플랫폼 기반의 투명한 운영으로 <span className="text-white font-medium italic underline underline-offset-4 decoration-purple-500">콘텐츠 회수율 100%</span>까지 책임집니다.</p>
+            <p className="text-slate-600 text-sm mt-3">※ 아래 모든 플랜은 부가세(VAT 10%)가 별도로 청구됩니다.</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-20">

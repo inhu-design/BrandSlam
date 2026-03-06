@@ -340,8 +340,16 @@ export default function Checkout() {
     price: (rawPlan.pricePerPerson * visitCount).toLocaleString(),
   } : rawPlan) : null;
 
+  const vatRate = 0.1;
+  const supplyPrice = plan ? plan.priceNum : 0;
+  const vatAmount = Math.round(supplyPrice * vatRate);
+  const totalPrice = supplyPrice + vatAmount;
+
   const [currentStep, setCurrentStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+
+  const hasExistingPassword = user?.identities?.some(i => i.provider === 'email') || false;
+  const [isSettingPassword, setIsSettingPassword] = useState(!hasExistingPassword);
 
   const [form, setForm] = useState({
     email: user?.email || '', password: '', passwordConfirm: '',
@@ -385,27 +393,33 @@ export default function Checkout() {
 
   const allAgreed = agree.terms && agree.refund && agree.privacy;
 
-  const step1Valid = form.email && form.password.length >= 8 &&
-    form.password === form.passwordConfirm && form.name && form.phone && form.company;
+  const passwordValid = isSettingPassword
+    ? form.password.length >= 8 && form.password === form.passwordConfirm
+    : form.password.length >= 8;
+
+  const step1Valid = form.email && passwordValid && form.name && form.phone && form.company;
 
   const handleSubmitOrder = async () => {
     setSubmitting(true);
-    const orderNum = `BS-${Math.random().toString().slice(2, 10)}`;
+    const now = new Date();
+    const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    const orderNum = `BS-${datePart}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
     setOrderNumber(orderNum);
 
     try {
-      await supabase.auth.signUp({
-        email: form.email,
-        password: form.password,
-        options: { data: { name: form.name, phone: form.phone, company: form.company } },
+      if (isSettingPassword) {
+        await supabase.auth.updateUser({ password: form.password });
+      }
+      await supabase.auth.updateUser({
+        data: { name: form.name, phone: form.phone, company: form.company },
       });
-    } catch { /* 계정 생성 실패해도 주문은 진행 */ }
+    } catch { /* 프로필 업데이트 실패해도 주문은 진행 */ }
 
     try {
       await supabase.from('orders').insert([{
         order_number: orderNum,
         plan_name: plan.name,
-        plan_price: plan.priceNum,
+        plan_price: totalPrice,
         content_count: plan.count,
         email: form.email,
         name: form.name,
@@ -414,6 +428,24 @@ export default function Checkout() {
         status: 'pending_payment',
       }]);
     } catch { /* 저장 실패해도 결과 표시 */ }
+
+    try {
+      await supabase.from('campaigns').insert([{
+        user_id: user.id,
+        order_number: orderNum,
+        plan: plan.name,
+        status: 'PAYMENT_PENDING',
+        brand_name: form.company,
+        product_name: plan.name,
+        target_creators: plan.count || 0,
+        matched_creators: 0,
+        plan_price: totalPrice,
+        content_count: plan.count || 0,
+        customer_name: form.name,
+        customer_email: form.email,
+        customer_phone: form.phone,
+      }]);
+    } catch { /* campaigns 저장 실패해도 결과 표시 */ }
 
     setSubmitting(false);
     setCurrentStep(4);
@@ -535,11 +567,21 @@ export default function Checkout() {
                     </button>
                   </div>
 
-                  <div className="flex items-center justify-between bg-white/[0.04] rounded-xl px-6 py-4 border border-white/10 mb-6">
-                    <span className="text-slate-400 text-sm">총 결제 금액</span>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-2xl font-black text-purple-400">{(300000 * visitCount).toLocaleString()}</span>
-                      <span className="text-slate-500 text-sm font-bold">원</span>
+                  <div className="bg-white/[0.04] rounded-xl px-6 py-4 border border-white/10 mb-6 space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-500">공급가액</span>
+                      <span className="text-slate-300">{(300000 * visitCount).toLocaleString()}원</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-500">부가세 (10%)</span>
+                      <span className="text-slate-300">{Math.round(300000 * visitCount * 0.1).toLocaleString()}원</span>
+                    </div>
+                    <div className="flex items-center justify-between pt-2 border-t border-white/10">
+                      <span className="text-white font-bold text-sm">총 결제 금액 (VAT 포함)</span>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-2xl font-black text-purple-400">{Math.round(300000 * visitCount * 1.1).toLocaleString()}</span>
+                        <span className="text-slate-500 text-sm font-bold">원</span>
+                      </div>
                     </div>
                   </div>
 
@@ -577,13 +619,31 @@ export default function Checkout() {
               <div className="space-y-6">
                 <Input label="이메일" required type="email" placeholder="your@email.com" value={form.email} onChange={set('email')} />
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <Input label="비밀번호" required type="password" placeholder="8자 이상" value={form.password} onChange={set('password')} />
-                  <Input label="비밀번호 확인" required type="password" placeholder="비밀번호 재입력" value={form.passwordConfirm} onChange={set('passwordConfirm')} />
-                </div>
-
-                {form.password && form.passwordConfirm && form.password !== form.passwordConfirm && (
-                  <p className="text-red-400 text-sm font-medium -mt-3">비밀번호가 일치하지 않습니다.</p>
+                {isSettingPassword ? (
+                  <>
+                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 flex gap-3">
+                      <AlertTriangle size={18} className="text-blue-400 flex-shrink-0 mt-0.5" />
+                      <p className="text-sm text-blue-300">비밀번호가 아직 설정되지 않았습니다. 아래에서 새 비밀번호를 설정해주세요.</p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                      <Input label="비밀번호 설정" required type="password" placeholder="8자 이상" value={form.password} onChange={set('password')} />
+                      <Input label="비밀번호 확인" required type="password" placeholder="비밀번호 재입력" value={form.passwordConfirm} onChange={set('passwordConfirm')} />
+                    </div>
+                    {form.password && form.passwordConfirm && form.password !== form.passwordConfirm && (
+                      <p className="text-red-400 text-sm font-medium -mt-3">비밀번호가 일치하지 않습니다.</p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Input label="비밀번호" required type="password" placeholder="기존 비밀번호 입력" value={form.password} onChange={set('password')} />
+                    <button
+                      type="button"
+                      onClick={() => setIsSettingPassword(true)}
+                      className="text-xs text-slate-500 hover:text-purple-400 transition-colors font-medium underline underline-offset-2 -mt-2"
+                    >
+                      비밀번호를 새로 설정하고 싶어요
+                    </button>
+                  </>
                 )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -700,8 +760,16 @@ export default function Checkout() {
                   <div className="flex justify-between"><span className="text-slate-500">이름</span><span className="font-medium text-slate-300">{form.name}</span></div>
                   <div className="flex justify-between"><span className="text-slate-500">회사명</span><span className="font-medium text-slate-300">{form.company}</span></div>
                   <div className="flex justify-between pt-3 border-t border-white/10">
-                    <span className="font-bold text-white">첫 달 결제 금액</span>
-                    <span className="text-xl font-black text-purple-400">{plan.price}원</span>
+                    <span className="text-slate-500">공급가액</span>
+                    <span className="font-medium text-slate-300">{supplyPrice.toLocaleString()}원</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">부가세 (10%)</span>
+                    <span className="font-medium text-slate-300">{vatAmount.toLocaleString()}원</span>
+                  </div>
+                  <div className="flex justify-between pt-3 border-t border-white/10">
+                    <span className="font-bold text-white">총 결제 금액 (VAT 포함)</span>
+                    <span className="text-xl font-black text-purple-400">{totalPrice.toLocaleString()}원</span>
                   </div>
                 </div>
               </div>
@@ -713,8 +781,8 @@ export default function Checkout() {
                   <div className="flex justify-between"><span className="text-slate-500">계좌번호</span><span className="font-bold text-white">{BANK_INFO.account}</span></div>
                   <div className="flex justify-between"><span className="text-slate-500">예금주</span><span className="font-bold text-white">{BANK_INFO.holder}</span></div>
                   <div className="flex justify-between pt-3 border-t border-white/10">
-                    <span className="font-bold text-white">입금 금액</span>
-                    <span className="text-xl font-black text-purple-400">{plan.price}원</span>
+                    <span className="font-bold text-white">입금 금액 (VAT 포함)</span>
+                    <span className="text-xl font-black text-purple-400">{totalPrice.toLocaleString()}원</span>
                   </div>
                 </div>
               </div>
@@ -769,7 +837,9 @@ export default function Checkout() {
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between"><span className="text-slate-500">주문번호</span><span className="font-bold text-white">{orderNumber}</span></div>
                   <div className="flex justify-between"><span className="text-slate-500">요금제</span><span className="font-bold text-white">{plan.name}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-500">결제 금액</span><span className="font-bold text-white">{plan.price}원</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">공급가액</span><span className="font-medium text-slate-300">{supplyPrice.toLocaleString()}원</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">부가세 (10%)</span><span className="font-medium text-slate-300">{vatAmount.toLocaleString()}원</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">결제 금액 (VAT 포함)</span><span className="font-bold text-purple-400">{totalPrice.toLocaleString()}원</span></div>
                   <div className="flex justify-between"><span className="text-slate-500">이메일</span><span className="font-medium text-slate-300">{form.email}</span></div>
                 </div>
               </div>

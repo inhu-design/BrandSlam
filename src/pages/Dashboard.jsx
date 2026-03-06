@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -6,15 +6,17 @@ import {
   Lock, Settings, BarChart3, Users, PlayCircle, Eye, Heart, MessageCircle, Share2, 
   ChevronRight, Calendar, ExternalLink, Zap, Trash2, CheckCircle2, MoreHorizontal,
   Plane, Gift, TrendingUp, BarChart2, Trophy, RefreshCw, AlertTriangle, Download,
-  FileText, CreditCard, Printer, Video, ShieldCheck, X
+  FileText, CreditCard, Printer, Video, ShieldCheck, X, Rocket, ArrowRight, Building2
 } from 'lucide-react';
 import Navbar from '../components/layout/Navbar'; 
 import Footer from '../components/layout/Footer';
+import sealImg from '../assets/seal.jpg';
 /**
  * [Logic 보존] Campaign Status Enum & Helper Functions
  */
 const CampaignStatus = {
-  PAYMENT_PENDING: 'PAYMENT_PENDING', // [New] 계약 및 입금 대기
+  PAYMENT_PENDING: 'PAYMENT_PENDING',
+  KICKOFF: 'KICKOFF',
   CONTACTING: 'CONTACTING',
   SHIPPING: 'SHIPPING',
   UPLOADING: 'UPLOADING',
@@ -37,13 +39,18 @@ const DEMO_CAMPAIGNS = [
   {
     id: 'demo-invoice',
     plan: 'Scale50',
-    status: CampaignStatus.PAYMENT_PENDING, // [New] 이 캠페인을 선택하면 송장 화면이 나옵니다.
+    status: CampaignStatus.PAYMENT_PENDING,
     brand_name: 'BrandSlam Demo',
     product_name: 'Volume Up Shampoo',
-    start_date: '2026-02-10', // 예정
+    start_date: '2026-02-10',
     end_date: '2026-05-10',
     target_creators: 50,
     matched_creators: 0,
+    plan_price: 2629000,
+    content_count: 50,
+    customer_name: '김데모',
+    customer_email: 'demo@brandslam.com',
+    order_number: 'BS-20260210-DEMO0001',
     kpi_views: '-', kpi_likes: '-', kpi_comments: '-', kpi_shares: '-',
     candidates: [],
     creators: [],
@@ -139,6 +146,7 @@ const DEMO_CAMPAIGNS = [
 const StatusBadge = ({ status }) => {
   const styles = {
     [CampaignStatus.PAYMENT_PENDING]: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
+    [CampaignStatus.KICKOFF]: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
     [CampaignStatus.CONTACTING]: "bg-blue-500/10 text-blue-400 border-blue-500/20",
     [CampaignStatus.SHIPPING]: "bg-orange-500/10 text-orange-400 border-orange-500/20",
     [CampaignStatus.UPLOADING]: "bg-purple-500/10 text-purple-400 border-purple-500/20",
@@ -147,6 +155,7 @@ const StatusBadge = ({ status }) => {
   
   const labels = {
     [CampaignStatus.PAYMENT_PENDING]: "계약/입금 대기",
+    [CampaignStatus.KICKOFF]: "착수",
     [CampaignStatus.CONTACTING]: "인플루언서 섭외 중",
     [CampaignStatus.SHIPPING]: "제품 발송 중",
     [CampaignStatus.UPLOADING]: "콘텐츠 업로드 중",
@@ -202,51 +211,59 @@ const CampaignCard = ({ campaign, onClick, isActive }) => (
 
 // --- [New Component] Invoice Detail View (계약서/송장) ---
 const InvoiceDetail = ({ campaign }) => {
+    const invoiceRef = useRef(null);
     const [isConfirmed, setIsConfirmed] = useState(false);
+    const [clientForm, setClientForm] = useState({
+        companyName: campaign.brand_name || '',
+        address: campaign.client_address || '',
+        bizRegNo: campaign.client_biz_reg_no || '',
+    });
+    const setClient = (field) => (e) => setClientForm(prev => ({ ...prev, [field]: e.target.value }));
 
-    // 가상의 송장 데이터 생성 (Campaign props 기반)
-    const invoiceData = {
-        invoiceNo: `INV-2026-${campaign.id.toUpperCase()}`,
-        date: new Date().toISOString().split('T')[0],
-        status: isConfirmed ? "WAITING_PAYMENT" : "PENDING_CONFIRM",
-        provider: {
-            name: "주식회사 브랜드슬램",
-            ceo: "장**",
-            regNo: "284-44-*****",
-            address: "서울시 용산구 한강대로 000, 00층",
-            contact: "contact@slam.global"
-        },
-        client: {
-            name: "주식회사 데일리스킨케어", // 데모용 가상 기업
-            ceo: "김**",
-            regNo: "123-45-67890",
-            address: "경기도 성남시 분당구 판교로 000",
-            email: "manager@dailyskincare.com"
-        },
-        items: [
-            {
-                id: 1,
-                name: `BrandSlam ${campaign.plan.toUpperCase()} PLAN`,
-                desc: `${campaign.product_name} 글로벌 캠페인 운영 및 매니지먼트`,
-                period: "3개월 (약정)",
-                qty: 1,
-                price: 2490000 
-            }
-        ],
-        paymentTerms: {
-            totalSupply: 2490000,
-            vat: 249000,
-            totalAmount: 2739000,
-            installments: [
-                { seq: 1, name: "선금 (50%)", amount: 1369500, dueDate: "즉시 (계약 확정 시)", status: "UNPAID" },
-                { seq: 2, name: "잔금 (50%)", amount: 1369500, dueDate: "캠페인 2개월 차", status: "SCHEDULED" }
-            ]
-        },
-        bankInfo: {
-            bank: "SC제일은행",
-            account: "357-20-******",
-            holder: "주식회사 브랜드슬램"
+    const isDemo = String(campaign.id).startsWith('demo-');
+
+    const totalAmount = campaign.plan_price || Math.round(2490000 * 1.1);
+    const supplyPrice = Math.round(totalAmount / 1.1);
+    const vatAmount = totalAmount - supplyPrice;
+
+    const invoiceId = isDemo ? campaign.id.toUpperCase() : (campaign.order_number || campaign.id.slice(0, 8)).toUpperCase();
+    const qty = campaign.content_count || campaign.target_creators || 1;
+    const isVisitPlan = campaign.plan?.toLowerCase().includes('visit');
+    const unitPrice = qty > 0 ? Math.round(supplyPrice / qty) : supplyPrice;
+    const invoiceDate = campaign.created_at ? new Date(campaign.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+    const clientValid = clientForm.companyName && clientForm.address && clientForm.bizRegNo;
+
+    const handleConfirm = async () => {
+        if (!clientValid) { alert('공급받는 자 정보를 모두 입력해주세요.'); return; }
+        if (!window.confirm("입력하신 정보로 계약을 확정하시겠습니까?\n확정 후에는 수정이 불가합니다.")) return;
+        if (!isDemo) {
+            try {
+                await supabase.from('campaigns').update({
+                    brand_name: clientForm.companyName,
+                    client_address: clientForm.address,
+                    client_biz_reg_no: clientForm.bizRegNo,
+                }).eq('id', campaign.id);
+            } catch { /* 저장 실패해도 UI는 진행 */ }
         }
+        setIsConfirmed(true);
+    };
+
+    const handlePdfDownload = async () => {
+        const el = invoiceRef.current;
+        if (!el) return;
+        const html2pdf = (await import('html2pdf.js')).default;
+        html2pdf().set({
+            margin: [10, 10, 10, 10],
+            filename: `Invoice-${invoiceId}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true, logging: false },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        }).from(el).save();
+    };
+
+    const navigate = useNavigate();
+    const handleCampaignSetup = () => {
+        navigate(`/campaign-setup/${campaign.id}`);
     };
 
     return (
@@ -260,10 +277,10 @@ const InvoiceDetail = ({ campaign }) => {
                     <div className="absolute top-1/2 left-0 w-full h-0.5 bg-white/10 -z-10"></div>
                     <div className="flex justify-between w-full max-w-4xl mx-auto">
                         {[
-                            { id: 1, label: "발주 문의", icon: MessageCircle, done: true },
-                            { id: 2, label: "화상 미팅", icon: Video, done: true },
-                            { id: 3, label: "계약/송장", icon: FileText, active: true },
-                            { id: 4, label: "입금 확인", icon: CreditCard, done: false },
+                            { id: 1, label: "플랜 선택", icon: Package, done: true },
+                            { id: 2, label: "결제 접수", icon: CreditCard, done: true },
+                            { id: 3, label: "계약 확정", icon: FileText, active: !isConfirmed, done: isConfirmed },
+                            { id: 4, label: "캠페인 세팅", icon: Rocket, active: isConfirmed, done: false },
                             { id: 5, label: "착수", icon: CheckCircle2, done: false }
                         ].map((step) => (
                             <div key={step.id} className="flex flex-col items-center gap-3 bg-[#020617] px-2 z-10">
@@ -271,12 +288,12 @@ const InvoiceDetail = ({ campaign }) => {
                                     step.active 
                                     ? "bg-yellow-500 border-yellow-500 text-slate-900 shadow-[0_0_15px_rgba(234,179,8,0.5)] scale-110" 
                                     : step.done 
-                                        ? "bg-slate-800 border-slate-700 text-slate-400"
+                                        ? "bg-emerald-600 border-emerald-500 text-white"
                                         : "bg-slate-900 border-slate-800 text-slate-600"
                                 }`}>
-                                    <step.icon size={20} strokeWidth={step.active ? 3 : 2} />
+                                    {step.done ? <CheckCircle2 size={20} strokeWidth={3} /> : <step.icon size={20} strokeWidth={step.active ? 3 : 2} />}
                                 </div>
-                                <span className={`text-[10px] font-bold uppercase tracking-widest ${step.active ? "text-yellow-400" : "text-slate-500"}`}>
+                                <span className={`text-[10px] font-bold uppercase tracking-widest ${step.active ? "text-yellow-400" : step.done ? "text-emerald-400" : "text-slate-500"}`}>
                                     {step.label}
                                 </span>
                             </div>
@@ -285,16 +302,34 @@ const InvoiceDetail = ({ campaign }) => {
                 </div>
             </div>
 
-            {/* 2. Notification Area */}
+            {/* 2. Client Info Form / Confirmation Notice */}
             {!isConfirmed ? (
-                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-3xl p-6 flex items-start gap-4 animate-pulse-slow">
-                    <AlertTriangle className="text-yellow-500 shrink-0 mt-1" size={24} />
-                    <div>
-                        <h4 className="font-bold text-yellow-400 text-lg mb-1">계약 내용 확인이 필요합니다.</h4>
-                        <p className="text-slate-300 text-sm font-light">
-                            아래 인보이스 및 계약 내용을 확인하신 후, 하단의 <strong>'계약 내용 확정하기'</strong> 버튼을 눌러주세요.<br/>
-                            확정 후 입금이 확인되면 캠페인이 즉시 시작됩니다.
-                        </p>
+                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-3xl p-8 space-y-6">
+                    <div className="flex items-start gap-4">
+                        <Building2 className="text-yellow-500 shrink-0 mt-1" size={24} />
+                        <div>
+                            <h4 className="font-bold text-yellow-400 text-lg mb-1">계약서 확정을 위해 귀사 정보를 입력해주세요.</h4>
+                            <p className="text-slate-300 text-sm font-light">
+                                아래 정보가 인보이스에 반영됩니다. 입력 후 하단의 <strong>'계약 확정하기'</strong> 버튼을 눌러주세요.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label className="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider">공급받는 자 (회사명) *</label>
+                            <input type="text" placeholder="주식회사 OOO" value={clientForm.companyName} onChange={setClient('companyName')}
+                                className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-600 focus:outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/30 transition-all text-sm" />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider">사업자등록번호 *</label>
+                            <input type="text" placeholder="000-00-00000" value={clientForm.bizRegNo} onChange={setClient('bizRegNo')}
+                                className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-600 focus:outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/30 transition-all text-sm" />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider">주소 *</label>
+                            <input type="text" placeholder="서울특별시 OO구 OO로 000" value={clientForm.address} onChange={setClient('address')}
+                                className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-600 focus:outline-none focus:border-yellow-500/50 focus:ring-1 focus:ring-yellow-500/30 transition-all text-sm" />
+                        </div>
                     </div>
                 </div>
             ) : (
@@ -302,16 +337,16 @@ const InvoiceDetail = ({ campaign }) => {
                     <CheckCircle2 className="text-emerald-500 shrink-0" size={24} />
                     <div>
                         <h4 className="font-bold text-emerald-400 text-lg">계약이 확정되었습니다.</h4>
-                        <p className="text-emerald-200/70 text-sm font-light">아래 계좌로 선금을 입금해주시면 담당 매니저가 배정됩니다.</p>
+                        <p className="text-emerald-200/70 text-sm font-light">입금 확인 후 캠페인 세팅이 시작됩니다. PDF 다운로드가 가능합니다.</p>
                     </div>
                 </div>
             )}
 
-            {/* 3. Invoice Paper (White Theme in Dark Mode) */}
-            <div className="bg-white text-slate-900 rounded-sm shadow-2xl p-8 md:p-16 max-w-4xl mx-auto relative overflow-hidden">
+            {/* 3. Invoice Paper */}
+            <div ref={invoiceRef} className="bg-white text-slate-900 rounded-sm shadow-2xl p-8 md:p-16 max-w-4xl mx-auto relative overflow-hidden">
                 {!isConfirmed && (
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-slate-200/50 font-black text-9xl -rotate-45 pointer-events-none select-none z-0 whitespace-nowrap">
-                        DRAFT / VIEW ONLY
+                        DRAFT
                     </div>
                 )}
 
@@ -319,37 +354,41 @@ const InvoiceDetail = ({ campaign }) => {
                 <div className="flex justify-between items-start border-b-2 border-slate-900 pb-8 mb-10 relative z-10">
                     <div>
                         <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">INVOICE</h1>
-                        <p className="text-slate-500 mt-2 font-medium">견적서 / 임시 송장</p>
+                        <p className="text-slate-500 mt-2 font-medium">{isConfirmed ? '세금계산서' : '견적서 (확정 전)'}</p>
                     </div>
                     <div className="text-right">
                         <p className="text-xs text-slate-400 uppercase tracking-widest font-bold">Invoice No.</p>
-                        <p className="text-lg font-bold text-slate-900 mb-2">{invoiceData.invoiceNo}</p>
+                        <p className="text-lg font-bold text-slate-900 mb-2">INV-{invoiceId}</p>
                         <p className="text-xs text-slate-400 uppercase tracking-widest font-bold">Date</p>
-                        <p className="text-md font-medium text-slate-900">{invoiceData.date}</p>
+                        <p className="text-md font-medium text-slate-900">{invoiceDate}</p>
                     </div>
                 </div>
 
                 {/* Supplier & Client */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-12 relative z-10">
                     <div>
-                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 border-b border-slate-100 pb-2">Supplier (공급자)</h3>
+                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 border-b border-slate-100 pb-2">공급자</h3>
                         <div className="text-sm text-slate-700 space-y-1.5">
-                            <p className="font-bold text-lg text-slate-900">{invoiceData.provider.name}</p>
-                            <p>대표이사: {invoiceData.provider.ceo}</p>
-                            <p>사업자등록번호: {invoiceData.provider.regNo}</p>
-                            <p>{invoiceData.provider.address}</p>
-                            <p className="text-indigo-600 font-medium">{invoiceData.provider.contact}</p>
+                            <p className="font-bold text-lg text-slate-900">주식회사 브랜드슬램</p>
+                            <p>대표이사: 장현우</p>
+                            <p>사업자등록번호: 284-44-03016</p>
+                            <p>서울특별시 용산구 한강대로 366, 8층 804호</p>
+                            <p className="text-indigo-600 font-medium">jhw@midas-m.com</p>
                         </div>
                     </div>
                     <div>
-                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 border-b border-slate-100 pb-2">Bill To (받는 분)</h3>
-                        <div className="text-sm text-slate-700 space-y-1.5">
-                            <p className="font-bold text-lg text-slate-900">{invoiceData.client.name}</p>
-                            <p>대표이사: {invoiceData.client.ceo}</p>
-                            <p>사업자등록번호: {invoiceData.client.regNo}</p>
-                            <p>{invoiceData.client.address}</p>
-                            <p>{invoiceData.client.email}</p>
-                        </div>
+                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 border-b border-slate-100 pb-2">공급받는 자</h3>
+                        {isConfirmed || clientForm.companyName ? (
+                            <div className="text-sm text-slate-700 space-y-1.5">
+                                <p className="font-bold text-lg text-slate-900">{clientForm.companyName || '-'}</p>
+                                <p>사업자등록번호: {clientForm.bizRegNo || '-'}</p>
+                                <p>{clientForm.address || '-'}</p>
+                            </div>
+                        ) : (
+                            <div className="text-sm text-slate-400 italic py-4 px-4 bg-slate-50 rounded-lg border border-dashed border-slate-200">
+                                상단에서 귀사 정보를 입력해주세요.
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -364,103 +403,107 @@ const InvoiceDetail = ({ campaign }) => {
                         </tr>
                     </thead>
                     <tbody className="text-slate-700">
-                        {invoiceData.items.map((item) => (
-                            <tr key={item.id} className="border-b border-slate-100">
-                                <td className="py-5 px-4">
-                                    <p className="font-bold text-slate-900 text-base">{item.name}</p>
-                                    <p className="text-xs text-slate-500 mt-1">{item.desc}</p>
-                                    <p className="text-xs text-indigo-600 mt-1 font-medium bg-indigo-50 inline-block px-2 py-0.5 rounded">기간: {item.period}</p>
-                                </td>
-                                <td className="py-5 px-4 text-center">{item.qty}</td>
-                                <td className="py-5 px-4 text-right text-slate-500">{item.price.toLocaleString()}</td>
-                                <td className="py-5 px-4 text-right font-bold text-slate-900">{(item.price * item.qty).toLocaleString()}</td>
-                            </tr>
-                        ))}
+                        <tr className="border-b border-slate-100">
+                            <td className="py-5 px-4">
+                                <p className="font-bold text-slate-900 text-base">BrandSlam {campaign.plan.toUpperCase()} PLAN</p>
+                                <p className="text-xs text-slate-500 mt-1">{campaign.product_name || campaign.plan} 글로벌 캠페인 운영 및 매니지먼트</p>
+                            </td>
+                            <td className="py-5 px-4 text-center">{qty}{isVisitPlan ? '명' : '개'}</td>
+                            <td className="py-5 px-4 text-right text-slate-500">{unitPrice.toLocaleString()}</td>
+                            <td className="py-5 px-4 text-right font-bold text-slate-900">{supplyPrice.toLocaleString()}</td>
+                        </tr>
                     </tbody>
                 </table>
 
                 {/* Summary & Payment Info */}
                 <div className="flex flex-col md:flex-row justify-between items-start gap-12 relative z-10">
                     <div className="w-full md:w-1/2">
-                        <h4 className="font-bold text-slate-900 mb-4 border-b-2 border-slate-900 pb-2 inline-block">Payment Terms</h4>
+                        <h4 className="font-bold text-slate-900 mb-4 border-b-2 border-slate-900 pb-2 inline-block">Payment</h4>
                         <div className="space-y-4">
-                            {invoiceData.paymentTerms.installments.map((inst, idx) => (
-                                <div key={idx} className={`p-4 rounded-lg border ${inst.status === 'UNPAID' ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-slate-200 opacity-60'}`}>
-                                    <div className="flex justify-between items-center mb-1">
-                                        <span className={`font-bold ${inst.status === 'UNPAID' ? 'text-indigo-700' : 'text-slate-500'}`}>
-                                            {inst.name}
-                                        </span>
-                                        <span className={`text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide ${inst.status === 'UNPAID' ? 'bg-indigo-200 text-indigo-800' : 'bg-slate-100 text-slate-400'}`}>
-                                            {inst.status === 'UNPAID' ? 'PAY NOW' : 'SCHEDULED'}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between items-baseline">
-                                        <span className="text-xl font-black text-slate-900">{inst.amount.toLocaleString()} <span className="text-sm font-normal text-slate-500">KRW</span></span>
-                                    </div>
-                                    <p className="text-xs text-slate-500 mt-2 flex items-center gap-1"><Clock size={12}/> 납부 기한: {inst.dueDate}</p>
+                            <div className="p-4 rounded-lg border bg-indigo-50 border-indigo-200">
+                                <div className="flex justify-between items-center mb-1">
+                                    <span className="font-bold text-indigo-700">전액 결제</span>
+                                    <span className="text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide bg-indigo-200 text-indigo-800">PAY NOW</span>
                                 </div>
-                            ))}
+                                <div className="flex justify-between items-baseline">
+                                    <span className="text-xl font-black text-slate-900">{totalAmount.toLocaleString()} <span className="text-sm font-normal text-slate-500">KRW</span></span>
+                                </div>
+                                <p className="text-xs text-slate-500 mt-2 flex items-center gap-1"><Clock size={12}/> 입금 확인 후 계약 확정</p>
+                            </div>
                         </div>
 
                         <div className="mt-8 p-5 bg-slate-900 text-white rounded-xl shadow-lg">
                             <p className="text-xs text-slate-400 mb-2 font-bold uppercase tracking-widest">Bank Information</p>
                             <p className="font-bold text-lg mb-1 flex items-center gap-2">
-                                <span className="text-yellow-400">{invoiceData.bankInfo.bank}</span> 
-                                {invoiceData.bankInfo.account}
+                                <span className="text-yellow-400">SC제일은행</span> 325-20-322490
                             </p>
-                            <p className="text-sm text-slate-400">예금주: {invoiceData.bankInfo.holder}</p>
+                            <p className="text-sm text-slate-400">예금주: 주식회사브랜드슬램</p>
                         </div>
                     </div>
 
                     <div className="w-full md:w-5/12">
                         <div className="bg-slate-50 p-8 rounded-2xl border border-slate-200">
                             <div className="flex justify-between mb-3 text-slate-500 text-sm">
-                                <span>Subtotal (공급가액)</span>
-                                <span>{invoiceData.paymentTerms.totalSupply.toLocaleString()}</span>
+                                <span>공급가액 (Subtotal)</span>
+                                <span>{supplyPrice.toLocaleString()}</span>
                             </div>
                             <div className="flex justify-between mb-6 text-slate-500 text-sm">
-                                <span>VAT (10%)</span>
-                                <span>{invoiceData.paymentTerms.vat.toLocaleString()}</span>
+                                <span>부가세 VAT (10%)</span>
+                                <span>{vatAmount.toLocaleString()}</span>
                             </div>
                             <div className="border-t-2 border-slate-200 my-4 pt-6 flex justify-between items-center">
                                 <span className="font-black text-xl text-slate-900">Total</span>
-                                <span className="font-black text-3xl text-indigo-600">{invoiceData.paymentTerms.totalAmount.toLocaleString()}</span>
+                                <span className="font-black text-3xl text-indigo-600">{totalAmount.toLocaleString()}</span>
                             </div>
                             <p className="text-xs text-right text-slate-400 mt-2">* KRW (원) 기준</p>
                         </div>
                         
                         <div className="mt-12 text-right relative">
-                            <p className="font-serif font-bold text-xl text-slate-900 pr-10 z-10 relative">주식회사 브랜드슬램 대표이사 (인)</p>
-                            <div className="absolute -top-6 right-0 w-20 h-20 border-4 border-red-600 rounded-full opacity-60 flex items-center justify-center rotate-12 mix-blend-multiply">
-                                <span className="text-red-600 font-black text-xs tracking-tighter">SlamGlobal</span>
-                            </div>
+                            <p className="font-serif font-bold text-lg text-slate-900 z-10 relative">주식회사 브랜드슬램 대표이사 장현우 (인)</p>
+                            <img src={sealImg} alt="직인" className="absolute -top-8 right-0 w-24 h-24 object-contain opacity-80 rotate-6 mix-blend-multiply" />
                         </div>
                     </div>
                 </div>
             </div>
 
             {/* 4. Action Buttons */}
-            <div className="flex flex-col md:flex-row justify-center gap-4 pb-20">
-                <button className="flex items-center justify-center gap-2 px-8 py-4 bg-white/5 border border-white/10 text-slate-300 rounded-2xl font-bold hover:bg-white/10 transition-all uppercase tracking-widest text-sm">
-                    <Download size={18} /> PDF Download
-                </button>
-                <button className="flex items-center justify-center gap-2 px-8 py-4 bg-white/5 border border-white/10 text-slate-300 rounded-2xl font-bold hover:bg-white/10 transition-all uppercase tracking-widest text-sm">
-                    <Printer size={18} /> Print
-                </button>
-                
-                {!isConfirmed && (
+            {!isConfirmed ? (
+                <div className="flex justify-center pb-8">
                     <button 
-                        onClick={() => {
-                            if(window.confirm("계약 내용을 모두 확인하였으며, 이에 동의하십니까?")) {
-                                setIsConfirmed(true);
-                            }
-                        }}
-                        className="flex items-center justify-center gap-2 px-10 py-4 bg-yellow-500 text-slate-900 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-yellow-400 shadow-[0_0_30px_rgba(234,179,8,0.4)] transition-all hover:-translate-y-1"
+                        onClick={handleConfirm}
+                        disabled={!clientValid}
+                        className={`flex items-center justify-center gap-3 px-14 py-5 rounded-2xl font-black text-lg uppercase tracking-widest transition-all hover:-translate-y-1 ${
+                            clientValid 
+                            ? 'bg-yellow-500 text-slate-900 shadow-[0_0_40px_rgba(234,179,8,0.4)] hover:bg-yellow-400' 
+                            : 'bg-white/5 text-slate-600 cursor-not-allowed border border-white/10'
+                        }`}
                     >
-                        <ShieldCheck size={20} /> Confirm Contract
+                        <ShieldCheck size={22} /> 계약 확정하기
                     </button>
-                )}
-            </div>
+                </div>
+            ) : (
+                <div className="space-y-6 pb-8">
+                    <div className="flex justify-center">
+                        <button onClick={handlePdfDownload} className="flex items-center justify-center gap-2 px-8 py-4 bg-white/5 border border-white/10 text-slate-300 rounded-2xl font-bold hover:bg-white/10 transition-all uppercase tracking-widest text-sm">
+                            <Download size={18} /> PDF Download
+                        </button>
+                    </div>
+
+                    {/* Campaign Setup CTA */}
+                    <div className="relative group">
+                        <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-500 rounded-3xl blur-xl opacity-40 group-hover:opacity-70 transition-opacity duration-500"></div>
+                        <button
+                            onClick={handleCampaignSetup}
+                            className="relative w-full py-7 bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-500 text-white rounded-3xl font-black text-xl md:text-2xl shadow-2xl hover:scale-[1.02] transition-all duration-300 flex items-center justify-center gap-4 tracking-tight"
+                        >
+                            <Rocket size={28} className="animate-bounce" />
+                            캠페인 세팅하기
+                            <ArrowRight size={28} />
+                        </button>
+                        <p className="text-center text-slate-500 text-xs mt-4 font-medium tracking-tight">입금 확인 후 캠페인에 필요한 세부 정보를 입력하는 단계입니다.</p>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -751,13 +794,246 @@ const OngoingCampaign = ({ campaign }) => {
     );
 };
 
+// --- 착수 단계 (캠페인 세팅 완료 후) ---
+const KICKOFF_STEPS = [
+  { id: 1, label: '플랜 선택', icon: Package, done: true },
+  { id: 2, label: '결제 접수', icon: CreditCard, done: true },
+  { id: 3, label: '계약 확정', icon: FileText, done: true },
+  { id: 4, label: '캠페인 세팅', icon: Rocket, done: true },
+  { id: 5, label: '착수', icon: CheckCircle2, active: true, done: false },
+];
+
+const COUNTRY_LABELS = { us: '🇺🇸 미국만', us_ca: '🇺🇸+🇨🇦 미국/캐나다', us_ca_eu: '🇺🇸+🇨🇦+🇪🇺 유럽 믹스' };
+const DELIVERY_LABELS = { '2-3': '2~3일', '1w': '약 1주', '2w': '약 2주', other: '기타' };
+
+const KickoffSummaryRow = ({ label, value }) => (
+  <div>
+    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">{label}</p>
+    <p className="text-slate-200 font-medium">{value || '-'}</p>
+  </div>
+);
+
+function EventScheduleCalendar({ dates = [] }) {
+  const [cursor, setCursor] = useState(() => {
+    const first = (dates || []).find((d) => d);
+    if (first) {
+      const [y, m] = first.split('-').map(Number);
+      return { year: y, month: m - 1 };
+    }
+    const d = new Date();
+    return { year: d.getFullYear(), month: d.getMonth() };
+  });
+
+  const set = new Set((dates || []).filter(Boolean));
+  if (set.size === 0) return <p className="text-slate-500 text-sm">선택된 날짜 없음</p>;
+
+  const year = cursor.year;
+  const month = cursor.month;
+  const first = new Date(year, month, 1);
+  const last = new Date(year, month + 1, 0);
+  const startPad = first.getDay();
+  const daysInMonth = last.getDate();
+
+  const weekDays = ['일', '월', '화', '수', '목', '금', '토'];
+  const cells = [];
+  for (let i = 0; i < startPad; i++) cells.push({ key: `p-${i}`, empty: true });
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    cells.push({ key: dateStr, dateStr, day: d, empty: false, selected: set.has(dateStr) });
+  }
+
+  const goPrev = () => setCursor((c) => (c.month === 0 ? { year: c.year - 1, month: 11 } : { year: c.year, month: c.month - 1 }));
+  const goNext = () => setCursor((c) => (c.month === 11 ? { year: c.year + 1, month: 0 } : { year: c.year, month: c.month + 1 }));
+
+  return (
+    <div className="inline-block bg-white/5 border border-white/10 rounded-xl p-4">
+      <div className="flex items-center justify-between mb-2">
+        <button type="button" onClick={goPrev} className="p-1.5 rounded-lg text-slate-400 hover:bg-white/10 hover:text-white transition-colors text-sm">‹</button>
+        <span className="text-sm font-bold text-white">{year}년 {month + 1}월</span>
+        <button type="button" onClick={goNext} className="p-1.5 rounded-lg text-slate-400 hover:bg-white/10 hover:text-white transition-colors text-sm">›</button>
+      </div>
+      <div className="grid grid-cols-7 gap-0.5 text-center">
+        {weekDays.map((w) => <div key={w} className="text-[10px] font-bold text-slate-500 py-1">{w}</div>)}
+        {cells.map((cell) =>
+          cell.empty ? <div key={cell.key} className="aspect-square max-w-[36px]" /> : (
+            <div
+              key={cell.key}
+              className={`aspect-square max-w-[36px] rounded-lg flex items-center justify-center text-xs font-medium ${cell.selected ? 'bg-amber-500 text-slate-900' : 'text-slate-400'}`}
+            >
+              {cell.day}
+            </div>
+          )
+        )}
+      </div>
+    </div>
+  );
+}
+
+const KickoffView = ({ campaign }) => {
+  const navigate = useNavigate();
+  const [submission, setSubmission] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!campaign?.id) return;
+    (async () => {
+      const { data } = await supabase
+        .from('campaign_setup_submissions')
+        .select('form_data, created_at')
+        .eq('campaign_id', campaign.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      setSubmission(data);
+      setLoading(false);
+    })();
+  }, [campaign?.id]);
+
+  const fd = submission?.form_data || {};
+  const isVisitPlan = campaign?.plan?.toLowerCase().includes('visit');
+
+  const eventScheduleDates = Array.isArray(fd.eventSchedule)
+    ? fd.eventSchedule
+    : (fd.eventSchedule ? [fd.eventSchedule] : []);
+
+  return (
+    <div className="space-y-10 animate-fade-in-up">
+      {/* Process Tracker (인보이스와 동일 스타일) */}
+      <div className="bg-white/5 backdrop-blur-xl p-8 rounded-[2.5rem] border border-white/10">
+        <h4 className="font-black text-white text-xl mb-8 flex items-center gap-3 tracking-tighter">
+          <CheckCircle2 size={24} className="text-emerald-400"/> 계약 및 결제 프로세스
+        </h4>
+        <div className="relative">
+          <div className="absolute top-1/2 left-0 w-full h-0.5 bg-white/10 -z-10" />
+          <div className="flex justify-between w-full max-w-4xl mx-auto">
+            {KICKOFF_STEPS.map((step) => (
+              <div key={step.id} className="flex flex-col items-center gap-3 bg-[#020617] px-2 z-10">
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border-2 transition-all ${
+                  step.active
+                    ? 'bg-emerald-500 border-emerald-500 text-slate-900 shadow-[0_0_15px_rgba(16,185,129,0.5)] scale-110'
+                    : step.done
+                      ? 'bg-emerald-600 border-emerald-500 text-white'
+                      : 'bg-slate-900 border-slate-800 text-slate-600'
+                }`}>
+                  {step.done || step.active ? <CheckCircle2 size={20} strokeWidth={3} /> : <step.icon size={20} strokeWidth={2} />}
+                </div>
+                <span className={`text-[10px] font-bold uppercase tracking-widest ${step.active ? 'text-emerald-400' : step.done ? 'text-emerald-400' : 'text-slate-500'}`}>
+                  {step.label}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* 제출 정보 요약 */}
+      <div className="bg-white/5 backdrop-blur-xl rounded-[2.5rem] border border-white/10 overflow-hidden">
+        <div className="px-8 py-6 border-b border-white/5 bg-white/5 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h3 className="font-black text-white flex items-center gap-3 tracking-tighter">
+              <Building2 size={20} className="text-cyan-400"/> 제출하신 캠페인 정보 요약
+            </h3>
+            <p className="text-slate-500 text-sm mt-1 font-light">입력하신 내용이 정상적으로 전달되었습니다.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate(`/campaign-setup/${campaign.id}`)}
+            className="shrink-0 px-5 py-2.5 rounded-xl font-bold text-sm bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all flex items-center gap-2"
+          >
+            <Settings size={18} />
+            내 캠페인 정보 수정하기
+          </button>
+        </div>
+        {loading ? (
+          <div className="p-12 flex justify-center">
+            <div className="w-10 h-10 border-2 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin" />
+          </div>
+        ) : submission ? (
+          <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <KickoffSummaryRow label="회사명" value={fd.companyName} />
+              <KickoffSummaryRow label="담당자명 / 직함" value={[fd.contactName, fd.contactTitle].filter(Boolean).join(' · ')} />
+              <KickoffSummaryRow label="연락처" value={fd.contactPhone} />
+              <KickoffSummaryRow label="담당자 이메일" value={fd.contactEmail} />
+            </div>
+            <div className="space-y-4">
+              <KickoffSummaryRow label="캠페인 제품명" value={fd.productName} />
+              {isVisitPlan ? (
+                <>
+                  <KickoffSummaryRow label="타겟 오디언스 국가" value={fd.targetAudienceCountry} />
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">행사일정</p>
+                    <EventScheduleCalendar dates={eventScheduleDates} />
+                  </div>
+                  <KickoffSummaryRow label="행사 장소" value={fd.eventVenue} />
+                  {fd.eventName && <KickoffSummaryRow label="행사명" value={fd.eventName} />}
+                  {fd.eventGift && <KickoffSummaryRow label="브랜드사 증정 선물" value={fd.eventGift} />}
+                </>
+              ) : (
+                <>
+                  <KickoffSummaryRow label="거주 국가 범위" value={COUNTRY_LABELS[fd.countryRange] || fd.countryRange} />
+                  <KickoffSummaryRow label="배송 예상 기간" value={fd.deliveryTime === 'other' ? (fd.deliveryOther || '기타') : (DELIVERY_LABELS[fd.deliveryTime] || fd.deliveryTime)} />
+                </>
+              )}
+              <KickoffSummaryRow label="제품 사진" value={Array.isArray(fd.productPhotoUrls) && fd.productPhotoUrls.length > 0 ? `${fd.productPhotoUrls.length}개 업로드됨` : '미첨부'} />
+            </div>
+          </div>
+        ) : (
+          <div className="p-8 text-slate-500 text-sm">제출 정보를 불러오는 중이거나 아직 없습니다.</div>
+        )}
+        {fd.uspAndLinks && (
+          <div className="px-8 pb-8">
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">제품 USP · 링크 · 참고 숏폼</p>
+            <p className="text-slate-300 text-sm font-light whitespace-pre-wrap bg-white/5 rounded-xl p-4 border border-white/5">{fd.uspAndLinks}</p>
+          </div>
+        )}
+      </div>
+
+      {/* 다음 단계 카드 */}
+      <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-[2.5rem] p-8 flex items-center gap-4">
+        <CheckCircle2 className="text-emerald-500 shrink-0" size={28} />
+        <div>
+          <h4 className="font-bold text-emerald-400 text-lg">다음 단계</h4>
+          <p className="text-slate-300 text-sm font-light mt-1">담당자가 확인 후 진행 일정·가이드라인 세팅 등을 안내드립니다.</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white/5 backdrop-blur-xl p-8 rounded-[2.5rem] border border-white/10">
+          <div className="w-14 h-14 rounded-2xl bg-slate-700/50 flex items-center justify-center mb-4">
+            <Calendar size={26} className="text-slate-500" />
+          </div>
+          <h3 className="font-black text-white text-lg mb-2">캠페인 캘린더</h3>
+          <p className="text-slate-500 text-sm font-light">진행 일정이 확정되면 여기에 표시됩니다.</p>
+        </div>
+        <div className="bg-white/5 backdrop-blur-xl p-8 rounded-[2.5rem] border border-white/10">
+          <div className="w-14 h-14 rounded-2xl bg-slate-700/50 flex items-center justify-center mb-4">
+            <FileText size={26} className="text-slate-500" />
+          </div>
+          <h3 className="font-black text-white text-lg mb-2">가이드라인 세팅</h3>
+          <p className="text-slate-500 text-sm font-light">캠페인 가이드라인 준비 후 공유됩니다.</p>
+        </div>
+        <div className="bg-white/5 backdrop-blur-xl p-8 rounded-[2.5rem] border border-white/10">
+          <div className="w-14 h-14 rounded-2xl bg-slate-700/50 flex items-center justify-center mb-4">
+            <Truck size={26} className="text-slate-500" />
+          </div>
+          <h3 className="font-black text-white text-lg mb-2">진행 일정</h3>
+          <p className="text-slate-500 text-sm font-light">제품 배송·업로드 일정이 정해지면 업데이트됩니다.</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // --- Main Campaign Detail Container ---
 const CampaignDetail = ({ campaign }) => {
   if (!campaign) return <div className="flex flex-col items-center justify-center py-40 text-slate-700 font-black uppercase tracking-[0.3em]"><Package size={48} className="mb-4 opacity-20"/> Select Campaign</div>;
 
-  // [New] 송장 화면 분기 처리
   if (campaign.status === CampaignStatus.PAYMENT_PENDING) {
       return <InvoiceDetail campaign={campaign} />;
+  }
+
+  if (campaign.status === CampaignStatus.KICKOFF) {
+      return <KickoffView campaign={campaign} />;
   }
 
   if (campaign.status === CampaignStatus.CONTACTING) {
@@ -800,6 +1076,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [newPassword, setNewPassword] = useState('');
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
   const [isPasswordMode, setIsPasswordMode] = useState(false);
 
   useEffect(() => {
@@ -836,10 +1113,11 @@ export default function Dashboard() {
     fetchData();
   }, [navigate]);
   const handlePasswordUpdate = async () => {
-    if (newPassword.length < 6) return alert("비밀번호는 6자 이상이어야 합니다.");
+    if (newPassword.length < 8) return alert("비밀번호는 8자 이상이어야 합니다.");
+    if (newPassword !== newPasswordConfirm) return alert("비밀번호가 일치하지 않습니다.");
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) alert("실패: " + error.message);
-    else { alert("비밀번호가 성공적으로 변경되었습니다."); setIsPasswordMode(false); setNewPassword(''); }
+    else { alert("비밀번호가 성공적으로 변경되었습니다."); setIsPasswordMode(false); setNewPassword(''); setNewPasswordConfirm(''); }
   };
 
   const handleSparkAdsClick = () => {
@@ -885,15 +1163,35 @@ export default function Dashboard() {
                 <h3 className="text-[10px] font-black tracking-widest uppercase mb-6 flex items-center gap-3 text-purple-400">
                     <Lock size={18} /> Update Security Key
                 </h3>
-                <div className="flex gap-4">
-                    <input 
-                        type="password" 
-                        placeholder="NEW PASSWORD (6글자 이상)" 
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        className="flex-1 px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-sm font-bold text-white outline-none focus:border-purple-500 transition-all uppercase tracking-widest"
-                    />
-                    <button onClick={handlePasswordUpdate} className="bg-purple-600 text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-purple-500 transition-all shadow-[0_0_15px_rgba(147,51,234,0.3)]">Update</button>
+                <div className="space-y-4">
+                    <div className="flex gap-4">
+                        <input 
+                            type="password" 
+                            placeholder="NEW PASSWORD (8글자 이상)" 
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            className="flex-1 px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-sm font-bold text-white outline-none focus:border-purple-500 transition-all uppercase tracking-widest"
+                        />
+                    </div>
+                    <div className="flex gap-4">
+                        <input 
+                            type="password" 
+                            placeholder="CONFIRM PASSWORD" 
+                            value={newPasswordConfirm}
+                            onChange={(e) => setNewPasswordConfirm(e.target.value)}
+                            className="flex-1 px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-sm font-bold text-white outline-none focus:border-purple-500 transition-all uppercase tracking-widest"
+                        />
+                    </div>
+                    {newPassword && newPasswordConfirm && newPassword !== newPasswordConfirm && (
+                        <p className="text-red-400 text-sm font-medium">비밀번호가 일치하지 않습니다.</p>
+                    )}
+                    <button 
+                        onClick={handlePasswordUpdate}
+                        disabled={newPassword.length < 8 || newPassword !== newPasswordConfirm}
+                        className="bg-purple-600 text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-purple-500 transition-all shadow-[0_0_15px_rgba(147,51,234,0.3)] disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                        Update
+                    </button>
                 </div>
             </div>
         )}
@@ -980,7 +1278,7 @@ export default function Dashboard() {
                                 <p className="text-slate-500 text-lg font-light flex items-center gap-3 tracking-tight">
                                     <span className={`w-3 h-3 rounded-full ${selectedCampaign?.status === CampaignStatus.COMPLETED ? 'bg-slate-700 shadow-none' : 'bg-cyan-400 animate-pulse shadow-[0_0_10px_rgba(34,211,238,0.8)]'}`}></span>
                                     {selectedCampaign?.status === CampaignStatus.COMPLETED ? 'FINAL REPORT GENERATED' : 
-                                     selectedCampaign?.status === CampaignStatus.PAYMENT_PENDING ? 'WAITING FOR CONFIRMATION' : 'ANALYTIC ENGINE ACTIVE - MONITORING LIVE FEED'}
+                                     selectedCampaign?.status === CampaignStatus.PAYMENT_PENDING ? 'WAITING FOR CONFIRMATION' : selectedCampaign?.status === CampaignStatus.KICKOFF ? 'KICKOFF - ONBOARDING' : 'ANALYTIC ENGINE ACTIVE - MONITORING LIVE FEED'}
                                 </p>
                             </div>
                             <StatusBadge status={selectedCampaign?.status} />
