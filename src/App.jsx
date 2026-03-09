@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 
 import { AuthProvider } from './contexts/AuthProvider';
@@ -29,7 +29,8 @@ function App() {
           <Route path="/management" element={<Management />} />
           <Route path="/diagnosis" element={<Diagnosis />} />
           <Route path="/checkout" element={<Checkout />} />
-          
+          {/* 매직 링크 등으로 잘못된 경로 진입 시 대시보드로 (SPA 폴백) */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
