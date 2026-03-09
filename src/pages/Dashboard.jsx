@@ -209,6 +209,138 @@ const CampaignCard = ({ campaign, onClick, isActive }) => (
   </div>
 );
 
+// --- 데모용 예시 송장 (비로그인 사용자용, 계약 폼 없음) ---
+const DEMO_INVOICE_EXAMPLE = {
+  invoiceId: 'INV-DEMO-2026-001',
+  invoiceDate: new Date().toISOString().split('T')[0],
+  plan: 'Growth',
+  productName: '글로벌 시딩 캠페인',
+  qty: 20,
+  supplyPrice: 990000,   // 상품가(공급가액)
+  vatAmount: 99000,      // 부가세 10%
+  totalAmount: 1089000,  // 실제 결제가격 (상품가 + 부가세)
+  unitPrice: 49500,      // 990000 / 20
+  clientCompanyName: '주식회사 송장 예시용 브랜드',
+  clientBizRegNo: '123-45-67890',
+  clientAddress: '서울특별시 강남구 테헤란로 123, 4층',
+};
+
+const DemoInvoiceExample = () => {
+  const d = DEMO_INVOICE_EXAMPLE;
+  const invoiceRef = useRef(null);
+  return (
+    <div className="space-y-10 animate-fade-in-up">
+      <div className="bg-purple-500/10 border border-purple-500/20 rounded-3xl p-6 flex items-center gap-4">
+        <FileText className="text-purple-400 shrink-0" size={24} />
+        <div>
+          <h4 className="font-bold text-purple-300 text-lg">데모용 예시 송장</h4>
+          <p className="text-slate-400 text-sm font-light">아래는 계약/송장 화면 예시입니다. 실제 계약 및 결제는 로그인 후 진행할 수 있습니다.</p>
+        </div>
+      </div>
+      <div ref={invoiceRef} className="bg-white text-slate-900 rounded-sm shadow-2xl p-8 md:p-16 max-w-4xl mx-auto relative overflow-hidden">
+        <div className="flex justify-between items-start border-b-2 border-slate-900 pb-8 mb-10">
+          <div>
+            <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">INVOICE</h1>
+            <p className="text-slate-500 mt-2 font-medium">세금계산서 (예시)</p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-slate-400 uppercase tracking-widest font-bold">Invoice No.</p>
+            <p className="text-lg font-bold text-slate-900 mb-2">{d.invoiceId}</p>
+            <p className="text-xs text-slate-400 uppercase tracking-widest font-bold">Date</p>
+            <p className="text-md font-medium text-slate-900">{d.invoiceDate}</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-12">
+          <div>
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 border-b border-slate-100 pb-2">공급자</h3>
+            <div className="text-sm text-slate-700 space-y-1.5">
+              <p className="font-bold text-lg text-slate-900">주식회사 브랜드슬램</p>
+              <p>대표이사: 장현우</p>
+              <p>사업자등록번호: 284-44-03016</p>
+              <p>서울특별시 용산구 한강대로 366, 8층 804호</p>
+              <p className="text-indigo-600 font-medium">contact@slam-global.com</p>
+            </div>
+          </div>
+          <div>
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 border-b border-slate-100 pb-2">공급받는 자</h3>
+            <div className="text-sm text-slate-700 space-y-1.5">
+              <p className="font-bold text-lg text-slate-900">{d.clientCompanyName}</p>
+              <p>사업자등록번호: {d.clientBizRegNo}</p>
+              <p>{d.clientAddress}</p>
+            </div>
+          </div>
+        </div>
+        <table className="w-full mb-12 text-sm">
+          <thead>
+            <tr className="bg-slate-50 border-y-2 border-slate-900 text-slate-500">
+              <th className="py-4 px-4 text-left font-bold uppercase tracking-wider">Description</th>
+              <th className="py-4 px-4 text-center font-bold uppercase tracking-wider">Qty</th>
+              <th className="py-4 px-4 text-right font-bold uppercase tracking-wider">Unit Price</th>
+              <th className="py-4 px-4 text-right font-bold uppercase tracking-wider">Amount</th>
+            </tr>
+          </thead>
+          <tbody className="text-slate-700">
+            <tr className="border-b border-slate-100">
+              <td className="py-5 px-4">
+                <p className="font-bold text-slate-900 text-base">BrandSlam {d.plan.toUpperCase()} PLAN</p>
+                <p className="text-xs text-slate-500 mt-1">{d.productName} 운영 및 매니지먼트</p>
+              </td>
+              <td className="py-5 px-4 text-center">{d.qty}개</td>
+              <td className="py-5 px-4 text-right text-slate-500">{d.unitPrice.toLocaleString()}</td>
+              <td className="py-5 px-4 text-right font-bold text-slate-900">{d.supplyPrice.toLocaleString()}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div className="flex flex-col md:flex-row justify-between items-start gap-12">
+          <div className="w-full md:w-1/2">
+            <h4 className="font-bold text-slate-900 mb-4 border-b-2 border-slate-900 pb-2 inline-block">Payment</h4>
+            <div className="space-y-4">
+              <div className="p-4 rounded-lg border bg-indigo-50 border-indigo-200">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="font-bold text-indigo-700">전액 결제</span>
+                  <span className="text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide bg-indigo-200 text-indigo-800">PAY NOW</span>
+                </div>
+                <div className="flex justify-between items-baseline">
+                  <span className="text-xl font-black text-slate-900">{d.totalAmount.toLocaleString()} <span className="text-sm font-normal text-slate-500">KRW</span></span>
+                </div>
+                <p className="text-xs text-slate-500 mt-2 flex items-center gap-1"><Clock size={12}/> 입금 확인 후 계약 확정</p>
+              </div>
+            </div>
+            <div className="mt-8 p-5 bg-slate-900 text-white rounded-xl shadow-lg">
+              <p className="text-xs text-slate-400 mb-2 font-bold uppercase tracking-widest">Bank Information</p>
+              <p className="font-bold text-lg mb-1 flex items-center gap-2">
+                <span className="text-yellow-400">SC제일은행</span> 325-20-322490
+              </p>
+              <p className="text-sm text-slate-400">예금주: 주식회사브랜드슬램</p>
+            </div>
+          </div>
+          <div className="w-full md:w-5/12">
+            <div className="bg-slate-50 p-8 rounded-2xl border border-slate-200">
+              <div className="flex justify-between mb-3 text-slate-500 text-sm">
+                <span>공급가액 (Subtotal)</span>
+                <span>{d.supplyPrice.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between mb-6 text-slate-500 text-sm">
+                <span>부가세 VAT (10%)</span>
+                <span>{d.vatAmount.toLocaleString()}</span>
+              </div>
+              <div className="border-t-2 border-slate-200 my-4 pt-6 flex justify-between items-center">
+                <span className="font-black text-xl text-slate-900">Total</span>
+                <span className="font-black text-3xl text-indigo-600">{d.totalAmount.toLocaleString()}</span>
+              </div>
+              <p className="text-xs text-right text-slate-400 mt-2">* KRW (원) 기준</p>
+            </div>
+            <div className="mt-12 text-right relative">
+              <p className="font-serif font-bold text-lg text-slate-900 z-10 relative">주식회사 브랜드슬램 대표이사 장현우 (인)</p>
+              <img src={sealImg} alt="직인" className="absolute -top-8 right-0 w-24 h-24 object-contain opacity-80 rotate-6 mix-blend-multiply" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // --- [New Component] Invoice Detail View (계약서/송장) ---
 const InvoiceDetail = ({ campaign }) => {
     const invoiceRef = useRef(null);
@@ -373,7 +505,7 @@ const InvoiceDetail = ({ campaign }) => {
                             <p>대표이사: 장현우</p>
                             <p>사업자등록번호: 284-44-03016</p>
                             <p>서울특별시 용산구 한강대로 366, 8층 804호</p>
-                            <p className="text-indigo-600 font-medium">jhw@midas-m.com</p>
+                            <p className="text-indigo-600 font-medium">contact@slam-global.com</p>
                         </div>
                     </div>
                     <div>
@@ -806,6 +938,78 @@ const KICKOFF_STEPS = [
 const COUNTRY_LABELS = { us: '🇺🇸 미국만', us_ca: '🇺🇸+🇨🇦 미국/캐나다', us_ca_eu: '🇺🇸+🇨🇦+🇪🇺 유럽 믹스' };
 const DELIVERY_LABELS = { '2-3': '2~3일', '1w': '약 1주', '2w': '약 2주', other: '기타' };
 
+// --- 캠페인 일정 자동 산출 (노션 프로세스 기준) ---
+const addDays = (dateStr, days) => {
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().split('T')[0];
+};
+const addBizDays = (dateStr, n) => {
+  let d = new Date(dateStr);
+  let left = n;
+  while (left > 0) {
+    d.setDate(d.getDate() + 1);
+    const day = d.getDay();
+    if (day !== 0 && day !== 6) left--;
+  }
+  return d.toISOString().split('T')[0];
+};
+const toYMD = (dateStr) => {
+  const d = new Date(dateStr);
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${day}`;
+};
+const formatShort = (dateStr) => {
+  if (!dateStr) return '-';
+  const d = new Date(dateStr);
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+};
+const getDaysDiff = (fromStr, toStr) => {
+  const from = new Date(fromStr);
+  const to = new Date(toStr);
+  return Math.ceil((to - from) / (24 * 60 * 60 * 1000));
+};
+
+/**
+ * @param {string} startDate - 계약/결제일 (YYYY-MM-DD)
+ * @param {{ shippingType: 'us'|'domestic', recruitmentWeeks?: number, requestedShippingDate?: string }} options
+ */
+function getCampaignSchedule(startDate, options = {}) {
+  const shippingType = options.shippingType || 'us';
+  const recruitmentWeeks = options.recruitmentWeeks ?? 3;
+  const requestedShipping = options.requestedShippingDate;
+  const base = startDate || toYMD(new Date());
+
+  const recruitmentEnd = addDays(base, recruitmentWeeks * 7);
+  const confirmationEnd = addDays(recruitmentEnd, 7);
+  const listDeliveryDate = addDays(confirmationEnd, 1);
+  const replacementEnd = addBizDays(listDeliveryDate, 3);
+  const shippingDate = requestedShipping && requestedShipping >= listDeliveryDate
+    ? requestedShipping
+    : addDays(listDeliveryDate, 7);
+  const uploadStartDays = shippingType === 'us' ? 3 : 10;
+  const uploadStartDate = addDays(shippingDate, uploadStartDays);
+  const uploadDeadlineDate = addDays(shippingDate, 30);
+  const trackingEndDate = addDays(uploadStartDate, 90);
+
+  return {
+    base,
+    recruitmentStart: base,
+    recruitmentEnd,
+    contentGuideEnd: confirmationEnd,
+    listDeliveryDate,
+    replacementWindowStart: listDeliveryDate,
+    replacementWindowEnd: replacementEnd,
+    shippingDate,
+    uploadStartDate,
+    uploadDeadlineDate,
+    trackingEndDate,
+    recruitmentWeeks,
+    shippingType,
+  };
+}
+
 const KickoffSummaryRow = ({ label, value }) => (
   <div>
     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">{label}</p>
@@ -869,6 +1073,125 @@ function EventScheduleCalendar({ dates = [] }) {
   );
 }
 
+// --- 캠페인 세팅 이후 여정: D-day 카드 ---
+const DdayCard = ({ label, dateStr, subLabel }) => {
+  const today = toYMD(new Date());
+  const d = dateStr ? getDaysDiff(today, dateStr) : null;
+  const isPast = d !== null && d < 0;
+  const isToday = d === 0;
+  return (
+    <div className="bg-white/5 border border-white/10 rounded-2xl p-5 flex flex-col min-w-[140px]">
+      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">{label}</span>
+      {subLabel && <span className="text-[10px] text-slate-500 mb-1">{subLabel}</span>}
+      {dateStr ? (
+        <>
+          <span className="text-2xl font-black text-white tabular-nums">
+            {isPast ? 'D+' + Math.abs(d) : isToday ? 'D-Day' : 'D-' + d}
+          </span>
+          <span className="text-xs text-slate-400 mt-1">{dateStr}</span>
+        </>
+      ) : (
+        <span className="text-slate-500 text-sm">-</span>
+      )}
+    </div>
+  );
+};
+
+// --- 캠페인 타임라인 (간트 스타일) ---
+const CampaignTimeline = ({ schedule }) => {
+  if (!schedule) return null;
+  const totalDays = getDaysDiff(schedule.base, schedule.trackingEndDate);
+  const getLeft = (dateStr) => {
+    const days = getDaysDiff(schedule.base, dateStr);
+    return Math.max(0, Math.min(100, (days / totalDays) * 100));
+  };
+  const phases = [
+    { label: '모집', start: schedule.base, end: schedule.recruitmentEnd, color: 'bg-cyan-500/80' },
+    { label: '소통·확정', start: schedule.recruitmentEnd, end: schedule.contentGuideEnd, color: 'bg-violet-500/80' },
+    { label: '명단 납품', start: schedule.listDeliveryDate, end: schedule.replacementWindowEnd, color: 'bg-amber-500/80' },
+    { label: '배송', start: schedule.replacementWindowEnd, end: schedule.shippingDate, color: 'bg-emerald-500/80' },
+    { label: '업로드 시작', start: schedule.uploadStartDate, end: schedule.uploadDeadlineDate, color: 'bg-pink-500/80' },
+    { label: '트래킹', start: schedule.uploadStartDate, end: schedule.trackingEndDate, color: 'bg-indigo-500/50' },
+  ];
+  const milestones = [
+    { label: 'List Delivery', date: schedule.listDeliveryDate },
+    { label: 'Shipping', date: schedule.shippingDate },
+    { label: 'Upload Start', date: schedule.uploadStartDate },
+    { label: 'Upload Deadline', date: schedule.uploadDeadlineDate },
+  ];
+  return (
+    <div className="space-y-4">
+      <div className="relative h-12 rounded-xl bg-slate-800/50 overflow-hidden flex">
+        {phases.map((p, i) => {
+          const left = getLeft(p.start);
+          const width = Math.max(4, getLeft(p.end) - left);
+          return (
+            <div
+              key={i}
+              className={`absolute top-0 h-full rounded ${p.color} transition-all`}
+              style={{ left: left + '%', width: width + '%' }}
+              title={`${p.label} ${p.start} ~ ${p.end}`}
+            />
+          );
+        })}
+      </div>
+      <div className="flex flex-wrap gap-2 justify-between text-[10px] font-bold text-slate-400">
+        {phases.map((p, i) => (
+          <span key={i} className="flex items-center gap-1.5">
+            <span className={`w-2 h-2 rounded-full ${p.color.replace('/80', '').replace('/50', '')}`} />
+            {p.label}
+          </span>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-4 pt-2 border-t border-white/10">
+        {milestones.map((m, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <span className="text-slate-500 uppercase tracking-wider">{m.label}</span>
+            <span className="text-white font-mono text-sm">{formatShort(m.date)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// --- 가이드라인 세팅 블록 ---
+const GuidelineSettingBlock = ({ status = 'pending' }) => {
+  const statusConfig = {
+    pending: { label: '가이드라인 대기 중', desc: '캠페인 시작 시 바로 받기 어려우면 1~2주 내 공유 요청드립니다.', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
+    shared: { label: '가이드라인 공유 완료', desc: '담당자가 브랜드 가이드라인을 공유했습니다. 확인 후 피드백이 있으면 요청해 주세요.', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+    feedback: { label: '피드백 반영 중', desc: '부적절하거나 어려운 가이드는 수정 후 재공유됩니다.', color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20' },
+  };
+  const c = statusConfig[status] || statusConfig.pending;
+  return (
+    <div className={`rounded-2xl border p-6 ${c.bg} ${c.border}`}>
+      <div className="flex items-start gap-4">
+        <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+          <FileText size={24} className={c.color} />
+        </div>
+        <div>
+          <h4 className={`font-bold text-lg ${c.color}`}>{c.label}</h4>
+          <p className="text-slate-400 text-sm mt-1 font-light">{c.desc}</p>
+          <p className="text-[10px] text-slate-500 mt-3 uppercase tracking-widest">가이드 품질 관리: 부적절·과도한 요청 시 피드백 및 수정 요청이 있을 수 있습니다.</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- 룰 안내 (툴팁/고정 안내) ---
+const ScheduleRulesCallout = ({ shippingType }) => (
+  <div className="bg-slate-800/50 border border-white/10 rounded-2xl p-5">
+    <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">일정 룰 안내</h5>
+    <ul className="text-sm text-slate-400 space-y-2 font-light">
+      <li>• <strong className="text-slate-300">업로드 시작:</strong> {shippingType === 'us' ? '미국 내 배송 시 배송일 기준 3일 후' : '국내 배송 시 배송일 기준 10일 후'}</li>
+      <li>• <strong className="text-slate-300">업로드 마감:</strong> 배송일 기준 30일 이내 (인플루언서 단위)</li>
+      <li>• <strong className="text-slate-300">전체 트래킹:</strong> 업로드 시작일로부터 90일</li>
+      <li>• <strong className="text-slate-300">리스트 교체:</strong> 명단 납품 후 3영업일 이내 1회, 전체 30%까지</li>
+    </ul>
+  </div>
+);
+
 const KickoffView = ({ campaign }) => {
   const navigate = useNavigate();
   const [submission, setSubmission] = useState(null);
@@ -895,6 +1218,16 @@ const KickoffView = ({ campaign }) => {
   const eventScheduleDates = Array.isArray(fd.eventSchedule)
     ? fd.eventSchedule
     : (fd.eventSchedule ? [fd.eventSchedule] : []);
+
+  // 일정 산출: 계약/결제일 = campaign.start_date 또는 제출일, 배송타입 = form 기반 추정
+  const startDateForSchedule = campaign?.start_date || (submission?.created_at ? submission.created_at.split('T')[0] : null) || toYMD(new Date());
+  const shippingType = fd.shippingRegion === 'domestic' ? 'domestic' : 'us';
+  const schedule = getCampaignSchedule(startDateForSchedule, {
+    shippingType,
+    recruitmentWeeks: 3,
+    requestedShippingDate: fd.requestedShippingDate || null,
+  });
+  const guidelineStatus = fd.guidelineStatus || 'pending';
 
   return (
     <div className="space-y-10 animate-fade-in-up">
@@ -989,35 +1322,61 @@ const KickoffView = ({ campaign }) => {
         )}
       </div>
 
-      {/* 다음 단계 카드 */}
-      <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-[2.5rem] p-8 flex items-center gap-4">
-        <CheckCircle2 className="text-emerald-500 shrink-0" size={28} />
-        <div>
-          <h4 className="font-bold text-emerald-400 text-lg">다음 단계</h4>
-          <p className="text-slate-300 text-sm font-light mt-1">담당자가 확인 후 진행 일정·가이드라인 세팅 등을 안내드립니다.</p>
-        </div>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white/5 backdrop-blur-xl p-8 rounded-[2.5rem] border border-white/10">
-          <div className="w-14 h-14 rounded-2xl bg-slate-700/50 flex items-center justify-center mb-4">
-            <Calendar size={26} className="text-slate-500" />
+      {/* 캠페인 세팅 이후 여정: 진행 일정 · 캘린더 · 가이드라인 */}
+      <div className="space-y-8">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center">
+            <Calendar size={24} className="text-cyan-400" />
           </div>
-          <h3 className="font-black text-white text-lg mb-2">캠페인 캘린더</h3>
-          <p className="text-slate-500 text-sm font-light">진행 일정이 확정되면 여기에 표시됩니다.</p>
-        </div>
-        <div className="bg-white/5 backdrop-blur-xl p-8 rounded-[2.5rem] border border-white/10">
-          <div className="w-14 h-14 rounded-2xl bg-slate-700/50 flex items-center justify-center mb-4">
-            <FileText size={26} className="text-slate-500" />
+          <div>
+            <h3 className="font-black text-white text-xl tracking-tight">캠페인 진행 일정</h3>
+            <p className="text-slate-500 text-sm font-light">기준일(계약/결제일) 기준 자동 산출된 일정입니다. 담당자 확인 후 세부 조정될 수 있습니다.</p>
           </div>
-          <h3 className="font-black text-white text-lg mb-2">가이드라인 세팅</h3>
-          <p className="text-slate-500 text-sm font-light">캠페인 가이드라인 준비 후 공유됩니다.</p>
         </div>
+
+        {/* D-day 카드 */}
+        <div className="flex flex-wrap gap-4">
+          <DdayCard label="명단 납품" dateStr={schedule?.listDeliveryDate} subLabel="List Delivery" />
+          <DdayCard label="배송일" dateStr={schedule?.shippingDate} subLabel="Shipping Date" />
+          <DdayCard label="업로드 시작" dateStr={schedule?.uploadStartDate} subLabel="Upload Start" />
+          <DdayCard label="업로드 마감" dateStr={schedule?.uploadDeadlineDate} subLabel="배송일+30일" />
+        </div>
+
+        {/* 캠페인 타임라인 (간트) */}
         <div className="bg-white/5 backdrop-blur-xl p-8 rounded-[2.5rem] border border-white/10">
-          <div className="w-14 h-14 rounded-2xl bg-slate-700/50 flex items-center justify-center mb-4">
-            <Truck size={26} className="text-slate-500" />
+          <h4 className="font-black text-white text-lg mb-6 flex items-center gap-2">
+            <BarChart3 size={20} className="text-cyan-400" />
+            캠페인 캘린더 (타임라인)
+          </h4>
+          <CampaignTimeline schedule={schedule} />
+          <p className="text-[10px] text-slate-500 mt-4 uppercase tracking-widest">Recruitment → 소통·확정 → 명단 납품 → 리스트 교체(3영업일) → 배송 확정 → 업로드 기간 → 90일 트래킹</p>
+        </div>
+
+        {/* 룰 안내 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <ScheduleRulesCallout shippingType={schedule?.shippingType || 'us'} />
+          <div className="bg-white/5 backdrop-blur-xl p-6 rounded-[2.5rem] border border-white/10">
+            <h4 className="font-black text-white text-lg mb-3 flex items-center gap-2">
+              <Truck size={20} className="text-emerald-400" />
+              진행 일정 요약
+            </h4>
+            <ul className="text-sm text-slate-400 space-y-2 font-light">
+              <li>• 모집: {schedule?.recruitmentWeeks || 3}주</li>
+              <li>• 인플루언서 소통·확정: 1주</li>
+              <li>• 명단 최초 납품 → 리스트 교체 3영업일</li>
+              <li>• 업로드 시작: {schedule?.shippingType === 'us' ? '배송 3일 후' : '배송 10일 후'}</li>
+              <li>• 업로드 마감: 배송일+30일 / 트래킹: 90일</li>
+            </ul>
           </div>
-          <h3 className="font-black text-white text-lg mb-2">진행 일정</h3>
-          <p className="text-slate-500 text-sm font-light">제품 배송·업로드 일정이 정해지면 업데이트됩니다.</p>
+        </div>
+
+        {/* 가이드라인 세팅 */}
+        <div className="bg-white/5 backdrop-blur-xl p-8 rounded-[2.5rem] border border-white/10">
+          <h4 className="font-black text-white text-lg mb-6 flex items-center gap-2">
+            <FileText size={20} className="text-amber-400" />
+            가이드라인 세팅
+          </h4>
+          <GuidelineSettingBlock status={guidelineStatus} />
         </div>
       </div>
     </div>
@@ -1025,10 +1384,11 @@ const KickoffView = ({ campaign }) => {
 };
 
 // --- Main Campaign Detail Container ---
-const CampaignDetail = ({ campaign }) => {
+const CampaignDetail = ({ campaign, isDemoMode }) => {
   if (!campaign) return <div className="flex flex-col items-center justify-center py-40 text-slate-700 font-black uppercase tracking-[0.3em]"><Package size={48} className="mb-4 opacity-20"/> Select Campaign</div>;
 
   if (campaign.status === CampaignStatus.PAYMENT_PENDING) {
+      if (isDemoMode) return <DemoInvoiceExample />;
       return <InvoiceDetail campaign={campaign} />;
   }
 
@@ -1284,7 +1644,7 @@ export default function Dashboard() {
                             <StatusBadge status={selectedCampaign?.status} />
                         </div>
                         <div className="relative z-10">
-                            <CampaignDetail campaign={selectedCampaign} />
+                            <CampaignDetail campaign={selectedCampaign} isDemoMode={isDemoMode} />
                         </div>
                     </div>
                 )}
