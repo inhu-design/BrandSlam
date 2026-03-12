@@ -80,6 +80,7 @@
 - **메서드**: POST
 - **URL**: `/api/bankda/confirm-deposit`
 - **요청 body**: `{ "requests": [{"order_id": "BS-20260312-XXX"}, ...] }`
+- **응답 (뱅크다 스펙)**: `return_code`, `description`, `orders` 세 항목만 반환. 성공 시 예: `{ "return_code": "0", "description": "정상 처리되었습니다", "orders": [{ "order_id": "BS-...", "description": "입금확인완료" }] }`
 - **동작**: 해당 `order_id`의 주문·캠페인을 입금 확인 상태로 변경 (다음 단계 진행 가능)
 
 ---
