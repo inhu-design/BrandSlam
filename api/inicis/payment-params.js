@@ -58,9 +58,13 @@ export default async function handler(req, res) {
   const returnUrl = `${base}/api/inicis/payment-callback`;
   const closeUrl = `${base}/checkout`;
 
+  // 테스트: stgstdpay.inicis.com / 운영: stdpay.inicis.com (기본)
+  const paymentUrl = (process.env.INICIS_PAYMENT_URL || 'https://stdpay.inicis.com/stdpay/INIStdPay.php').replace(/\/$/, '');
+
   return res.status(200).json({
     version: '1.0',
     mid: INICIS_MID,
+    paymentUrl,
     oid,
     price: priceStr,
     currency: 'WON',

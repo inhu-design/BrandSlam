@@ -578,7 +578,7 @@ export default function Checkout() {
       formEl = document.createElement('form');
       formEl.id = formId;
       formEl.method = 'POST';
-      formEl.action = 'https://stdpay.inicis.com/stdpay/INIStdPay.php';
+      formEl.action = params.paymentUrl || 'https://stdpay.inicis.com/stdpay/INIStdPay.php';
       formEl.target = 'inicis_pay_window';
       formEl.style.display = 'none';
 
