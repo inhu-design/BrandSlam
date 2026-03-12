@@ -81,7 +81,7 @@ export default async function handler(req, res) {
   const trimmedId = orderId.trim();
   // 뱅크다 연동 테스트: 미확인 주문 테스트에서 쓰는 더미 주문번호면 더미 응답 반환
   if (trimmedId === 'BS-TEST-CONNECTION') {
-    return res.status(200).json(getDummyOrderForTest());
+    return res.status(200).json({ order: getDummyOrderForTest() });
   }
 
   try {
@@ -100,7 +100,7 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'Order not found', code: 401 });
     }
 
-    return res.status(200).json(toBankdaOrder(order));
+    return res.status(200).json({ order: toBankdaOrder(order) });
   } catch (err) {
     console.error('[bankda order-detail]', err);
     return res.status(500).json({ error: String(err.message), code: 401 });
