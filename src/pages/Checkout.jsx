@@ -375,15 +375,13 @@ export default function Checkout() {
   useEffect(() => { window.scrollTo(0, 0); }, []);
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'smooth' }); }, [currentStep]);
 
-  if (authLoading) {
+  if (authLoading || !user) {
     return (
       <div className="font-sans antialiased text-white bg-[#020617] min-h-screen flex items-center justify-center">
         <Loader2 className="w-10 h-10 animate-spin text-purple-500" />
       </div>
     );
   }
-
-  if (!user) return null;
 
   const set = (field) => (e) => setForm(prev => ({ ...prev, [field]: e.target.value }));
 
@@ -519,10 +517,14 @@ export default function Checkout() {
         return;
       }
     } catch (e) {
-      console.error(e);
+      console.error('[카드결제] 결제 파라미터 요청 실패', e);
       paymentInProgressRef.current = false;
       setSubmitting(false);
-      alert('카드 결제 기능은 현재 준비중입니다. 계좌이체를 이용해 주시길 부탁드립니다.');
+      const isLocal = /localhost|127\.0\.0\.1/.test(window.location.origin);
+      const msg = isLocal
+        ? '로컬에서는 결제 API가 없어 결제창을 열 수 없습니다. 터미널에서 "vercel dev"로 실행하거나, 배포된 사이트에서 결제를 시도해 주세요.'
+        : '카드 결제 기능은 현재 준비중입니다. 계좌이체를 이용해 주시길 부탁드립니다.';
+      alert(msg);
       return;
     }
 
@@ -575,11 +577,10 @@ export default function Checkout() {
       const formId = 'inicis-pay-form';
       let formEl = document.getElementById(formId);
       if (formEl) formEl.remove();
+      
       formEl = document.createElement('form');
       formEl.id = formId;
-      formEl.method = 'POST';
-      formEl.action = params.paymentUrl || 'https://stdpay.inicis.com/stdpay/INIStdPay.php';
-      formEl.target = 'inicis_pay_window';
+      // 💡 주의: action, method, target 속성을 직접 설정하지 마세요! INIStdPay.js가 알아서 처리합니다.
       formEl.style.display = 'none';
 
       const keys = ['version', 'mid', 'oid', 'price', 'currency', 'goodname', 'buyername', 'buyertel', 'buyeremail', 'timestamp', 'signature', 'verification', 'mKey', 'returnUrl', 'closeUrl', 'use_chkfake', 'gopaymethod', 'acceptmethod'];
@@ -593,16 +594,33 @@ export default function Checkout() {
         }
       });
 
+      // 폼을 body에 추가합니다 (INIStdPay.pay 함수가 이 폼을 찾아야 하므로 지우면 안 됩니다)
       document.body.appendChild(formEl);
-      window.open('', 'inicis_pay_window', 'width=500,height=700,scrollbars=yes');
-      formEl.submit();
-      formEl.remove();
+
+      // 💡 해결의 핵심: INICIS JS 라이브러리를 동적으로 로드하고 실행하는 함수
+      const openInicisPay = () => {
+        window.INIStdPay.pay(formId);
+        // 팝업이 뜬 후엔 로딩 상태를 풀어주어 다른 조작이 가능하게 합니다.
+        paymentInProgressRef.current = false;
+        setSubmitting(false);
+      };
+
+      // 이미 스크립트가 로드되어 있는지 확인 후 실행
+      if (!window.INIStdPay) {
+        const script = document.createElement('script');
+        script.src = 'https://stdpay.inicis.com/stdjs/INIStdPay.js'; // 운영/테스트 공통 js
+        script.onload = openInicisPay;
+        document.body.appendChild(script);
+      } else {
+        openInicisPay();
+      }
+
     } catch (e) {
       console.error(e);
       await rollbackOrder(orderNum);
       paymentInProgressRef.current = false;
       setSubmitting(false);
-      alert('카드 결제 기능은 준비 중입니다. 계좌이체를 이용해 주시길 부탁드립니다.');
+      alert('카드 결제창을 여는 도중 문제가 발생했습니다. 계좌이체를 이용해 주시길 부탁드립니다.');
     }
   };
 
