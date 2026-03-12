@@ -13,6 +13,7 @@ import About from './pages/About';
 import Management from './pages/Management';
 import Diagnosis from './pages/Diagnosis';
 import Checkout from './pages/Checkout';
+import CheckoutResult from './pages/CheckoutResult';
 import CampaignSetup from './pages/CampaignSetup';
 import SetPassword from './pages/SetPassword';
 
@@ -30,6 +31,7 @@ function App() {
           <Route path="/management" element={<Management />} />
           <Route path="/diagnosis" element={<Diagnosis />} />
           <Route path="/checkout" element={<Checkout />} />
+          <Route path="/checkout/result" element={<CheckoutResult />} />
           <Route path="/set-password" element={<SetPassword />} />
           {/* 매직 링크 등으로 잘못된 경로 진입 시 대시보드로 (SPA 폴백) */}
           <Route path="*" element={<Navigate to="/" replace />} />

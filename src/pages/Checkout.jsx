@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, ArrowRight, Check, UserPlus, FileText,
@@ -359,6 +359,9 @@ export default function Checkout() {
   const [agree, setAgree] = useState({ terms: false, refund: false, privacy: false });
   const [orderNumber, setOrderNumber] = useState('');
   const [legalModal, setLegalModal] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState('bank'); // 'bank' | 'card'
+  const [verifyingPassword, setVerifyingPassword] = useState(false);
+  const paymentInProgressRef = useRef(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -400,6 +403,8 @@ export default function Checkout() {
   const step1Valid = form.email && passwordValid && form.name && form.phone && form.company;
 
   const handleSubmitOrder = async () => {
+    if (paymentInProgressRef.current) return;
+    paymentInProgressRef.current = true;
     setSubmitting(true);
     const now = new Date();
     const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
@@ -452,9 +457,176 @@ export default function Checkout() {
 
     setSubmitting(false);
     setCurrentStep(4);
+    paymentInProgressRef.current = false;
+  };
+
+  const rollbackOrder = async (orderNum) => {
+    try {
+      const base = window.location.origin;
+      await fetch(`${base}/api/checkout/rollback-order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_number: orderNum }),
+      });
+    } catch (err) {
+      console.error('rollback failed', err);
+    }
+  };
+
+  const handleCardPayment = async () => {
+    if (paymentInProgressRef.current) return;
+    paymentInProgressRef.current = true;
+    setSubmitting(true);
+    const now = new Date();
+    const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    const orderNum = `BS-${datePart}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+    setOrderNumber(orderNum);
+
+    try {
+      if (isSettingPassword) {
+        await supabase.auth.updateUser({ password: form.password });
+        await supabase.auth.updateUser({
+          data: { ...(user?.user_metadata || {}), password_set: true },
+        });
+      }
+      await supabase.auth.updateUser({
+        data: { ...(user?.user_metadata || {}), name: form.name, phone: form.phone, company: form.company },
+      });
+    } catch { /* 프로필 업데이트 실패해도 진행 */ }
+
+    const base = window.location.origin;
+
+    // 1) 결제 파라미터 먼저 확인. 실패하면 주문/캠페인 생성 없이 종료
+    let params;
+    try {
+      const res = await fetch(`${base}/api/inicis/payment-params`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          oid: orderNum,
+          price: totalPrice,
+          goodname: `${plan.name} (${plan.count}개)`,
+          buyername: form.name,
+          buyertel: form.phone,
+          buyeremail: form.email,
+        }),
+      });
+      params = await res.json();
+      if (!res.ok || params.error) {
+        paymentInProgressRef.current = false;
+        setSubmitting(false);
+        alert(params.error || '결제 정보 생성에 실패했습니다. 계좌이체를 이용해 주시거나 관리자에게 문의하세요.');
+        return;
+      }
+    } catch (e) {
+      console.error(e);
+      paymentInProgressRef.current = false;
+      setSubmitting(false);
+      alert('카드 결제 기능은 현재 준비중입니다. 계좌이체를 이용해 주시길 부탁드립니다.');
+      return;
+    }
+
+    // 2) 결제창이 정상적으로 열릴 수 있을 때만 주문/캠페인 생성
+    try {
+      await supabase.from('orders').insert([{
+        order_number: orderNum,
+        plan_name: plan.name,
+        plan_price: totalPrice,
+        content_count: plan.count,
+        email: form.email,
+        name: form.name,
+        phone: form.phone,
+        company: form.company,
+        status: 'pending_payment',
+      }]);
+    } catch {
+      paymentInProgressRef.current = false;
+      setSubmitting(false);
+      alert('주문 저장에 실패했습니다. 다시 시도해 주세요.');
+      return;
+    }
+
+    try {
+      await supabase.from('campaigns').insert([{
+        user_id: user.id,
+        order_number: orderNum,
+        plan: plan.name,
+        status: 'PAYMENT_PENDING',
+        brand_name: form.company,
+        product_name: plan.name,
+        target_creators: plan.count || 0,
+        matched_creators: 0,
+        plan_price: totalPrice,
+        content_count: plan.count || 0,
+        customer_name: form.name,
+        customer_email: form.email,
+        customer_phone: form.phone,
+      }]);
+    } catch {
+      await rollbackOrder(orderNum);
+      paymentInProgressRef.current = false;
+      setSubmitting(false);
+      alert('캠페인 저장에 실패했습니다. 다시 시도해 주세요.');
+      return;
+    }
+
+    // 3) 결제창 오픈. 실패하면 방금 만든 주문/캠페인 롤백
+    try {
+      const formId = 'inicis-pay-form';
+      let formEl = document.getElementById(formId);
+      if (formEl) formEl.remove();
+      formEl = document.createElement('form');
+      formEl.id = formId;
+      formEl.method = 'POST';
+      formEl.action = 'https://stdpay.inicis.com/stdpay/INIStdPay.php';
+      formEl.target = 'inicis_pay_window';
+      formEl.style.display = 'none';
+
+      const keys = ['version', 'mid', 'oid', 'price', 'currency', 'goodname', 'buyername', 'buyertel', 'buyeremail', 'timestamp', 'signature', 'verification', 'mKey', 'returnUrl', 'closeUrl', 'use_chkfake', 'acceptmethod'];
+      keys.forEach((k) => {
+        if (params[k] != null && params[k] !== '') {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = k;
+          input.value = params[k];
+          formEl.appendChild(input);
+        }
+      });
+
+      document.body.appendChild(formEl);
+      window.open('', 'inicis_pay_window', 'width=500,height=700,scrollbars=yes');
+      formEl.submit();
+      formEl.remove();
+    } catch (e) {
+      console.error(e);
+      await rollbackOrder(orderNum);
+      paymentInProgressRef.current = false;
+      setSubmitting(false);
+      alert('카드 결제 기능은 준비 중입니다. 계좌이체를 이용해 주시길 부탁드립니다.');
+    }
   };
 
   const goNext = () => setCurrentStep(s => s + 1);
+
+  const handleStep1Next = async () => {
+    if (!step1Valid) return;
+    if (isSettingPassword) {
+      goNext();
+      return;
+    }
+    setVerifyingPassword(true);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: form.email.trim(),
+      password: form.password,
+    });
+    setVerifyingPassword(false);
+    if (error) {
+      alert('비밀번호가 일치하지 않습니다. 다시 입력해 주세요.');
+      return;
+    }
+    goNext();
+  };
+
   const goPrev = () => setCurrentStep(s => s - 1);
 
   const selectPlan = (id) => {
@@ -626,7 +798,11 @@ export default function Checkout() {
                   <>
                     <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 flex gap-3">
                       <AlertTriangle size={18} className="text-blue-400 flex-shrink-0 mt-0.5" />
-                      <p className="text-sm text-blue-300">한 번만 설정해두시면, 다음 로그인부터는 이메일 + 비밀번호만으로 바로 들어올 수 있어요. 아래에서 비밀번호를 설정해주세요.</p>
+                      <div className="text-sm text-blue-300">
+                        <p className="mb-2">한 번만 설정해두시면, 다음 로그인부터는 이메일 + 비밀번호만으로 바로 들어올 수 있어요. 아래에서 비밀번호를 설정해주세요.</p>
+                        <p className="text-blue-200/90 text-xs mt-1">이미 비밀번호가 있으시면 <button type="button" onClick={() => setIsSettingPassword(false)} className="underline hover:text-white">기존 비밀번호로 진행</button></p>
+                        <p className="text-blue-200/80 text-xs mt-2">다음 구매부터는 비밀번호만 입력하면 됩니다. <Link to="/set-password?from=/checkout" className="underline hover:text-white">별도 설정 페이지에서 미리 설정하기</Link></p>
+                      </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                       <Input label="비밀번호 설정" required type="password" placeholder="8자 이상" value={form.password} onChange={set('password')} />
@@ -657,15 +833,19 @@ export default function Checkout() {
                 <Input label="회사명" required placeholder="주식회사 브랜드슬램" value={form.company} onChange={set('company')} />
 
                 <button
-                  onClick={goNext}
-                  disabled={!step1Valid}
-                  className={`w-full py-4 rounded-2xl font-bold text-lg transition-all mt-4 ${
-                    step1Valid
+                  onClick={handleStep1Next}
+                  disabled={!step1Valid || verifyingPassword}
+                  className={`w-full py-4 rounded-2xl font-bold text-lg transition-all mt-4 flex items-center justify-center gap-2 ${
+                    step1Valid && !verifyingPassword
                       ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:-translate-y-0.5 shadow-lg shadow-purple-500/20'
                       : 'bg-white/5 text-slate-600 cursor-not-allowed'
                   }`}
                 >
-                  다음 단계로
+                  {verifyingPassword ? (
+                    <>확인 중... <Loader2 size={18} className="animate-spin" /></>
+                  ) : (
+                    '다음 단계로'
+                  )}
                 </button>
               </div>
             </div>
@@ -777,27 +957,70 @@ export default function Checkout() {
                 </div>
               </div>
 
-              <h3 className="font-bold text-white mb-4">계좌이체 정보</h3>
-              <div className="bg-white/[0.04] rounded-2xl p-6 mb-6 border border-white/10">
-                <div className="space-y-3 text-sm">
-                  <div className="flex justify-between"><span className="text-slate-500">은행</span><span className="font-bold text-white">{BANK_INFO.bank}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-500">계좌번호</span><span className="font-bold text-white">{BANK_INFO.account}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-500">예금주</span><span className="font-bold text-white">{BANK_INFO.holder}</span></div>
-                  <div className="flex justify-between pt-3 border-t border-white/10">
-                    <span className="font-bold text-white">입금 금액 (VAT 포함)</span>
-                    <span className="text-xl font-black text-purple-400">{totalPrice.toLocaleString()}원</span>
-                  </div>
-                </div>
+              <h3 className="font-bold text-white mb-4">결제 수단</h3>
+              <div className="flex gap-4 mb-6">
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('bank')}
+                  className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl font-bold border-2 transition-all ${
+                    paymentMethod === 'bank'
+                      ? 'bg-purple-500/20 border-purple-500 text-purple-300'
+                      : 'bg-white/[0.04] border-white/10 text-slate-400 hover:border-white/20'
+                  }`}
+                >
+                  <CreditCard size={20} /> 계좌이체
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('card')}
+                  className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl font-bold border-2 transition-all ${
+                    paymentMethod === 'card'
+                      ? 'bg-purple-500/20 border-purple-500 text-purple-300'
+                      : 'bg-white/[0.04] border-white/10 text-slate-400 hover:border-white/20'
+                  }`}
+                >
+                  <CreditCard size={20} /> 신용카드
+                </button>
               </div>
 
-              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-2xl p-5 mb-8">
-                <div className="flex gap-3">
-                  <AlertTriangle size={20} className="text-yellow-400 flex-shrink-0 mt-0.5" />
-                  <div className="text-sm">
-                    <p className="font-bold text-yellow-300">입금 기한: 오늘 오후 11시 59분까지</p>
-                    <p className="text-yellow-400/70 mt-1">입금자명은 가입하신 이름({form.name})과 동일하게 입금해주세요.</p>
+              {paymentMethod === 'bank' && (
+                <>
+                  <h3 className="font-bold text-white mb-4">계좌이체 정보</h3>
+                  <div className="bg-white/[0.04] rounded-2xl p-6 mb-6 border border-white/10">
+                    <div className="space-y-3 text-sm">
+                      <div className="flex justify-between"><span className="text-slate-500">은행</span><span className="font-bold text-white">{BANK_INFO.bank}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500">계좌번호</span><span className="font-bold text-white">{BANK_INFO.account}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500">예금주</span><span className="font-bold text-white">{BANK_INFO.holder}</span></div>
+                      <div className="flex justify-between pt-3 border-t border-white/10">
+                        <span className="font-bold text-white">입금 금액 (VAT 포함)</span>
+                        <span className="text-xl font-black text-purple-400">{totalPrice.toLocaleString()}원</span>
+                      </div>
+                    </div>
                   </div>
+                  <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-2xl p-5 mb-8">
+                    <div className="flex gap-3">
+                      <AlertTriangle size={20} className="text-yellow-400 flex-shrink-0 mt-0.5" />
+                      <div className="text-sm">
+                        <p className="font-bold text-yellow-300">입금 기한: 오늘 오후 11시 59분까지</p>
+                        <p className="text-yellow-400/70 mt-1">입금자명은 가입하신 이름({form.name})과 동일하게 입금해주세요.</p>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {paymentMethod === 'card' && (
+                <div className="bg-white/[0.04] rounded-2xl p-5 mb-8 border border-white/10">
+                  <p className="text-sm text-slate-400">결제하기 버튼을 누르면 KG이니시스 결제창이 열립니다. 카드 정보를 입력해 결제를 완료해 주세요.</p>
                 </div>
+              )}
+
+              <div className="bg-slate-800/30 rounded-2xl p-5 mb-8 border border-white/10">
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  모든 거래에 대한 책임과 배송, 교환, 환불 민원 등의 처리는 (주)브랜드슬램에서 진행합니다.
+                  <br />
+                  자세한 문의는 Email: contact@slam-global.com , 유선: 070-8027-2323 으로 가능합니다.
+                </p>
               </div>
 
               <div className="flex gap-4">
@@ -807,13 +1030,23 @@ export default function Checkout() {
                 >
                   <ArrowLeft size={18} /> 이전
                 </button>
-                <button
-                  onClick={handleSubmitOrder}
-                  disabled={submitting}
-                  className="flex-1 py-4 rounded-2xl font-bold text-lg bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:-translate-y-0.5 shadow-lg shadow-purple-500/20 transition-all disabled:opacity-50"
-                >
-                  {submitting ? '처리 중...' : '입금 완료'}
-                </button>
+                {paymentMethod === 'bank' ? (
+                  <button
+                    onClick={handleSubmitOrder}
+                    disabled={submitting}
+                    className="flex-1 py-4 rounded-2xl font-bold text-lg bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:-translate-y-0.5 shadow-lg shadow-purple-500/20 transition-all disabled:opacity-50"
+                  >
+                    {submitting ? '처리 중...' : '입금 완료'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleCardPayment}
+                    disabled={submitting}
+                    className="flex-1 py-4 rounded-2xl font-bold text-lg bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:-translate-y-0.5 shadow-lg shadow-purple-500/20 transition-all disabled:opacity-50"
+                  >
+                    {submitting ? '결제창 열기 중...' : '신용카드 결제'}
+                  </button>
+                )}
               </div>
             </div>
           )}

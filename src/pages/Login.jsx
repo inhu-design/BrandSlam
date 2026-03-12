@@ -104,6 +104,9 @@ const handleMagicLogin = async (e) => {
                             <b>{email}</b>로 로그인 링크를 보냈습니다.<br/>
                             링크를 클릭하면 바로 로그인됩니다.
                         </p>
+                        <p className="text-green-600/90 text-xs mt-3">
+                            로그인 후 <strong>비밀번호를 한 번 설정</strong>해 두시면, 다음부터는 이메일+비밀번호만으로 로그인할 수 있고, 구매 시에도 비밀번호 입력이 더 간단해집니다.
+                        </p>
                         <button onClick={() => setSent(false)} className="mt-4 text-xs text-green-600 underline">
                             이메일 다시 입력하기
                         </button>
