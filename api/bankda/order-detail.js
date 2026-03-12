@@ -1,10 +1,9 @@
 /**
  * 뱅크다 연동: 주문 상세 API
- * - 뱅크다가 주문번호로 상세 한 건 조회할 때 호출
  * - POST /api/bankda/order-detail
  * - Body: { "order_id": "BS-20260312-XXXXXXXX" }
  */
-const { supabase } = require('../lib/supabase-server');
+import { supabase } from '../lib/supabase-server.js';
 
 const BANK_ACCOUNT_NO = '32520322490';
 const BANK_CODE_NAME = 'SC제일';
@@ -39,7 +38,9 @@ function toBankdaOrder(row) {
   };
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Method not allowed' });
@@ -82,4 +83,4 @@ module.exports = async function handler(req, res) {
     console.error('[bankda order-detail]', err);
     return res.status(500).json({ error: String(err.message), code: 401 });
   }
-};
+}

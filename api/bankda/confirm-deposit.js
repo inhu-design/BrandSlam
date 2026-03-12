@@ -1,12 +1,13 @@
 /**
  * 뱅크다 연동: 입금 확인 처리 API
- * - 뱅크다가 매칭된 주문을 입금 확인 처리할 때 호출
  * - POST /api/bankda/confirm-deposit
  * - Body: { "requests": [{"order_id": "BS-20260312-XXX"}, ...] }
  */
-const { supabase } = require('../lib/supabase-server');
+import { supabase } from '../lib/supabase-server.js';
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Method not allowed' });
@@ -38,7 +39,6 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    // orders 테이블: status -> paid (또는 deposit_confirmed 등 사용 중인 값으로 통일)
     const { error: ordersError } = await supabase
       .from('orders')
       .update({ status: 'paid' })
@@ -49,7 +49,6 @@ module.exports = async function handler(req, res) {
       return res.status(500).json({ error: ordersError.message, code: 401 });
     }
 
-    // campaigns 테이블: PAYMENT_PENDING -> KICKOFF (입금 확인 후 다음 단계)
     const { error: campaignsError } = await supabase
       .from('campaigns')
       .update({ status: 'KICKOFF' })
@@ -57,7 +56,6 @@ module.exports = async function handler(req, res) {
 
     if (campaignsError) {
       console.error('[bankda confirm-deposit] campaigns update', campaignsError);
-      // orders는 이미 반영됐을 수 있으므로 500만 반환
       return res.status(500).json({ error: campaignsError.message, code: 401 });
     }
 
@@ -66,4 +64,4 @@ module.exports = async function handler(req, res) {
     console.error('[bankda confirm-deposit]', err);
     return res.status(500).json({ error: String(err.message), code: 401 });
   }
-};
+}

@@ -3,10 +3,9 @@
  * - 뱅크다가 입금 확인 전 주문 목록을 조회할 때 호출
  * - GET /api/bankda/unconfirmed-orders
  */
-const { supabase } = require('../lib/supabase-server');
+import { supabase } from '../lib/supabase-server.js';
 
-// 우리 사이트 무통장 입금 계좌 정보 (뱅크다 형식)
-const BANK_ACCOUNT_NO = '32520322490';  // 숫자만
+const BANK_ACCOUNT_NO = '32520322490';
 const BANK_CODE_NAME = 'SC제일';
 
 function formatOrderDate(isoString) {
@@ -39,7 +38,9 @@ function toBankdaOrder(row) {
   };
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET');
     return res.status(405).json({ error: 'Method not allowed' });
@@ -67,4 +68,4 @@ module.exports = async function handler(req, res) {
     console.error('[bankda unconfirmed-orders]', err);
     return res.status(500).json({ error: String(err.message), code: 401 });
   }
-};
+}

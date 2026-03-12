@@ -21,6 +21,7 @@
 | **주문 상세 API URL** | `https://your-domain.com/api/bankda/order-detail` |
 | **입금 확인 처리 API URL** | `https://your-domain.com/api/bankda/confirm-deposit` |
 
+- **주의**: URL에 슬래시가 두 개 들어가면 안 됩니다. (`https://...com//api/...` ❌ → `https://...com/api/...` ✅)
 - 로컬 테스트 시: `https://your-vercel-app.vercel.app/api/bankda/...` 형태로 배포된 주소 사용
 - 각 입력란 옆 **테스트** 버튼으로 호출 가능 여부 확인
 
