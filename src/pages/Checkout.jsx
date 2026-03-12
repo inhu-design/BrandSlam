@@ -380,8 +380,12 @@ export default function Checkout() {
   const restoreScroll = () => {
     document.body.style.overflow = '';
     document.body.style.position = '';
+    document.body.style.width = '';
+    document.body.style.height = '';
     document.documentElement.style.overflow = '';
     document.documentElement.style.position = '';
+    document.documentElement.style.width = '';
+    document.documentElement.style.height = '';
   };
 
   useEffect(() => {
@@ -394,10 +398,42 @@ export default function Checkout() {
     return () => window.removeEventListener('message', onMessage);
   }, []);
 
+  const focusRollbackTimerRef = useRef(null);
+  const scheduleRollbackIfAbandonedRef = useRef(null);
+  const scheduleRollbackIfAbandoned = () => {
+    const pending = pendingPaymentOrderRef.current;
+    if (!pending || paymentSuccessOrderRef.current === pending) return;
+    if (focusRollbackTimerRef.current) clearTimeout(focusRollbackTimerRef.current);
+    focusRollbackTimerRef.current = setTimeout(() => {
+      focusRollbackTimerRef.current = null;
+      const stillPending = pendingPaymentOrderRef.current;
+      const success = paymentSuccessOrderRef.current;
+      if (stillPending && success !== stillPending) {
+        rollbackOrder(stillPending).catch((err) => console.error('[결제 취소] 롤백 실패', err));
+        pendingPaymentOrderRef.current = null;
+        paymentSuccessOrderRef.current = null;
+      }
+    }, 1500);
+  };
+  scheduleRollbackIfAbandonedRef.current = scheduleRollbackIfAbandoned;
   useEffect(() => {
-    const onFocus = () => restoreScroll();
+    const onFocus = () => {
+      restoreScroll();
+      scheduleRollbackIfAbandonedRef.current?.();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        restoreScroll();
+        scheduleRollbackIfAbandonedRef.current?.();
+      }
+    };
     window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+      if (focusRollbackTimerRef.current) clearTimeout(focusRollbackTimerRef.current);
+    };
   }, []);
 
   if (authLoading || !user) {
@@ -632,30 +668,29 @@ export default function Checkout() {
       };
 
       const openInicisPay = () => {
-        try {
-          window.INIStdPay.pay(formId);
-        } finally {
-          window.open = originalOpen;
-        }
+        window.INIStdPay.pay(formId);
         paymentInProgressRef.current = false;
         setSubmitting(false);
 
-        if (payWindow) {
-          const intervalId = setInterval(() => {
-            if (!payWindow.closed) return;
-            clearInterval(intervalId);
+        setTimeout(() => {
+          window.open = originalOpen;
+          if (payWindow) {
+            const intervalId = setInterval(() => {
+              if (!payWindow.closed) return;
+              clearInterval(intervalId);
+              restoreScroll();
+              const pending = pendingPaymentOrderRef.current;
+              const success = paymentSuccessOrderRef.current;
+              if (pending && pending !== success) {
+                rollbackOrder(pending).catch((err) => console.error('[결제창 닫힘] 롤백 실패', err));
+                pendingPaymentOrderRef.current = null;
+                paymentSuccessOrderRef.current = null;
+              }
+            }, 300);
+          } else {
             restoreScroll();
-            const pending = pendingPaymentOrderRef.current;
-            const success = paymentSuccessOrderRef.current;
-            if (pending && pending !== success) {
-              rollbackOrder(pending).catch((err) => console.error('[결제창 닫힘] 롤백 실패', err));
-            }
-            pendingPaymentOrderRef.current = null;
-            paymentSuccessOrderRef.current = null;
-          }, 300);
-        } else {
-          restoreScroll();
-        }
+          }
+        }, 5000);
       };
 
       if (!window.INIStdPay) {
