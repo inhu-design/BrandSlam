@@ -47,10 +47,11 @@ export default async function handler(req, res) {
   const signStr = `oid=${oid}&price=${priceStr}&timestamp=${timestamp}`;
   const signature = sha256(signStr);
 
-  // verification = SHA256(oid + price + signKey + timestamp) (일반적 방식)
-  const verification = sha256(oid + priceStr + INICIS_SIGNKEY + timestamp);
+  // verification = SHA256(NVP 문자열), NVP: oid=...&price=...&signKey=...&timestamp=...
+  const verificationStr = `oid=${oid}&price=${priceStr}&signKey=${INICIS_SIGNKEY}&timestamp=${timestamp}`;
+  const verification = sha256(verificationStr);
 
-  // mKey = SHA256(signKey)
+  // mKey = SHA256(signKey) — signKey 문자열 그대로 해시
   const mKey = sha256(INICIS_SIGNKEY);
 
   const base = (process.env.INICIS_RETURN_BASE_URL || 'https://www.slam-global.com').replace(/\/$/, '');
@@ -74,6 +75,7 @@ export default async function handler(req, res) {
     returnUrl,
     closeUrl,
     use_chkfake: 'Y',
+    gopaymethod: 'Card',  // 이니시스 웹표준 필수: 요청 지불수단 (Card=신용카드)
     acceptmethod: 'card',
   });
 }

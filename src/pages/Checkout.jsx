@@ -582,7 +582,7 @@ export default function Checkout() {
       formEl.target = 'inicis_pay_window';
       formEl.style.display = 'none';
 
-      const keys = ['version', 'mid', 'oid', 'price', 'currency', 'goodname', 'buyername', 'buyertel', 'buyeremail', 'timestamp', 'signature', 'verification', 'mKey', 'returnUrl', 'closeUrl', 'use_chkfake', 'acceptmethod'];
+      const keys = ['version', 'mid', 'oid', 'price', 'currency', 'goodname', 'buyername', 'buyertel', 'buyeremail', 'timestamp', 'signature', 'verification', 'mKey', 'returnUrl', 'closeUrl', 'use_chkfake', 'gopaymethod', 'acceptmethod'];
       keys.forEach((k) => {
         if (params[k] != null && params[k] !== '') {
           const input = document.createElement('input');
