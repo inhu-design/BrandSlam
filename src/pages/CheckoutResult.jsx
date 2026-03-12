@@ -12,10 +12,20 @@ export default function CheckoutResult() {
 
   useEffect(() => {
     if (window.opener) {
-      window.opener.location.href = `${window.location.pathname}${window.location.search}`;
-      window.close();
+      if (success && orderNumber) {
+        window.opener.postMessage(
+          { type: 'INICIS_PAYMENT_SUCCESS', order_number: orderNumber },
+          window.location.origin
+        );
+      }
+      setTimeout(() => {
+        if (window.opener) {
+          window.opener.location.href = `${window.location.pathname}${window.location.search}`;
+        }
+        window.close();
+      }, 100);
     }
-  }, []);
+  }, [success, orderNumber]);
 
   return (
     <div className="font-sans antialiased text-white bg-[#020617] min-h-screen flex flex-col selection:bg-purple-500/30">

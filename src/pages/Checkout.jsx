@@ -362,6 +362,8 @@ export default function Checkout() {
   const [paymentMethod, setPaymentMethod] = useState('bank'); // 'bank' | 'card'
   const [verifyingPassword, setVerifyingPassword] = useState(false);
   const paymentInProgressRef = useRef(false);
+  const pendingPaymentOrderRef = useRef(null);
+  const paymentSuccessOrderRef = useRef(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -374,6 +376,29 @@ export default function Checkout() {
 
   useEffect(() => { window.scrollTo(0, 0); }, []);
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'smooth' }); }, [currentStep]);
+
+  const restoreScroll = () => {
+    document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.documentElement.style.overflow = '';
+    document.documentElement.style.position = '';
+  };
+
+  useEffect(() => {
+    const onMessage = (e) => {
+      if (e.data?.type === 'INICIS_PAYMENT_SUCCESS' && e.data?.order_number) {
+        paymentSuccessOrderRef.current = e.data.order_number;
+      }
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, []);
+
+  useEffect(() => {
+    const onFocus = () => restoreScroll();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, []);
 
   if (authLoading || !user) {
     return (
@@ -594,21 +619,48 @@ export default function Checkout() {
         }
       });
 
-      // 폼을 body에 추가합니다 (INIStdPay.pay 함수가 이 폼을 찾아야 하므로 지우면 안 됩니다)
       document.body.appendChild(formEl);
 
-      // 💡 해결의 핵심: INICIS JS 라이브러리를 동적으로 로드하고 실행하는 함수
-      const openInicisPay = () => {
-        window.INIStdPay.pay(formId);
-        // 팝업이 뜬 후엔 로딩 상태를 풀어주어 다른 조작이 가능하게 합니다.
-        paymentInProgressRef.current = false;
-        setSubmitting(false);
+      pendingPaymentOrderRef.current = orderNum;
+      paymentSuccessOrderRef.current = null;
+
+      let payWindow = null;
+      const originalOpen = window.open;
+      window.open = function (...args) {
+        payWindow = originalOpen.apply(this, args);
+        return payWindow;
       };
 
-      // 이미 스크립트가 로드되어 있는지 확인 후 실행
+      const openInicisPay = () => {
+        try {
+          window.INIStdPay.pay(formId);
+        } finally {
+          window.open = originalOpen;
+        }
+        paymentInProgressRef.current = false;
+        setSubmitting(false);
+
+        if (payWindow) {
+          const intervalId = setInterval(() => {
+            if (!payWindow.closed) return;
+            clearInterval(intervalId);
+            restoreScroll();
+            const pending = pendingPaymentOrderRef.current;
+            const success = paymentSuccessOrderRef.current;
+            if (pending && pending !== success) {
+              rollbackOrder(pending).catch((err) => console.error('[결제창 닫힘] 롤백 실패', err));
+            }
+            pendingPaymentOrderRef.current = null;
+            paymentSuccessOrderRef.current = null;
+          }, 300);
+        } else {
+          restoreScroll();
+        }
+      };
+
       if (!window.INIStdPay) {
         const script = document.createElement('script');
-        script.src = 'https://stdpay.inicis.com/stdjs/INIStdPay.js'; // 운영/테스트 공통 js
+        script.src = 'https://stdpay.inicis.com/stdjs/INIStdPay.js';
         script.onload = openInicisPay;
         document.body.appendChild(script);
       } else {
