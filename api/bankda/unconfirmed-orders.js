@@ -38,6 +38,22 @@ function toBankdaOrder(row) {
   };
 }
 
+/** 뱅크다 '연동 테스트' 버튼 통과용 더미 1건 (실제 입금 매칭되지 않도록 금액 1원) */
+function getDummyOrderForTest() {
+  const now = new Date();
+  const orderDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+  return {
+    order_id: 'BS-TEST-CONNECTION',
+    buyer_name: '연동테스트',
+    billing_name: '연동테스트',
+    bank_account_no: BANK_ACCOUNT_NO,
+    bank_code_name: BANK_CODE_NAME,
+    order_price_amount: 1,
+    order_date: orderDate,
+    items: [{ product_name: '뱅크다 연동 테스트용 (실제 주문 아님)' }],
+  };
+}
+
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
 
@@ -62,7 +78,12 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: error.message, code: 401 });
     }
 
-    const list = (orders || []).map(toBankdaOrder);
+    let list = (orders || []).map(toBankdaOrder);
+    // 뱅크다 연동 테스트: URL에 ?bankda_test=1 이 있으면 빈 목록일 때 더미 1건 반환 (테스트 통과용)
+    const isTestCall = req.query?.bankda_test === '1';
+    if (list.length === 0 && isTestCall) {
+      list = [getDummyOrderForTest()];
+    }
     return res.status(200).json({ orders: list });
   } catch (err) {
     console.error('[bankda unconfirmed-orders]', err);

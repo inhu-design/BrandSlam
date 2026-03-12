@@ -22,6 +22,9 @@
 | **입금 확인 처리 API URL** | `https://your-domain.com/api/bankda/confirm-deposit` |
 
 - **주의**: URL에 슬래시가 두 개 들어가면 안 됩니다. (`https://...com//api/...` ❌ → `https://...com/api/...` ✅)
+- **뱅크다 ‘연동 테스트’ 통과:** 테스트는 “미확인 주문이 1건 이상 있어야 성공”으로 동작합니다. 실제 주문이 없을 때 테스트만 통과하려면, **미확인 주문 API URL**에 쿼리만 붙여서 입력하세요.  
+  - 테스트용: `https://your-domain.com/api/bankda/unconfirmed-orders?bankda_test=1`  
+  - 테스트 성공 후 **저장**한 뒤, 실제 운영 시에는 `?bankda_test=1`을 제거한 URL로 다시 저장해 두는 것을 권장합니다.
 - 로컬 테스트 시: `https://your-vercel-app.vercel.app/api/bankda/...` 형태로 배포된 주소 사용
 - 각 입력란 옆 **테스트** 버튼으로 호출 가능 여부 확인
 
