@@ -132,7 +132,7 @@ const handleMagicLogin = async (e) => {
                             {loading ? <Loader2 className="animate-spin" /> : '로그인 링크 받기'}
                         </button>
                         <p className="text-xs text-center text-slate-400">
-                            * 처음이신가요? 링크를 받으면 자동으로 가입됩니다.
+                            * 처음이신가요? 링크를 받으면 자동으로 가입됩니다. 로그인 후 한 번만 비밀번호를 설정해두시면, 다음부터는 이메일+비밀번호로 바로 로그인할 수 있어요.
                         </p>
                     </form>
                 )}

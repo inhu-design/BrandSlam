@@ -1477,7 +1477,10 @@ export default function Dashboard() {
     if (newPassword !== newPasswordConfirm) return alert("비밀번호가 일치하지 않습니다.");
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) alert("실패: " + error.message);
-    else { alert("비밀번호가 성공적으로 변경되었습니다."); setIsPasswordMode(false); setNewPassword(''); setNewPasswordConfirm(''); }
+    else {
+      await supabase.auth.updateUser({ data: { ...(user?.user_metadata || {}), password_set: true } });
+      alert("비밀번호가 성공적으로 변경되었습니다."); setIsPasswordMode(false); setNewPassword(''); setNewPasswordConfirm('');
+    }
   };
 
   const handleSparkAdsClick = () => {
@@ -1498,6 +1501,22 @@ export default function Dashboard() {
                 <div className="absolute top-0 left-0 w-1 h-full bg-purple-500 animate-pulse"></div>
                 <AlertCircle size={20} className="text-purple-400 shrink-0" />
                 <span className="font-light tracking-tight">현재 시스템 체험을 위한 <b className="font-black text-white uppercase tracking-widest underline decoration-purple-500 underline-offset-4">Demo Mode</b>가 활성화되어 있습니다. 실제 캠페인 계약 시 실시간 데이터 피드가 전송됩니다.</span>
+            </div>
+        )}
+
+        {user && !user?.user_metadata?.password_set && (
+            <div className="mb-10 p-5 bg-white/[0.03] border border-white/10 rounded-3xl flex flex-col sm:flex-row sm:items-center gap-4 text-slate-300 text-sm animate-fade-in-down">
+                <Lock size={22} className="text-purple-400 shrink-0" />
+                <div className="flex-1">
+                    <p className="font-medium text-white">다음부터는 비밀번호로 빠르게 로그인할 수 있어요.</p>
+                    <p className="text-slate-500 text-xs mt-0.5">한 번만 설정하면, 이메일+비밀번호만으로 바로 들어올 수 있습니다.</p>
+                </div>
+                <button
+                    onClick={() => navigate('/set-password?from=/dashboard')}
+                    className="shrink-0 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl font-bold text-sm hover:shadow-[0_0_15px_rgba(147,51,234,0.4)] transition-all"
+                >
+                    비밀번호 설정하기
+                </button>
             </div>
         )}
 

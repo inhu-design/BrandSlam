@@ -91,7 +91,7 @@ function MultiDatePicker({ value = [], onChange, className = '' }) {
     return { year: d.getFullYear(), month: d.getMonth() };
   });
 
-  const year = cursor.year;
+  const year = cursor.year;''
   const month = cursor.month;
   const first = new Date(year, month, 1);
   const last = new Date(year, month + 1, 0);

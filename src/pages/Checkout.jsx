@@ -348,7 +348,7 @@ export default function Checkout() {
   const [currentStep, setCurrentStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
 
-  const hasExistingPassword = user?.identities?.some(i => i.provider === 'email') || false;
+  const hasExistingPassword = user?.user_metadata?.password_set === true;
   const [isSettingPassword, setIsSettingPassword] = useState(!hasExistingPassword);
 
   const [form, setForm] = useState({
@@ -409,9 +409,12 @@ export default function Checkout() {
     try {
       if (isSettingPassword) {
         await supabase.auth.updateUser({ password: form.password });
+        await supabase.auth.updateUser({
+          data: { ...(user?.user_metadata || {}), password_set: true },
+        });
       }
       await supabase.auth.updateUser({
-        data: { name: form.name, phone: form.phone, company: form.company },
+        data: { ...(user?.user_metadata || {}), name: form.name, phone: form.phone, company: form.company },
       });
     } catch { /* 프로필 업데이트 실패해도 주문은 진행 */ }
 
@@ -623,7 +626,7 @@ export default function Checkout() {
                   <>
                     <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 flex gap-3">
                       <AlertTriangle size={18} className="text-blue-400 flex-shrink-0 mt-0.5" />
-                      <p className="text-sm text-blue-300">비밀번호가 아직 설정되지 않았습니다. 아래에서 새 비밀번호를 설정해주세요.</p>
+                      <p className="text-sm text-blue-300">한 번만 설정해두시면, 다음 로그인부터는 이메일 + 비밀번호만으로 바로 들어올 수 있어요. 아래에서 비밀번호를 설정해주세요.</p>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                       <Input label="비밀번호 설정" required type="password" placeholder="8자 이상" value={form.password} onChange={set('password')} />

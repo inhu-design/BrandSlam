@@ -403,6 +403,9 @@ const Footer = () => {
                 <div className="flex flex-wrap gap-x-4 gap-y-1">
                   <span>이메일: contact@slam-global.com</span>
                 </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  <span>대표전화번호 : 070-8027-2323</span>
+                </div>
               </div>
 
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-xs text-gray-400 mt-2">

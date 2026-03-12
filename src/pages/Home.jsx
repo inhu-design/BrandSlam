@@ -294,7 +294,7 @@ const Hero = ({ onOpenLeadModal }) => (
       </div>
       
       <h1 className="text-5xl md:text-8xl font-black text-white tracking-tighter mb-10 leading-[1.1]">
-        미국 시딩은 <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400">브랜드슬램 </span>
+        미국 시딩은 <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400">슬램글로벌 </span>
         <span className="block mt-4 text-slate-300 text-3xl md:text-5xl font-light">직접 운영하는 글로벌 콘텐츠 시스템</span>
       </h1>
       
