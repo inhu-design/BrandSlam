@@ -10,7 +10,11 @@ export default async function handler(req, res) {
 
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
-    return res.status(405).json({ error: 'Method not allowed' });
+    return res.status(405).json({
+      return_code: 1,
+      description: 'Method not allowed',
+      orders: [],
+    });
   }
 
   if (!supabase) {
@@ -83,12 +87,14 @@ export default async function handler(req, res) {
       });
     }
 
-    // 뱅크다 스펙: return_code(숫자), description, orders 세 항목만 반환
-    return res.status(200).json({
+    // 뱅크다 스펙: return_code, description, orders 만 반환 (orders 내부: order_id, description)
+    const payload = {
       return_code: 0,
       description: '정상 처리되었습니다',
       orders: orderIds.map((order_id) => ({ order_id, description: '입금확인완료' })),
-    });
+    };
+    res.status(200).setHeader('Content-Type', 'application/json; charset=utf-8');
+    return res.end(JSON.stringify(payload));
   } catch (err) {
     console.error('[bankda confirm-deposit]', err);
     return res.status(500).json({
