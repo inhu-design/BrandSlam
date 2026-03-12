@@ -80,12 +80,54 @@
 - **메서드**: POST
 - **URL**: `/api/bankda/confirm-deposit`
 - **요청 body**: `{ "requests": [{"order_id": "BS-20260312-XXX"}, ...] }`
-- **응답 (뱅크다 스펙)**: `return_code`, `description`, `orders` 세 항목만 반환. 성공 시 예: `{ "return_code": "0", "description": "정상 처리되었습니다", "orders": [{ "order_id": "BS-...", "description": "입금확인완료" }] }`
+- **응답 (뱅크다 API 연동 가이드)**: `return_code`, `description`, `orders` 세 항목만 반환. **정상 시** `return_code: 200`, `description: "정상"`, `orders[].description: "성공"`. 예: `{ "return_code": 200, "description": "정상", "orders": [{ "order_id": "BS-...", "description": "성공" }] }`
 - **동작**: 해당 `order_id`의 주문·캠페인을 입금 확인 상태로 변경 (다음 단계 진행 가능)
 
 ---
 
-## 3. 환경 변수 (배포 시)
+## 3. 재배포 후 해야 할 일 (입금 확인 처리 API 테스트)
+
+코드 수정 후 **재배포**가 끝났다면, 아래 순서대로 진행하세요.
+
+### 1) 터미널에서 API 응답 확인 (선택)
+
+배포된 URL이 실제로 뱅크다 형식으로 응답하는지 확인합니다. **PowerShell**에서:
+
+```powershell
+Invoke-RestMethod -Uri "https://www.slam-global.com/api/bankda/confirm-deposit" -Method POST -ContentType "application/json" -Body '{"requests":[{"order_id":"BS-TEST-CONNECTION"}]}'
+```
+
+**예상 출력 예시:**
+```json
+return_code description orders
+----------- ----------- -----
+        200 정상        {@{order_id=BS-TEST-CONNECTION; description=성공}}
+```
+
+또는 **curl**이 있다면:
+
+```bash
+curl -X POST "https://www.slam-global.com/api/bankda/confirm-deposit" -H "Content-Type: application/json" -d "{\"requests\":[{\"order_id\":\"BS-TEST-CONNECTION\"}]}"
+```
+
+**예상 출력:** `{"return_code":200,"description":"정상","orders":[{"order_id":"BS-TEST-CONNECTION","description":"성공"}]}`
+
+### 2) 뱅크다 화면에서 테스트
+
+1. **뱅크다** → **설정** → **상점 연동** 이동
+2. **입금 확인 처리 API URL**이 `https://www.slam-global.com/api/bankda/confirm-deposit` 인지 확인
+3. 같은 섹션의 **요청값** 입력란에 아래 중 하나를 넣습니다.
+   - **실제 주문이 있을 때:**  
+     `{"requests":[{"order_id":"실제주문번호"}]}`  
+     (예: `{"requests":[{"order_id":"BS-20260315-A1B2C3D4"}]}`)
+   - **테스트만 할 때:**  
+     `{"requests":[{"order_id":"BS-TEST-CONNECTION"}]}`
+4. **테스트** 버튼 클릭
+5. **최종 결과**가 **성공**으로 나오면 연동 완료. **저장** 클릭 후 이용여부를 **이용중**으로 변경할 수 있습니다.
+
+---
+
+## 4. 환경 변수 (배포 시)
 
 API에서 Supabase를 사용하므로, **서버(또는 Vercel) 환경 변수**에 다음을 설정해야 합니다.
 
@@ -98,7 +140,7 @@ API에서 Supabase를 사용하므로, **서버(또는 Vercel) 환경 변수**�
 
 ---
 
-## 4. 자동 입금 확인 흐름 요약
+## 5. 자동 입금 확인 흐름 요약
 
 1. 고객이 결제(무통장) 접수 → 우리 사이트에서 주문/캠페인 생성 (status: 입금 대기)
 2. 뱅크다가 주기적으로 **미확인 주문 API**로 입금 대기 주문 목록 조회
@@ -108,7 +150,7 @@ API에서 Supabase를 사용하므로, **서버(또는 Vercel) 환경 변수**�
 
 ---
 
-## 5. 문제 해결
+## 6. 문제 해결
 
 - **테스트 실패**: URL이 `https`인지, 배포된 도메인에서 실제로 해당 경로가 열리는지, 확인
 - **401 인증 오류**: 뱅크다 API 가이드의 인증 방식(헤더 등)이 있다면 동일하게 적용했는지 확인

@@ -11,7 +11,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({
-      return_code: 1,
+      return_code: 400,
       description: 'Method not allowed',
       orders: [],
     });
@@ -19,7 +19,7 @@ export default async function handler(req, res) {
 
   if (!supabase) {
     return res.status(503).json({
-      return_code: 1,
+      return_code: 401,
       description: 'Server configuration error',
       orders: [],
     });
@@ -30,8 +30,8 @@ export default async function handler(req, res) {
     body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
   } catch {
     return res.status(400).json({
-      return_code: 1,
-      description: 'Invalid JSON body',
+      return_code: 400,
+      description: '요청 format 오류',
       orders: [],
     });
   }
@@ -39,8 +39,8 @@ export default async function handler(req, res) {
   const requests = body.requests;
   if (!Array.isArray(requests) || requests.length === 0) {
     return res.status(400).json({
-      return_code: 1,
-      description: 'requests 배열이 필요합니다.',
+      return_code: 400,
+      description: '요청 format 오류',
       orders: [],
     });
   }
@@ -52,8 +52,8 @@ export default async function handler(req, res) {
 
   if (orderIds.length === 0) {
     return res.status(400).json({
-      return_code: 1,
-      description: '유효한 order_id가 없습니다.',
+      return_code: 400,
+      description: '요청 format 오류',
       orders: [],
     });
   }
@@ -66,10 +66,10 @@ export default async function handler(req, res) {
 
     if (ordersError) {
       console.error('[bankda confirm-deposit] orders update', ordersError);
-      return res.status(500).json({
-        return_code: 1,
-        description: ordersError.message || '주문 상태 업데이트 실패',
-        orders: [],
+      return res.status(200).json({
+        return_code: 415,
+        description: 'order id 오류',
+        orders: orderIds.map((order_id) => ({ order_id, description: '주문 상태 업데이트 실패' })),
       });
     }
 
@@ -80,25 +80,25 @@ export default async function handler(req, res) {
 
     if (campaignsError) {
       console.error('[bankda confirm-deposit] campaigns update', campaignsError);
-      return res.status(500).json({
-        return_code: 1,
-        description: campaignsError.message || '캠페인 상태 업데이트 실패',
-        orders: [],
+      return res.status(200).json({
+        return_code: 415,
+        description: 'order id 오류',
+        orders: orderIds.map((order_id) => ({ order_id, description: '캠페인 상태 업데이트 실패' })),
       });
     }
 
-    // 뱅크다 스펙: return_code, description, orders 만 반환 (orders 내부: order_id, description)
+    // 뱅크다 API 연동 가이드: 정상 시 return_code 200, description "정상", orders[].description "성공"
     const payload = {
-      return_code: 0,
-      description: '정상 처리되었습니다',
-      orders: orderIds.map((order_id) => ({ order_id, description: '입금확인완료' })),
+      return_code: 200,
+      description: '정상',
+      orders: orderIds.map((order_id) => ({ order_id, description: '성공' })),
     };
     res.status(200).setHeader('Content-Type', 'application/json; charset=utf-8');
     return res.end(JSON.stringify(payload));
   } catch (err) {
     console.error('[bankda confirm-deposit]', err);
-    return res.status(500).json({
-      return_code: 1,
+    return res.status(200).json({
+      return_code: 400,
       description: String(err.message),
       orders: [],
     });
