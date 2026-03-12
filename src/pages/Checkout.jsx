@@ -11,6 +11,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
 const PLANS = {
+  TestPayment: { id: 'TestPayment', name: '결제 테스트 (1,000원)', price: '1,000', priceNum: 1000, count: 1, desc: 'KG이니시스 결제 연동 테스트용', isTest: true },
   Starter: { id: 'Starter', name: 'Starter', price: '590,000', priceNum: 590000, count: 10, desc: '콘텐츠 10개 보장' },
   Growth: { id: 'Growth', name: 'Growth', price: '990,000', priceNum: 990000, count: 20, desc: '콘텐츠 20개 보장', isBest: true },
   Scale50: { id: 'Scale50', name: 'Scale50', price: '2,390,000', priceNum: 2390000, count: 50, desc: '콘텐츠 50개 보장' },
@@ -288,6 +289,11 @@ const PlanCard = ({ plan, selected, onClick, showChange, onChangeClick }) => (
     {plan.isBest && (
       <span className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-3 py-1.5 rounded-full text-[10px] font-black tracking-widest shadow-lg shadow-purple-500/30">
         MOST POPULAR
+      </span>
+    )}
+    {plan.isTest && (
+      <span className="absolute -top-4 left-1/2 -translate-x-1/2 bg-amber-500 text-slate-900 px-3 py-1.5 rounded-full text-[10px] font-black tracking-widest shadow-lg">
+        결제 테스트용
       </span>
     )}
     <h3 className="text-xl font-black text-white mb-2 tracking-tight">{plan.name}</h3>
