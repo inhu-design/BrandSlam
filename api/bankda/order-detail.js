@@ -38,6 +38,22 @@ function toBankdaOrder(row) {
   };
 }
 
+/** 뱅크다 연동 테스트용 더미 주문 (미확인 주문 API 테스트 시 반환한 것과 동일) */
+function getDummyOrderForTest() {
+  const now = new Date();
+  const orderDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+  return {
+    order_id: 'BS-TEST-CONNECTION',
+    buyer_name: '연동테스트',
+    billing_name: '연동테스트',
+    bank_account_no: BANK_ACCOUNT_NO,
+    bank_code_name: BANK_CODE_NAME,
+    order_price_amount: 1,
+    order_date: orderDate,
+    items: [{ product_name: '뱅크다 연동 테스트용 (실제 주문 아님)' }],
+  };
+}
+
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
 
@@ -62,11 +78,17 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'order_id is required', code: 401 });
   }
 
+  const trimmedId = orderId.trim();
+  // 뱅크다 연동 테스트: 미확인 주문 테스트에서 쓰는 더미 주문번호면 더미 응답 반환
+  if (trimmedId === 'BS-TEST-CONNECTION') {
+    return res.status(200).json(getDummyOrderForTest());
+  }
+
   try {
     const { data: order, error } = await supabase
       .from('orders')
       .select('*')
-      .eq('order_number', orderId.trim())
+      .eq('order_number', trimmedId)
       .maybeSingle();
 
     if (error) {
