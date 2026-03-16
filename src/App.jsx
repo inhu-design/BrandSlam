@@ -1,27 +1,8 @@
-import React, { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 
 import { AuthProvider } from './contexts/AuthProvider';
-
-/** 결제창 닫기 후 메인 이동 시 스크롤 락 해제를 위한 새로고침 */
-function PaymentCancelRefresh() {
-  const location = useLocation();
-  useEffect(() => {
-    const pc = new URLSearchParams(location.search).get('pc');
-    if (pc !== '1') return;
-    const key = 'pc_refresh';
-    const count = parseInt(sessionStorage.getItem(key) || '0', 10);
-    if (count < 3) {
-      sessionStorage.setItem(key, String(count + 1));
-      setTimeout(() => window.location.reload(), 300);
-    } else {
-      sessionStorage.removeItem(key);
-      window.history.replaceState({}, '', '/');
-    }
-  }, [location.search]);
-  return null;
-}
 
 // --- Pages Import ---
 import Home from './pages/Home';
@@ -40,7 +21,6 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <PaymentCancelRefresh />
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />    

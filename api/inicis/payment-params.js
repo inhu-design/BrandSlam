@@ -61,8 +61,7 @@ export default async function handler(req, res) {
 
   const base = (process.env.INICIS_RETURN_BASE_URL || 'https://www.slam-global.com').replace(/\/$/, '');
   const returnUrl = `${base}/api/inicis/payment-callback`;
-  // 결제창 닫기 시 메인으로 이동 후 새로고침 3회 (스크롤 락·폼 초기화 방지)
-  const closeUrl = `${base}/?pc=1`;
+  const closeUrl = `${base}/checkout`;
 
   // 테스트: stgstdpay.inicis.com / 운영: stdpay.inicis.com (기본)
   const paymentUrl = (process.env.INICIS_PAYMENT_URL || 'https://stdpay.inicis.com/stdpay/INIStdPay.php').replace(/\/$/, '');

@@ -1,0 +1,76 @@
+/**
+ * 계좌이체 결제 완료 확인
+ * - POST /api/checkout/confirm-bank-transfer
+ * - Body: { order_number } + Authorization: Bearer <Supabase JWT>
+ * - 주문 이메일과 로그인 사용자 이메일 일치 시 orders/campaigns를 paid/KICKOFF로 갱신
+ */
+import { createClient } from '@supabase/supabase-js';
+import { supabase as supabaseAdmin } from '../lib/supabase-server.js';
+
+const supabaseUrl = process.env.SUPABASE_URL || 'https://grlayjybcxrcaufnwysb.supabase.co';
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdybGF5anliY3hyY2F1Zm53eXNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUzNDM4NzksImV4cCI6MjA4MDkxOTg3OX0.Voj60xKccEl2_r8EzLVO-fot5WiEiUHb6UTfya2ql8Q';
+
+export default async function handler(req, res) {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.replace(/^Bearer\s+/i, '');
+  if (!token) {
+    return res.status(401).json({ error: '로그인이 필요합니다.' });
+  }
+
+  const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey);
+  const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
+  if (authError || !user) {
+    return res.status(401).json({ error: '로그인 세션이 만료되었습니다.' });
+  }
+
+  let body;
+  try {
+    body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+  } catch {
+    return res.status(400).json({ error: 'Invalid JSON' });
+  }
+
+  const orderNumber = (body.order_number || '').toString().trim();
+  if (!orderNumber || !orderNumber.startsWith('BS-')) {
+    return res.status(400).json({ error: 'order_number가 필요합니다.' });
+  }
+
+  if (!supabaseAdmin) {
+    return res.status(503).json({ error: '서버 설정 오류' });
+  }
+
+  const { data: order, error: orderError } = await supabaseAdmin
+    .from('orders')
+    .select('id, email, status')
+    .eq('order_number', orderNumber)
+    .single();
+
+  if (orderError || !order) {
+    return res.status(404).json({ error: '주문을 찾을 수 없습니다.' });
+  }
+
+  if (order.status === 'paid') {
+    return res.status(200).json({ ok: true, order_number: orderNumber });
+  }
+
+  const orderEmail = (order.email || '').toLowerCase().trim();
+  const userEmail = (user.email || '').toLowerCase().trim();
+  if (orderEmail !== userEmail) {
+    return res.status(403).json({ error: '본인 주문만 결제 완료 처리할 수 있습니다.' });
+  }
+
+  try {
+    await supabaseAdmin.from('orders').update({ status: 'paid' }).eq('order_number', orderNumber);
+    await supabaseAdmin.from('campaigns').update({ status: 'KICKOFF' }).eq('order_number', orderNumber);
+    return res.status(200).json({ ok: true, order_number: orderNumber });
+  } catch (err) {
+    console.error('[confirm-bank-transfer]', err);
+    return res.status(500).json({ error: String(err.message) });
+  }
+}

@@ -354,10 +354,9 @@ export default function Checkout() {
   const [orderNumber, setOrderNumber] = useState('');
   const [legalModal, setLegalModal] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('bank'); // 'bank' | 'card'
+  const [bankOrderNumber, setBankOrderNumber] = useState(null); // 계좌이체 시 주문 생성 후 표시
   const [verifyingPassword, setVerifyingPassword] = useState(false);
   const paymentInProgressRef = useRef(false);
-  const pendingPaymentOrderRef = useRef(null);
-  const paymentSuccessOrderRef = useRef(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -371,86 +370,15 @@ export default function Checkout() {
   useEffect(() => { window.scrollTo(0, 0); }, []);
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'smooth' }); }, [currentStep]);
 
-  const restoreScroll = () => {
-    [document.body, document.documentElement].forEach((el) => {
-      el.style.removeProperty('overflow');
-      el.style.removeProperty('position');
-      el.style.removeProperty('width');
-      el.style.removeProperty('height');
-      el.style.setProperty('overflow', 'auto', 'important');
-    });
-    document.body.classList.remove('modal-open', 'overflow-hidden');
-    document.documentElement.classList.remove('modal-open', 'overflow-hidden');
-  };
-
   useEffect(() => {
     const onMessage = (e) => {
       if (e.data?.type === 'INICIS_PAYMENT_SUCCESS' && e.data?.order_number) {
-        paymentSuccessOrderRef.current = e.data.order_number;
+        setOrderNumber(e.data.order_number);
+        setCurrentStep(4);
       }
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-  }, []);
-
-  const focusRollbackTimerRef = useRef(null);
-  const scheduleRollbackIfAbandonedRef = useRef(null);
-  const scheduleRollbackIfAbandoned = () => {
-    const pending = pendingPaymentOrderRef.current;
-    if (!pending || paymentSuccessOrderRef.current === pending) return;
-    if (focusRollbackTimerRef.current) clearTimeout(focusRollbackTimerRef.current);
-    focusRollbackTimerRef.current = setTimeout(() => {
-      focusRollbackTimerRef.current = null;
-      const stillPending = pendingPaymentOrderRef.current;
-      const success = paymentSuccessOrderRef.current;
-      if (stillPending && success !== stillPending) {
-        rollbackOrder(stillPending).catch((err) => console.error('[결제 취소] 롤백 실패', err));
-        pendingPaymentOrderRef.current = null;
-        paymentSuccessOrderRef.current = null;
-      }
-    }, 500);
-  };
-  scheduleRollbackIfAbandonedRef.current = scheduleRollbackIfAbandoned;
-  useEffect(() => {
-    let scrollFixInterval = null;
-    const runScrollFix = () => {
-      restoreScroll();
-      scheduleRollbackIfAbandonedRef.current?.();
-      if (scrollFixInterval) clearInterval(scrollFixInterval);
-      scrollFixInterval = setInterval(restoreScroll, 150);
-      setTimeout(() => {
-        if (scrollFixInterval) clearInterval(scrollFixInterval);
-        scrollFixInterval = null;
-      }, 4000);
-    };
-    const onFocus = runScrollFix;
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') runScrollFix();
-    };
-    const onPageHide = () => {
-      restoreScroll();
-      const pending = pendingPaymentOrderRef.current;
-      const success = paymentSuccessOrderRef.current;
-      if (pending && success !== pending) {
-        const url = `${window.location.origin}/api/checkout/rollback-order`;
-        fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ order_number: pending }),
-          keepalive: true,
-        }).catch(() => {});
-      }
-    };
-    window.addEventListener('focus', onFocus);
-    document.addEventListener('visibilitychange', onVisibility);
-    window.addEventListener('pagehide', onPageHide);
-    return () => {
-      window.removeEventListener('focus', onFocus);
-      document.removeEventListener('visibilitychange', onVisibility);
-      window.removeEventListener('pagehide', onPageHide);
-      if (focusRollbackTimerRef.current) clearTimeout(focusRollbackTimerRef.current);
-      if (scrollFixInterval) clearInterval(scrollFixInterval);
-    };
   }, []);
 
   if (authLoading || !user) {
@@ -617,9 +545,6 @@ export default function Checkout() {
 
       document.body.appendChild(formEl);
 
-      pendingPaymentOrderRef.current = orderNum;
-      paymentSuccessOrderRef.current = null;
-
       let payWindow = null;
       const originalOpen = window.open;
       window.open = function (...args) {
@@ -631,27 +556,7 @@ export default function Checkout() {
         window.INIStdPay.pay(formId);
         paymentInProgressRef.current = false;
         setSubmitting(false);
-
-        setTimeout(() => {
-          window.open = originalOpen;
-          if (payWindow) {
-            const intervalId = setInterval(() => {
-              if (!payWindow.closed) return;
-              clearInterval(intervalId);
-              const pending = pendingPaymentOrderRef.current;
-              const success = paymentSuccessOrderRef.current;
-              if (pending && pending !== success) {
-                rollbackOrder(pending).catch((err) => console.error('[결제창 닫힘] 롤백 실패', err));
-                pendingPaymentOrderRef.current = null;
-                paymentSuccessOrderRef.current = null;
-              }
-              // 스크롤 락·폼 초기화 방지: 메인으로 이동 후 새로고침
-              window.location.replace('/?pc=1');
-            }, 300);
-          } else {
-            restoreScroll();
-          }
-        }, 5000);
+        setTimeout(() => { window.open = originalOpen; }, 5000);
       };
 
       if (!window.INIStdPay) {
@@ -673,7 +578,87 @@ export default function Checkout() {
   };
 
   const handleCardPayment = () => handleInicisPayment('card');
-  const handleBankPayment = () => handleInicisPayment('bank');
+
+  const handleBankPayment = async () => {
+    if (paymentInProgressRef.current || !plan) return;
+    paymentInProgressRef.current = true;
+    setSubmitting(true);
+    const now = new Date();
+    const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    const orderNum = `BS-${datePart}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+    try {
+      if (isSettingPassword) {
+        await supabase.auth.updateUser({ password: form.password });
+        await supabase.auth.updateUser({ data: { ...(user?.user_metadata || {}), password_set: true } });
+      }
+      await supabase.auth.updateUser({
+        data: { ...(user?.user_metadata || {}), name: form.name, phone: form.phone, company: form.company },
+      });
+      await supabase.from('orders').insert([{
+        order_number: orderNum,
+        plan_name: plan.name,
+        plan_price: totalPrice,
+        content_count: plan.count,
+        email: form.email,
+        name: form.name,
+        phone: form.phone,
+        company: form.company,
+        status: 'pending_payment',
+      }]);
+      await supabase.from('campaigns').insert([{
+        user_id: user.id,
+        order_number: orderNum,
+        plan: plan.name,
+        status: 'PAYMENT_PENDING',
+        brand_name: form.company,
+        product_name: plan.name,
+        target_creators: plan.count || 0,
+        matched_creators: 0,
+        plan_price: totalPrice,
+        content_count: plan.count || 0,
+        customer_name: form.name,
+        customer_email: form.email,
+        customer_phone: form.phone,
+      }]);
+      setOrderNumber(orderNum);
+      setBankOrderNumber(orderNum);
+    } catch (e) {
+      console.error(e);
+      alert('주문 생성에 실패했습니다. 다시 시도해 주세요.');
+    } finally {
+      paymentInProgressRef.current = false;
+      setSubmitting(false);
+    }
+  };
+
+  const handleConfirmBankTransfer = async () => {
+    if (!bankOrderNumber || submitting) return;
+    setSubmitting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) {
+        alert('로그인 세션이 없습니다. 다시 로그인해 주세요.');
+        return;
+      }
+      const res = await fetch(`${window.location.origin}/api/checkout/confirm-bank-transfer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ order_number: bankOrderNumber }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || '결제 완료 처리에 실패했습니다.');
+        return;
+      }
+      setCurrentStep(4);
+    } catch (e) {
+      console.error(e);
+      alert('결제 완료 처리 중 오류가 발생했습니다.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const adminEmails = (import.meta.env.VITE_ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
   const isAdmin = adminEmails.length > 0 && user?.email && adminEmails.includes(user.email.toLowerCase());
@@ -1091,7 +1076,7 @@ export default function Checkout() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPaymentMethod('card')}
+                  onClick={() => { setPaymentMethod('card'); setBankOrderNumber(null); }}
                   className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl font-bold border-2 transition-all ${
                     paymentMethod === 'card'
                       ? 'bg-purple-500/20 border-purple-500 text-purple-300'
@@ -1102,9 +1087,22 @@ export default function Checkout() {
                 </button>
               </div>
 
-              {paymentMethod === 'bank' && (
+              {paymentMethod === 'bank' && !bankOrderNumber && (
                 <div className="bg-white/[0.04] rounded-2xl p-5 mb-8 border border-white/10">
-                  <p className="text-sm text-slate-400">실시간 계좌이체로 결제합니다. 아래 버튼을 누르면 KG이니시스 결제창이 열리고, 본인 은행을 선택한 뒤 인증을 진행하면 결제 금액이 즉시 이체됩니다. (SC제일은행 법인계좌로 입금됩니다)</p>
+                  <p className="text-sm text-slate-400">아래 버튼을 누르면 입금할 법인계좌 정보가 표시됩니다. 입금 후 결제 완료 버튼을 눌러 주세요.</p>
+                </div>
+              )}
+              {paymentMethod === 'bank' && bankOrderNumber && (
+                <div className="bg-white/[0.04] rounded-2xl p-6 mb-8 border border-white/10 space-y-4">
+                  <p className="text-sm text-slate-400">아래 계좌로 결제 금액을 입금해 주신 뒤, 입금이 완료되면 <strong className="text-white">결제 완료</strong> 버튼을 눌러 주세요.</p>
+                  <div className="p-5 bg-slate-900/50 rounded-xl border border-white/10">
+                    <p className="text-xs text-slate-500 mb-2 font-bold uppercase tracking-wider">입금 계좌</p>
+                    <p className="font-bold text-lg text-white flex items-center gap-2">
+                      <span className="text-yellow-400">SC제일은행</span> 325-20-322490
+                    </p>
+                    <p className="text-sm text-slate-400 mt-1">예금주: 주식회사 브랜드슬램</p>
+                    <p className="text-sm text-purple-400 font-bold mt-3">{totalPrice.toLocaleString()}원</p>
+                  </div>
                 </div>
               )}
 
@@ -1130,13 +1128,23 @@ export default function Checkout() {
                   <ArrowLeft size={18} /> 이전
                 </button>
                 {paymentMethod === 'bank' ? (
-                  <button
-                    onClick={handleBankPayment}
-                    disabled={submitting}
-                    className="flex-1 py-4 rounded-2xl font-bold text-lg bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:-translate-y-0.5 shadow-lg shadow-purple-500/20 transition-all disabled:opacity-50"
-                  >
-                    {submitting ? '결제창 열기 중...' : '계좌이체 결제하기'}
-                  </button>
+                  bankOrderNumber ? (
+                    <button
+                      onClick={handleConfirmBankTransfer}
+                      disabled={submitting}
+                      className="flex-1 py-4 rounded-2xl font-bold text-lg bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:-translate-y-0.5 shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-50"
+                    >
+                      {submitting ? '처리 중...' : '결제 완료'}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleBankPayment}
+                      disabled={submitting}
+                      className="flex-1 py-4 rounded-2xl font-bold text-lg bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:-translate-y-0.5 shadow-lg shadow-purple-500/20 transition-all disabled:opacity-50"
+                    >
+                      {submitting ? '처리 중...' : '계좌이체 안내보기'}
+                    </button>
+                  )
                 ) : (
                   <button
                     onClick={handleCardPayment}
