@@ -1,7 +1,7 @@
 /**
  * KG이니시스 결제 결과 수신 (returnUrl)
  * - 이니시스가 결제 완료 후 이 URL로 POST
- * - resultCode "00" 또는 "0000" 등 성공 시 orders/campaigns 상태를 paid·KICKOFF로 갱신 후 리다이렉트
+ * - resultCode "00" 또는 "0000" 등 성공 시 orders만 paid로 갱신 (campaigns는 PAYMENT_PENDING 유지 → 송장·캠페인 세팅 후 착수)
  */
 import { supabase } from '../lib/supabase-server.js';
 
@@ -34,11 +34,10 @@ export default async function handler(req, res) {
   const successCodes = ['00', '0000', '0', '000'];
   const isSuccess = successCodes.includes(resultCode);
 
-  // 카드·실시간 계좌이체 모두 즉시 완료 → paid/KICKOFF 갱신
+  // 결제 완료 시 orders만 paid로 갱신. campaigns는 PAYMENT_PENDING 유지 → 대시보드에서 송장·캠페인 세팅 후 착수(KICKOFF)
   if (isSuccess && orderId && supabase) {
     try {
       await supabase.from('orders').update({ status: 'paid' }).eq('order_number', orderId);
-      await supabase.from('campaigns').update({ status: 'KICKOFF' }).eq('order_number', orderId);
     } catch (err) {
       console.error('[inicis payment-callback]', err);
     }

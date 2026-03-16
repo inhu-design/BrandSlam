@@ -2,7 +2,7 @@
  * 계좌이체 결제 완료 확인
  * - POST /api/checkout/confirm-bank-transfer
  * - Body: { order_number } + Authorization: Bearer <Supabase JWT>
- * - 주문 이메일과 로그인 사용자 이메일 일치 시 orders/campaigns를 paid/KICKOFF로 갱신
+ * - 주문 이메일과 로그인 사용자 이메일 일치 시 orders만 paid로 갱신 (campaigns는 PAYMENT_PENDING 유지 → 송장·캠페인 세팅 후 착수)
  */
 import { createClient } from '@supabase/supabase-js';
 import { supabase as supabaseAdmin } from '../lib/supabase-server.js';
@@ -67,7 +67,6 @@ export default async function handler(req, res) {
 
   try {
     await supabaseAdmin.from('orders').update({ status: 'paid' }).eq('order_number', orderNumber);
-    await supabaseAdmin.from('campaigns').update({ status: 'KICKOFF' }).eq('order_number', orderNumber);
     return res.status(200).json({ ok: true, order_number: orderNumber });
   } catch (err) {
     console.error('[confirm-bank-transfer]', err);

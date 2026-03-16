@@ -7,8 +7,8 @@
 ## 현재 사이트 상태
 
 - **결제 흐름**: Checkout에서 주문 제출 시 `orders`(status: `pending_payment`), `campaigns`(status: `PAYMENT_PENDING`) 생성
-- **카드 결제**: 결제 완료 시 `payment-callback`에서 `paid`/`KICKOFF`로 갱신 → 대시보드 착수 화면
-- **실시간 계좌이체**: 결제 완료 시 `payment-callback`에서 `paid`/`KICKOFF`로 갱신 → 대시보드 착수 화면 (카드와 동일)
+- **카드 결제**: 결제 완료 시 `payment-callback`에서 `orders`만 `paid`로 갱신 → 대시보드 송장·캠페인 세팅 → 세팅 완료 시 착수
+- **계좌이체**: 결제 완료 시 `confirm-bank-transfer`에서 `orders`만 `paid`로 갱신 → 대시보드 송장·캠페인 세팅 → 세팅 완료 시 착수
 
 ---
 
@@ -18,29 +18,28 @@
 
 | 방식 | 특징 | 처리 흐름 |
 |------|------|---------------------------|
-| **카드 결제** | 결제 시점에 즉시 승인 | payment-callback → paid/KICKOFF |
-| **실시간 계좌이체** | 결제창에서 은행 선택 후 즉시 이체 | payment-callback → paid/KICKOFF |
+| **카드 결제** | 결제 시점에 즉시 승인 | payment-callback → orders paid (campaigns PAYMENT_PENDING 유지) |
+| **계좌이체** | 법인계좌 입금 후 결제 완료 버튼 | confirm-bank-transfer → orders paid (campaigns PAYMENT_PENDING 유지) |
 
-### 법인계좌 연동
+### 법인계좌 (계좌이체)
 
-실시간 계좌이체 시 **KG 이니시스 가맹점 계약**에 등록된 법인계좌(SC제일은행 325-20-322490)로 입금됩니다.  
-가맹점관리자에서 정산 계좌가 설정되어 있으면 별도 코드 연동 없이 자동 처리됩니다.
+계좌이체 선택 시 법인계좌(SC제일은행 325-20-322490) 정보가 표시됩니다. 고객이 직접 입금 후 결제 완료 버튼을 누릅니다.
 
 ### API 엔드포인트
 
 | API | 용도 |
 |-----|------|
 | `/api/inicis/payment-params` | 결제창 호출용 파라미터 생성 |
-| `/api/inicis/payment-callback` | 결제 결과 수신 (returnUrl). 카드·계좌이체 성공 시 paid/KICKOFF |
+| `/api/inicis/payment-callback` | 결제 결과 수신 (returnUrl). 카드 성공 시 orders만 paid |
+| `/api/checkout/confirm-bank-transfer` | 계좌이체 결제 완료. orders만 paid |
 
 ---
 
 ## DB 반영
 
-- 결제 확인 시:
-  - `orders.status` → `paid`
-  - 해당 `campaigns.status` → `KICKOFF`
-- 대시보드: `PAYMENT_PENDING` → 송장 발급/캠페인 세팅, `KICKOFF` → 착수 화면
+- 결제 확인 시: `orders.status` → `paid` (campaigns는 PAYMENT_PENDING 유지)
+- 캠페인 세팅 완료 시: `campaigns.status` → `KICKOFF` (CampaignSetup에서 처리)
+- 대시보드: `PAYMENT_PENDING` → 송장 발급·캠페인 세팅, `KICKOFF` → 착수 화면
 
 ---
 

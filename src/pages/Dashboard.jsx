@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -11,6 +11,7 @@ import {
 import Navbar from '../components/layout/Navbar'; 
 import Footer from '../components/layout/Footer';
 import sealImg from '../assets/seal.jpg';
+import testInfluencers from '../data/test-influencers.json';
 /**
  * [Logic 보존] Campaign Status Enum & Helper Functions
  */
@@ -640,12 +641,23 @@ const InvoiceDetail = ({ campaign }) => {
     );
 };
 
-// --- Detail Component: Candidate List (섭외 중) ---
-const CandidateList = ({ candidates, targetCount, matchedCount }) => {
+// --- Detail Component: Candidate List (섭외 중 / 납품) ---
+const CandidateList = ({ candidates, targetCount, matchedCount, isDeliveryTest }) => {
     const progress = Math.min(Math.round((matchedCount / targetCount) * 100), 100);
 
     const handleDownloadCSV = () => {
-        alert("납품 리스트가 아직 확정되지 않았습니다. 인플루언서 섭외가 완료되고 확정된 후에 다운로드 가능합니다.");
+        if (isDeliveryTest) {
+            const headers = ['name', 'handle', 'platform', 'followers', 'location', 'contact'];
+            const csv = [headers.join(','), ...(candidates || []).map((c) => headers.map((h) => `"${String(c[h] || '').replace(/"/g, '""')}"`).join(','))].join('\n');
+            const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'BS-US-FARMSKIN-납품리스트.csv';
+            a.click();
+            URL.revokeObjectURL(a.href);
+        } else {
+            alert("납품 리스트가 아직 확정되지 않았습니다. 인플루언서 섭외가 완료되고 확정된 후에 다운로드 가능합니다.");
+        }
     };
 
     const handleDeleteCreator = (e, creatorName) => {
@@ -661,8 +673,8 @@ const CandidateList = ({ candidates, targetCount, matchedCount }) => {
                 <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/5 blur-[100px] rounded-full"></div>
                 <div className="flex justify-between items-end mb-6 relative z-10">
                     <div>
-                        <h4 className="font-black text-white text-2xl tracking-tighter">섭외 진행 현황</h4>
-                        <p className="text-sm text-slate-500 mt-2 font-light tracking-tight">목표 인원 달성 시 자동으로 제품 배송 단계로 전환됩니다.</p>
+                        <h4 className="font-black text-white text-2xl tracking-tighter">{isDeliveryTest ? '납품 리스트' : '섭외 진행 현황'}</h4>
+                        <p className="text-sm text-slate-500 mt-2 font-light tracking-tight">{isDeliveryTest ? '인플루언서 리스트 (테스트 데이터)' : '목표 인원 달성 시 자동으로 제품 배송 단계로 전환됩니다.'}</p>
                     </div>
                     <div className="text-right">
                         <span className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400 tracking-tighter">{progress}%</span>
@@ -682,7 +694,7 @@ const CandidateList = ({ candidates, targetCount, matchedCount }) => {
             <div className="bg-white/5 backdrop-blur-md rounded-[2.5rem] border border-white/10 overflow-hidden shadow-2xl">
                 <div className="px-8 py-6 border-b border-white/5 flex justify-between items-center bg-white/5">
                     <h3 className="font-black text-white flex items-center gap-3 tracking-tighter">
-                        <UserCheck size={20} className="text-cyan-400"/> 리스트 (Real-time)
+                        <UserCheck size={20} className="text-cyan-400"/> {isDeliveryTest ? '인플루언서 리스트 (50명)' : '리스트 (Real-time)'}
                     </h3>
                     <button 
                         onClick={handleDownloadCSV}
@@ -1397,11 +1409,22 @@ const CampaignDetail = ({ campaign, isDemoMode }) => {
   }
 
   if (campaign.status === CampaignStatus.CONTACTING) {
+      const candidates = campaign.candidates || (campaign.creators || []).map((c, i) => ({
+        id: c.id || i + 1,
+        name: c.name || c.handle || '-',
+        handle: c.handle || c.name || '-',
+        platform: c.platform || 'SNS',
+        followers: String(c.followers || c.follower_count || '0'),
+        location: c.location || '-',
+        status: c.status || 'Pending Review',
+        contact: c.contact || c.email || '-',
+      }));
       return (
           <CandidateList 
-            candidates={campaign.candidates} 
+            candidates={candidates} 
             targetCount={campaign.target_creators || 50} 
-            matchedCount={campaign.matched_creators || 0} 
+            matchedCount={campaign.matched_creators || 0}
+            isDeliveryTest={campaign.id === 'admin-delivery-test'}
           />
       );
   }
@@ -1440,6 +1463,8 @@ export default function Dashboard() {
   const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
   const [isPasswordMode, setIsPasswordMode] = useState(false);
 
+  const adminEmails = useMemo(() => (import.meta.env.VITE_ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean), []);
+
   useEffect(() => {
     const fetchData = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -1452,12 +1477,32 @@ export default function Dashboard() {
           .eq('user_id', user.id)
           .order('created_at', { ascending: false });
 
-        if (data && data.length > 0) {
-          setCampaigns(data);
-          setSelectedCampaignId(data[0].id);
+        let campaignList = data || [];
+        const isAdminUser = adminEmails.length > 0 && user?.email && adminEmails.includes(user.email.toLowerCase());
+        if (isAdminUser) {
+          const deliveryTestCampaign = {
+            id: 'admin-delivery-test',
+            order_number: 'BS-DELIVERY-TEST',
+            plan: 'Scale50',
+            status: CampaignStatus.CONTACTING,
+            brand_name: '납품 테스트 (관리자 전용)',
+            product_name: 'BS-US-FARMSKIN',
+            target_creators: 50,
+            matched_creators: 50,
+            candidates: testInfluencers,
+            plan_price: 2390000,
+            content_count: 50,
+            customer_name: '-',
+            customer_email: user.email,
+          };
+          campaignList = [deliveryTestCampaign, ...campaignList];
+        }
+
+        if (campaignList.length > 0) {
+          setCampaigns(campaignList);
+          setSelectedCampaignId(campaignList[0].id);
           setIsDemoMode(false);
         } else {
-          // [수정됨] 로그인 유저이나 캠페인이 없는 경우: Empty State 처리를 위한 상태 세팅
           setCampaigns([]);
           setSelectedCampaignId(null);
           setIsDemoMode(false); 
@@ -1481,7 +1526,7 @@ export default function Dashboard() {
     };
 
     fetchData();
-  }, [navigate]);
+  }, [navigate, adminEmails]);
   const handlePasswordUpdate = async () => {
     if (newPassword.length < 8) return alert("비밀번호는 8자 이상이어야 합니다.");
     if (newPassword !== newPasswordConfirm) return alert("비밀번호가 일치하지 않습니다.");
@@ -1511,6 +1556,13 @@ export default function Dashboard() {
                 <div className="absolute top-0 left-0 w-1 h-full bg-purple-500 animate-pulse"></div>
                 <AlertCircle size={20} className="text-purple-400 shrink-0" />
                 <span className="font-light tracking-tight">현재 시스템 체험을 위한 <b className="font-black text-white uppercase tracking-widest underline decoration-purple-500 underline-offset-4">Demo Mode</b>가 활성화되어 있습니다. 실제 캠페인 계약 시 실시간 데이터 피드가 전송됩니다.</span>
+            </div>
+        )}
+
+        {user && adminEmails.includes(user.email?.toLowerCase()) && selectedCampaignId === 'admin-delivery-test' && (
+            <div className="mb-10 p-5 bg-amber-500/10 border border-amber-500/30 rounded-3xl flex items-center gap-4 text-amber-200 text-sm animate-fade-in-down">
+                <AlertCircle size={20} className="text-amber-400 shrink-0" />
+                <span className="font-light tracking-tight"><b className="font-black text-amber-400 uppercase tracking-widest">납품 테스트</b> — BS-US-FARMSKIN 엑셀에서 추출한 50명 인플루언서 데이터입니다. 고객 노출 전 관리자 전용 미리보기입니다.</span>
             </div>
         )}
 
