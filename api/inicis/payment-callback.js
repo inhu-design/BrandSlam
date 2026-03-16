@@ -31,10 +31,10 @@ export default async function handler(req, res) {
   const body = req.method === 'GET' ? (req.query || {}) : parseBody(req);
   const resultCode = (body.resultCode || body.resultcode || body.RESULT_CODE || body.result_code || '').toString().trim();
   const orderId = (body.MOID || body.moid || body.orderNumber || body.oid || body.order_number || body.OID || '').toString().trim();
-
   const successCodes = ['00', '0000', '0', '000'];
   const isSuccess = successCodes.includes(resultCode);
 
+  // 카드·실시간 계좌이체 모두 즉시 완료 → paid/KICKOFF 갱신
   if (isSuccess && orderId && supabase) {
     try {
       await supabase.from('orders').update({ status: 'paid' }).eq('order_number', orderId);

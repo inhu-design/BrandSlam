@@ -412,15 +412,20 @@ export default function Checkout() {
   };
   scheduleRollbackIfAbandonedRef.current = scheduleRollbackIfAbandoned;
   useEffect(() => {
-    const onFocus = () => {
+    let scrollFixInterval = null;
+    const runScrollFix = () => {
       restoreScroll();
       scheduleRollbackIfAbandonedRef.current?.();
+      if (scrollFixInterval) clearInterval(scrollFixInterval);
+      scrollFixInterval = setInterval(restoreScroll, 150);
+      setTimeout(() => {
+        if (scrollFixInterval) clearInterval(scrollFixInterval);
+        scrollFixInterval = null;
+      }, 4000);
     };
+    const onFocus = runScrollFix;
     const onVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        restoreScroll();
-        scheduleRollbackIfAbandonedRef.current?.();
-      }
+      if (document.visibilityState === 'visible') runScrollFix();
     };
     const onPageHide = () => {
       restoreScroll();
@@ -444,6 +449,7 @@ export default function Checkout() {
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('pagehide', onPageHide);
       if (focusRollbackTimerRef.current) clearTimeout(focusRollbackTimerRef.current);
+      if (scrollFixInterval) clearInterval(scrollFixInterval);
     };
   }, []);
 
@@ -538,7 +544,7 @@ export default function Checkout() {
       const isLocal = /localhost|127\.0\.0\.1/.test(window.location.origin);
       const msg = isLocal
         ? '로컬에서는 결제 API가 없어 결제창을 열 수 없습니다. 터미널에서 "vercel dev"로 실행하거나, 배포된 사이트에서 결제를 시도해 주세요.'
-        : '카드 결제 기능은 현재 준비중입니다. 계좌이체를 이용해 주시길 부탁드립니다.';
+        : '결제 기능에 일시적인 문제가 있습니다. 다른 결제 수단을 이용해 주시거나 잠시 후 다시 시도해 주세요.';
       alert(msg);
       return;
     }
@@ -598,7 +604,7 @@ export default function Checkout() {
       // 💡 주의: action, method, target 속성을 직접 설정하지 마세요! INIStdPay.js가 알아서 처리합니다.
       formEl.style.display = 'none';
 
-      const keys = ['version', 'mid', 'oid', 'price', 'currency', 'goodname', 'buyername', 'buyertel', 'buyeremail', 'timestamp', 'signature', 'verification', 'mKey', 'returnUrl', 'closeUrl', 'use_chkfake', 'gopaymethod', 'acceptmethod', 'vbank_dt', 'vbank_tm'];
+      const keys = ['version', 'mid', 'oid', 'price', 'currency', 'goodname', 'buyername', 'buyertel', 'buyeremail', 'timestamp', 'signature', 'verification', 'mKey', 'returnUrl', 'closeUrl', 'use_chkfake', 'gopaymethod', 'acceptmethod'];
       keys.forEach((k) => {
         if (params[k] != null && params[k] !== '') {
           const input = document.createElement('input');
@@ -661,12 +667,12 @@ export default function Checkout() {
       await rollbackOrder(orderNum);
       paymentInProgressRef.current = false;
       setSubmitting(false);
-      alert('카드 결제창을 여는 도중 문제가 발생했습니다. 계좌이체를 이용해 주시길 부탁드립니다.');
+      alert('결제창을 여는 도중 문제가 발생했습니다. 다른 결제 수단을 이용해 주시거나 잠시 후 다시 시도해 주세요.');
     }
   };
 
   const handleCardPayment = () => handleInicisPayment('card');
-  const handleVBankPayment = () => handleInicisPayment('vbank');
+  const handleBankPayment = () => handleInicisPayment('bank');
 
   const adminEmails = (import.meta.env.VITE_ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
   const isAdmin = adminEmails.length > 0 && user?.email && adminEmails.includes(user.email.toLowerCase());
@@ -1080,7 +1086,7 @@ export default function Checkout() {
                       : 'bg-white/[0.04] border-white/10 text-slate-400 hover:border-white/20'
                   }`}
                 >
-                  <Landmark size={20} /> 무통장입금
+                  <Landmark size={20} /> 실시간 계좌이체
                 </button>
                 <button
                   type="button"
@@ -1097,7 +1103,7 @@ export default function Checkout() {
 
               {paymentMethod === 'bank' && (
                 <div className="bg-white/[0.04] rounded-2xl p-5 mb-8 border border-white/10">
-                  <p className="text-sm text-slate-400">무통장입금(가상계좌)으로 결제합니다. 아래 버튼을 누르면 KG이니시스 결제창이 열리고, 입금할 가상계좌 번호·은행·입금 기한을 발급받을 수 있습니다. 발급받은 계좌로 입금하시면 자동으로 결제가 완료됩니다.</p>
+                  <p className="text-sm text-slate-400">실시간 계좌이체로 결제합니다. 아래 버튼을 누르면 KG이니시스 결제창이 열리고, 본인 은행을 선택한 뒤 인증을 진행하면 결제 금액이 즉시 이체됩니다. (SC제일은행 법인계좌로 입금됩니다)</p>
                 </div>
               )}
 
@@ -1124,11 +1130,11 @@ export default function Checkout() {
                 </button>
                 {paymentMethod === 'bank' ? (
                   <button
-                    onClick={handleVBankPayment}
+                    onClick={handleBankPayment}
                     disabled={submitting}
                     className="flex-1 py-4 rounded-2xl font-bold text-lg bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:-translate-y-0.5 shadow-lg shadow-purple-500/20 transition-all disabled:opacity-50"
                   >
-                    {submitting ? '발급 중...' : '가상계좌 발급받기'}
+                    {submitting ? '결제창 열기 중...' : '계좌이체 결제하기'}
                   </button>
                 ) : (
                   <button
@@ -1167,8 +1173,7 @@ export default function Checkout() {
                 </div>
                 <h2 className="text-2xl font-black text-white mb-3">주문이 접수되었습니다!</h2>
                 <p className="text-slate-400 leading-relaxed">
-                  입금 확인 후 캠페인 대시보드에 접근하실 수 있습니다.<br />
-                  입금 확인은 영업일 기준 1~2시간 이내에 완료됩니다.
+                  결제가 완료되었습니다. 캠페인 대시보드에서 다음 단계를 진행해 주세요.
                 </p>
               </div>
 
@@ -1200,7 +1205,7 @@ export default function Checkout() {
               </div>
 
               <p className="text-center text-sm text-slate-600 mt-8">
-                입금 확인 관련 문의: contact@slam-global.com
+                결제 관련 문의: contact@slam-global.com
               </p>
             </div>
           )}

@@ -40,15 +40,9 @@ export default async function handler(req, res) {
     });
   }
   const payMethod = (method || 'card').toLowerCase();
-  const isVBank = payMethod === 'vbank' || payMethod === 'vacct' || payMethod === 'bank';
-  const gopaymethod = isVBank ? 'VBank' : 'Card';
-  // 가상계좌: 입금 기한 필수. vbank(YYYYMMDD:HHmm) 또는 vbank_dt + vbank_tm
-  const now = new Date();
-  const expDate = new Date(now);
-  expDate.setDate(expDate.getDate() + 7);
-  const vbankDt = expDate.toISOString().slice(0, 10).replace(/-/g, '');
-  const vbankTm = '2359';
-  const acceptmethod = isVBank ? `vbank(${vbankDt}:${vbankTm})` : 'card';
+  const isBank = payMethod === 'bank';
+  const gopaymethod = isBank ? 'Bank' : 'Card';
+  const acceptmethod = isBank ? 'bank' : 'card';
 
   const priceStr = String(Number(price));
   const timestamp = String(Date.now());
@@ -92,9 +86,5 @@ export default async function handler(req, res) {
     gopaymethod,
     acceptmethod,
   };
-  if (isVBank) {
-    payload.vbank_dt = vbankDt;
-    payload.vbank_tm = vbankTm;
-  }
   return res.status(200).json(payload);
 }
