@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, ArrowRight, Check, UserPlus, FileText,
   CreditCard, ExternalLink, AlertTriangle, CheckCircle2, Sparkles, X, Loader2,
-  Minus, Plus, MapPin, Landmark
+  Minus, Plus, MapPin, Landmark, Receipt
 } from 'lucide-react';
 import Navbar from '../components/layout/Navbar';
 import Footer from '../components/layout/Footer';
@@ -212,6 +212,7 @@ const STEP_META = [
   { label: '요금제 선택', icon: Sparkles },
   { label: '고객 정보 입력', icon: UserPlus },
   { label: '약관 동의', icon: FileText },
+  { label: '인보이스 확인', icon: Receipt },
   { label: '결제', icon: CreditCard },
 ];
 
@@ -242,8 +243,9 @@ const LegalModal = ({ isOpen, onClose, title, content }) => {
 const StepIndicator = ({ currentStep }) => (
   <div className="flex items-center justify-between mb-12">
     {STEP_META.map((s, i) => {
-      const done = currentStep > i;
-      const active = currentStep === i;
+      const stepForDisplay = Math.min(currentStep, STEP_META.length);
+      const done = stepForDisplay > i;
+      const active = stepForDisplay === i;
       const Icon = s.icon;
       return (
         <React.Fragment key={i}>
@@ -316,6 +318,41 @@ const Input = ({ label, required, ...props }) => (
   </div>
 );
 
+const InvoicePdfButton = ({ invoiceRef }) => {
+  const [downloading, setDownloading] = useState(false);
+  const handleDownload = async () => {
+    const el = invoiceRef?.current;
+    if (!el) return;
+    setDownloading(true);
+    try {
+      const html2pdf = (await import('html2pdf.js')).default;
+      await html2pdf().set({
+        margin: [10, 10, 10, 10],
+        filename: `Invoice-${new Date().toISOString().split('T')[0]}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      }).from(el).save();
+    } catch (e) {
+      console.error(e);
+      alert('PDF 다운로드에 실패했습니다.');
+    } finally {
+      setDownloading(false);
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={handleDownload}
+      disabled={downloading}
+      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 border border-white/20 text-white text-sm font-bold hover:bg-white/20 transition-all disabled:opacity-50"
+    >
+      {downloading ? <Loader2 size={16} className="animate-spin" /> : <Receipt size={16} />}
+      {downloading ? '다운로드 중...' : 'PDF 다운로드'}
+    </button>
+  );
+};
+
 export default function Checkout() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -323,21 +360,50 @@ export default function Checkout() {
 
   const queryPlan = new URLSearchParams(location.search).get('plan');
   const initialPlanId = location.state?.plan?.id || location.state?.plan || queryPlan || null;
-  const [selectedPlanId, setSelectedPlanId] = useState(initialPlanId);
-  const [visitCount, setVisitCount] = useState(1);
-  const rawPlan = selectedPlanId ? PLANS[selectedPlanId] : null;
+  // cart: [{ planId, qty }, ...] - 복합/다중 구매 지원
+  const [cart, setCart] = useState(() => {
+    if (initialPlanId && PLANS[initialPlanId]) {
+      return [{ planId: initialPlanId, qty: 1 }];
+    }
+    return [];
+  });
 
-  const plan = rawPlan ? (rawPlan.isVisit ? {
-    ...rawPlan,
-    count: visitCount,
-    priceNum: rawPlan.pricePerPerson * visitCount,
-    price: (rawPlan.pricePerPerson * visitCount).toLocaleString(),
-  } : rawPlan) : null;
+  // cart에서 line items 및 총액 계산
+  const lineItems = cart
+    .filter((item) => item.qty > 0)
+    .map((item) => {
+      const p = PLANS[item.planId];
+      if (!p) return null;
+      const isVisit = p.isVisit;
+      const unitPrice = isVisit ? p.pricePerPerson : p.priceNum;
+      const count = isVisit ? item.qty : p.count * item.qty;
+      const supplyAmount = unitPrice * item.qty;
+      return {
+        planId: item.planId,
+        plan: p,
+        qty: item.qty,
+        unitPrice,
+        supplyAmount,
+        count,
+        isVisit,
+      };
+    })
+    .filter(Boolean);
 
   const vatRate = 0.1;
-  const supplyPrice = plan ? plan.priceNum : 0;
+  const supplyPrice = lineItems.reduce((sum, li) => sum + li.supplyAmount, 0);
   const vatAmount = Math.round(supplyPrice * vatRate);
   const totalPrice = supplyPrice + vatAmount;
+  const hasCartItems = lineItems.length > 0;
+
+  // 단일 플랜일 때 기존 plan 변수 호환 (일부 UI에서 사용)
+  const plan = lineItems.length === 1 && lineItems[0].qty === 1
+    ? (lineItems[0].plan.isVisit
+        ? { ...lineItems[0].plan, count: lineItems[0].qty, priceNum: lineItems[0].supplyAmount, price: lineItems[0].supplyAmount.toLocaleString() }
+        : lineItems[0].plan)
+    : lineItems.length > 0
+      ? { name: lineItems.map((li) => `${li.plan.name} x ${li.qty}`).join(', '), count: lineItems.reduce((s, li) => s + li.count, 0), priceNum: supplyPrice, price: supplyPrice.toLocaleString(), isMulti: true }
+      : null;
 
   const [currentStep, setCurrentStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
@@ -349,6 +415,10 @@ export default function Checkout() {
     email: user?.email || '', password: '', passwordConfirm: '',
     name: '', phone: '', company: '',
   });
+  // 인보이스용 공급받는 자 정보 (결제 전 인보이스 확인 단계에서 입력)
+  const [clientForm, setClientForm] = useState({
+    companyName: '', address: '', bizRegNo: '',
+  });
 
   const [agree, setAgree] = useState({ terms: false, refund: false, privacy: false });
   const [orderNumber, setOrderNumber] = useState('');
@@ -357,6 +427,7 @@ export default function Checkout() {
   const [bankOrderNumber, setBankOrderNumber] = useState(null); // 계좌이체 시 주문 생성 후 표시
   const [verifyingPassword, setVerifyingPassword] = useState(false);
   const paymentInProgressRef = useRef(false);
+  const invoicePreviewRef = useRef(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -374,7 +445,7 @@ export default function Checkout() {
     const onMessage = (e) => {
       if (e.data?.type === 'INICIS_PAYMENT_SUCCESS' && e.data?.order_number) {
         setOrderNumber(e.data.order_number);
-        setCurrentStep(4);
+        setCurrentStep(5);
       }
     };
     window.addEventListener('message', onMessage);
@@ -390,6 +461,7 @@ export default function Checkout() {
   }
 
   const set = (field) => (e) => setForm(prev => ({ ...prev, [field]: e.target.value }));
+  const setClient = (field) => (e) => setClientForm(prev => ({ ...prev, [field]: e.target.value }));
 
   const toggleAgree = (key) => setAgree(prev => ({ ...prev, [key]: !prev[key] }));
 
@@ -420,13 +492,17 @@ export default function Checkout() {
   };
 
   const handleInicisPayment = async (inicisMethod = 'card') => {
-    if (paymentInProgressRef.current) return;
+    if (paymentInProgressRef.current || !hasCartItems) return;
     paymentInProgressRef.current = true;
     setSubmitting(true);
     const now = new Date();
     const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
     const orderNum = `BS-${datePart}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
     setOrderNumber(orderNum);
+
+    const goodname = lineItems.map((li) => `${li.plan.name} x ${li.qty}`).join(', ').slice(0, 40);
+    const planSummary = lineItems.map((li) => `${li.plan.name} x ${li.qty}`).join(', ');
+    const totalContentCount = lineItems.reduce((s, li) => s + li.count, 0);
 
     try {
       if (isSettingPassword) {
@@ -451,7 +527,7 @@ export default function Checkout() {
         body: JSON.stringify({
           oid: orderNum,
           price: totalPrice,
-          goodname: `${plan.name} (${plan.count}개)`,
+          goodname: goodname || plan?.name || 'BrandSlam',
           buyername: form.name,
           buyertel: form.phone,
           buyeremail: form.email,
@@ -481,13 +557,13 @@ export default function Checkout() {
     try {
       await supabase.from('orders').insert([{
         order_number: orderNum,
-        plan_name: plan.name,
+        plan_name: planSummary,
         plan_price: totalPrice,
-        content_count: plan.count,
+        content_count: totalContentCount,
         email: form.email,
         name: form.name,
         phone: form.phone,
-        company: form.company,
+        company: clientForm.companyName || form.company,
         status: 'pending_payment',
       }]);
     } catch {
@@ -497,22 +573,34 @@ export default function Checkout() {
       return;
     }
 
+    // 다중 구매: 라인아이템별로 qty만큼 캠페인 생성
+    const campaignRows = [];
+    for (const li of lineItems) {
+      const unitSupply = li.unitPrice;
+      const unitTotal = Math.round(unitSupply * 1.1);
+      const unitCount = li.isVisit ? 1 : li.plan.count;
+      for (let i = 0; i < li.qty; i++) {
+        campaignRows.push({
+          user_id: user.id,
+          order_number: orderNum,
+          plan: li.plan.name,
+          status: 'PAYMENT_PENDING',
+          brand_name: clientForm.companyName || form.company,
+          product_name: li.plan.name,
+          target_creators: unitCount,
+          matched_creators: 0,
+          plan_price: unitTotal,
+          content_count: unitCount,
+          customer_name: form.name,
+          customer_email: form.email,
+          customer_phone: form.phone,
+          client_address: clientForm.address || null,
+          client_biz_reg_no: clientForm.bizRegNo || null,
+        });
+      }
+    }
     try {
-      await supabase.from('campaigns').insert([{
-        user_id: user.id,
-        order_number: orderNum,
-        plan: plan.name,
-        status: 'PAYMENT_PENDING',
-        brand_name: form.company,
-        product_name: plan.name,
-        target_creators: plan.count || 0,
-        matched_creators: 0,
-        plan_price: totalPrice,
-        content_count: plan.count || 0,
-        customer_name: form.name,
-        customer_email: form.email,
-        customer_phone: form.phone,
-      }]);
+      await supabase.from('campaigns').insert(campaignRows);
     } catch {
       await rollbackOrder(orderNum);
       paymentInProgressRef.current = false;
@@ -580,12 +668,41 @@ export default function Checkout() {
   const handleCardPayment = () => handleInicisPayment('card');
 
   const handleBankPayment = async () => {
-    if (paymentInProgressRef.current || !plan) return;
+    if (paymentInProgressRef.current || !hasCartItems) return;
     paymentInProgressRef.current = true;
     setSubmitting(true);
     const now = new Date();
     const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
     const orderNum = `BS-${datePart}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+    const planSummary = lineItems.map((li) => `${li.plan.name} x ${li.qty}`).join(', ');
+    const totalContentCount = lineItems.reduce((s, li) => s + li.count, 0);
+
+    const campaignRows = [];
+    for (const li of lineItems) {
+      const unitSupply = li.unitPrice;
+      const unitTotal = Math.round(unitSupply * 1.1);
+      const unitCount = li.isVisit ? 1 : li.plan.count;
+      for (let i = 0; i < li.qty; i++) {
+        campaignRows.push({
+          user_id: user.id,
+          order_number: orderNum,
+          plan: li.plan.name,
+          status: 'PAYMENT_PENDING',
+          brand_name: clientForm.companyName || form.company,
+          product_name: li.plan.name,
+          target_creators: unitCount,
+          matched_creators: 0,
+          plan_price: unitTotal,
+          content_count: unitCount,
+          customer_name: form.name,
+          customer_email: form.email,
+          customer_phone: form.phone,
+          client_address: clientForm.address || null,
+          client_biz_reg_no: clientForm.bizRegNo || null,
+        });
+      }
+    }
+
     try {
       if (isSettingPassword) {
         await supabase.auth.updateUser({ password: form.password });
@@ -596,30 +713,16 @@ export default function Checkout() {
       });
       await supabase.from('orders').insert([{
         order_number: orderNum,
-        plan_name: plan.name,
+        plan_name: planSummary,
         plan_price: totalPrice,
-        content_count: plan.count,
+        content_count: totalContentCount,
         email: form.email,
         name: form.name,
         phone: form.phone,
-        company: form.company,
+        company: clientForm.companyName || form.company,
         status: 'pending_payment',
       }]);
-      await supabase.from('campaigns').insert([{
-        user_id: user.id,
-        order_number: orderNum,
-        plan: plan.name,
-        status: 'PAYMENT_PENDING',
-        brand_name: form.company,
-        product_name: plan.name,
-        target_creators: plan.count || 0,
-        matched_creators: 0,
-        plan_price: totalPrice,
-        content_count: plan.count || 0,
-        customer_name: form.name,
-        customer_email: form.email,
-        customer_phone: form.phone,
-      }]);
+      await supabase.from('campaigns').insert(campaignRows);
       setOrderNumber(orderNum);
       setBankOrderNumber(orderNum);
     } catch (e) {
@@ -639,6 +742,7 @@ export default function Checkout() {
       const token = session?.access_token;
       if (!token) {
         alert('로그인 세션이 없습니다. 다시 로그인해 주세요.');
+        setSubmitting(false);
         return;
       }
       const res = await fetch(`${window.location.origin}/api/checkout/confirm-bank-transfer`, {
@@ -646,15 +750,30 @@ export default function Checkout() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ order_number: bankOrderNumber }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        alert(data.error || '결제 완료 처리에 실패했습니다.');
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        const isLocal = /localhost|127\.0\.0\.1/.test(window.location.origin);
+        alert(isLocal
+          ? '로컬에서는 API가 동작하지 않을 수 있습니다. "vercel dev"를 실행한 뒤 테스트해 주세요.'
+          : '서버 응답을 처리하는 중 오류가 발생했습니다.');
         return;
       }
-      setCurrentStep(4);
+      if (!res.ok) {
+        const msg = data?.error || '결제 완료 처리에 실패했습니다.';
+        alert(msg);
+        setSubmitting(false);
+        return;
+      }
+      setCurrentStep(5);
     } catch (e) {
-      console.error(e);
-      alert('결제 완료 처리 중 오류가 발생했습니다.');
+      console.error('[결제 완료]', e);
+      const isLocal = /localhost|127\.0\.0\.1/.test(window.location.origin);
+      const msg = isLocal
+        ? '로컬에서는 결제 API가 동작하지 않을 수 있습니다. 터미널에서 "vercel dev"를 실행한 뒤, 다른 터미널에서 "npm run dev"로 실행해 주세요. 또는 관리자인 경우 "테스트: 결제 스킵" 버튼을 사용해 주세요.'
+        : '결제 완료 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.';
+      alert(msg);
     } finally {
       setSubmitting(false);
     }
@@ -664,13 +783,21 @@ export default function Checkout() {
   const isAdmin = adminEmails.length > 0 && user?.email && adminEmails.includes(user.email.toLowerCase());
 
   const handleAdminSkipPayment = async () => {
-    if (!isAdmin || paymentInProgressRef.current || !plan) return;
+    if (!isAdmin || paymentInProgressRef.current || !hasCartItems) return;
     paymentInProgressRef.current = true;
     setSubmitting(true);
     const now = new Date();
     const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
     const orderNum = `BS-${datePart}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
     setOrderNumber(orderNum);
+    const orderItems = lineItems.map((li) => ({
+      plan_name: li.plan.name,
+      qty: li.qty,
+      unit_price: li.unitPrice,
+      supply_amount: li.supplyAmount,
+      content_count: li.count,
+      is_visit: li.isVisit,
+    }));
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
@@ -686,13 +813,16 @@ export default function Checkout() {
         },
         body: JSON.stringify({
           order_number: orderNum,
-          plan_name: plan.name,
+          plan_name: lineItems.map((li) => `${li.plan.name} x ${li.qty}`).join(', '),
           plan_price: totalPrice,
-          content_count: plan.count,
+          content_count: lineItems.reduce((s, li) => s + li.count, 0),
+          order_items: orderItems,
           email: form.email,
           name: form.name,
           phone: form.phone,
-          company: form.company,
+          company: clientForm.companyName || form.company,
+          client_address: clientForm.address,
+          client_biz_reg_no: clientForm.bizRegNo,
         }),
       });
       const data = await res.json();
@@ -700,7 +830,7 @@ export default function Checkout() {
         alert(data.error || '결제 스킵에 실패했습니다.');
         return;
       }
-      setCurrentStep(4);
+      setCurrentStep(5);
     } catch (e) {
       console.error(e);
       alert('결제 스킵에 실패했습니다.');
@@ -733,9 +863,37 @@ export default function Checkout() {
 
   const goPrev = () => setCurrentStep(s => s - 1);
 
-  const selectPlan = (id) => {
-    setSelectedPlanId(id);
-    if (id === 'Visit') return;
+  const setCartQty = (planId, delta) => {
+    setCart((prev) => {
+      const next = [...prev];
+      const idx = next.findIndex((i) => i.planId === planId);
+      if (idx >= 0) {
+        const newQty = Math.max(0, next[idx].qty + delta);
+        if (newQty === 0) {
+          next.splice(idx, 1);
+        } else {
+          next[idx] = { ...next[idx], qty: newQty };
+        }
+      } else if (delta > 0) {
+        next.push({ planId, qty: 1 });
+      }
+      return next;
+    });
+  };
+
+  const setCartQtyDirect = (planId, value) => {
+    const v = Math.max(0, parseInt(value, 10) || 0);
+    setCart((prev) => {
+      const next = prev.filter((i) => i.planId !== planId);
+      if (v > 0) next.push({ planId, qty: v });
+      return next;
+    });
+  };
+
+  const getCartQty = (planId) => cart.find((i) => i.planId === planId)?.qty ?? 0;
+
+  const goToNextFromPlanSelection = () => {
+    if (!hasCartItems) return;
     setCurrentStep(1);
   };
 
@@ -769,28 +927,48 @@ export default function Checkout() {
             <div>
               <h2 className="text-2xl font-black text-white mb-10 text-center">요금제를 선택해주세요</h2>
 
-              {/* Main plans */}
+              {/* Main plans with quantity */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                {Object.values(PLANS).filter(p => !p.isVisit).map(p => (
-                  <PlanCard
-                    key={p.id}
-                    plan={p}
-                    selected={selectedPlanId === p.id}
-                    onClick={() => selectPlan(p.id)}
-                  />
-                ))}
+                {Object.values(PLANS).filter(p => !p.isVisit).map(p => {
+                  const qty = getCartQty(p.id);
+                  return (
+                    <div key={p.id} className={`relative text-left w-full p-8 rounded-2xl border-2 transition-all ${
+                      qty > 0 ? 'border-purple-500 bg-purple-500/10' : 'border-white/10 bg-white/[0.03] hover:border-white/20'
+                    }`}>
+                      {p.isBest && (
+                        <span className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-3 py-1.5 rounded-full text-[10px] font-black tracking-widest">
+                          MOST POPULAR
+                        </span>
+                      )}
+                      <h3 className="text-xl font-black text-white mb-2">{p.name}</h3>
+                      <div className="flex items-baseline gap-1 mb-2">
+                        <span className="text-3xl font-black text-purple-400">{p.price}</span>
+                        <span className="text-slate-500 text-sm font-bold">원</span>
+                      </div>
+                      <p className="text-sm text-slate-400 mb-4">{p.desc}</p>
+                      <div className="flex items-center gap-3">
+                        <button onClick={() => setCartQty(p.id, -1)} disabled={qty <= 0}
+                          className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white disabled:opacity-30">
+                          <Minus size={18} />
+                        </button>
+                        <input type="number" min="0" value={qty} onChange={(e) => setCartQtyDirect(p.id, e.target.value)}
+                          className="w-16 text-center text-xl font-bold text-white bg-white/5 rounded-xl border border-white/10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                        <button onClick={() => setCartQty(p.id, 1)}
+                          className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white">
+                          <Plus size={18} />
+                        </button>
+                        <span className="text-slate-500 text-sm">개</span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
 
-              {/* Visit plan */}
-              <button
-                onClick={() => selectPlan('Visit')}
-                className={`relative w-full text-left p-8 rounded-2xl border-2 transition-all duration-300 hover:-translate-y-1 ${
-                  selectedPlanId === 'Visit'
-                    ? 'border-purple-500 bg-purple-500/10 shadow-lg shadow-purple-500/10'
-                    : 'border-white/10 bg-white/[0.03] hover:border-white/20'
-                }`}
-              >
-                <span className="absolute -top-4 left-6 bg-gradient-to-r from-orange-500 to-pink-500 text-white px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest shadow-lg">
+              {/* Visit plan with quantity */}
+              <div className={`relative w-full p-8 rounded-2xl border-2 transition-all ${
+                getCartQty('Visit') > 0 ? 'border-orange-500/50 bg-orange-500/5' : 'border-white/10 bg-white/[0.03] hover:border-white/20'
+              }`}>
+                <span className="absolute -top-4 left-6 bg-gradient-to-r from-orange-500 to-pink-500 text-white px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest">
                   OFFLINE SPECIAL
                 </span>
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -799,73 +977,44 @@ export default function Checkout() {
                       <MapPin size={22} className="text-orange-400" />
                     </div>
                     <div>
-                      <h3 className="text-xl font-black text-white tracking-tight">Visit Content</h3>
-                      <p className="text-sm text-slate-400">방문형 콘텐츠 · 오프라인 매출 펌핑 시딩 상품</p>
+                      <h3 className="text-xl font-black text-white">Visit Content</h3>
+                      <p className="text-sm text-slate-400">방문형 콘텐츠 · 인당 300,000원</p>
                     </div>
                   </div>
-                  <div className="flex items-baseline gap-1 md:text-right">
-                    <span className="text-3xl font-black text-orange-400">300,000</span>
-                    <span className="text-slate-500 text-sm font-bold">원 / 1인</span>
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => setCartQty('Visit', -1)} disabled={getCartQty('Visit') <= 0}
+                      className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white disabled:opacity-30">
+                      <Minus size={18} />
+                    </button>
+                    <input type="number" min="0" value={getCartQty('Visit')} onChange={(e) => setCartQtyDirect('Visit', e.target.value)}
+                      className="w-16 text-center text-xl font-bold text-white bg-white/5 rounded-xl border border-white/10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                    <button onClick={() => setCartQty('Visit', 1)}
+                      className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white">
+                      <Plus size={18} />
+                    </button>
+                    <span className="text-slate-500 text-sm">명</span>
                   </div>
                 </div>
-              </button>
+              </div>
 
-              {/* Visit count selector */}
-              {selectedPlanId === 'Visit' && (
-                <div className="mt-6 bg-white/[0.03] border border-white/[0.08] rounded-2xl p-8">
-                  <h3 className="text-lg font-bold text-white mb-2">진행할 인원수를 선택해주세요</h3>
-                  <p className="text-sm text-slate-500 mb-6">최소 1명부터 원하는 수량만큼 진행 가능합니다.</p>
-
-                  <div className="flex items-center justify-center gap-6 mb-6">
-                    <button
-                      onClick={() => setVisitCount(c => Math.max(1, c - 1))}
-                      className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white hover:border-white/30 transition-all disabled:opacity-30"
-                      disabled={visitCount <= 1}
-                    >
-                      <Minus size={20} />
-                    </button>
-                    <div className="text-center min-w-[120px] flex items-baseline justify-center gap-1">
-                      <input
-                        type="number"
-                        min="1"
-                        value={visitCount}
-                        onChange={(e) => {
-                          const v = parseInt(e.target.value, 10);
-                          if (!isNaN(v) && v >= 1) setVisitCount(v);
-                          else if (e.target.value === '') setVisitCount(1);
-                        }}
-                        className="w-20 text-center text-5xl font-black text-white bg-transparent border-b-2 border-white/20 focus:border-purple-500 outline-none transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      />
-                      <span className="text-slate-500 text-lg font-bold">명</span>
-                    </div>
-                    <button
-                      onClick={() => setVisitCount(c => c + 1)}
-                      className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white hover:border-white/30 transition-all"
-                    >
-                      <Plus size={20} />
-                    </button>
-                  </div>
-
-                  <div className="bg-white/[0.04] rounded-xl px-6 py-4 border border-white/10 mb-6 space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-500">공급가액</span>
-                      <span className="text-slate-300">{(300000 * visitCount).toLocaleString()}원</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-500">부가세 (10%)</span>
-                      <span className="text-slate-300">{Math.round(300000 * visitCount * 0.1).toLocaleString()}원</span>
-                    </div>
-                    <div className="flex items-center justify-between pt-2 border-t border-white/10">
-                      <span className="text-white font-bold text-sm">총 결제 금액 (VAT 포함)</span>
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-2xl font-black text-purple-400">{Math.round(300000 * visitCount * 1.1).toLocaleString()}</span>
-                        <span className="text-slate-500 text-sm font-bold">원</span>
+              {/* Cart summary & next - replaces old Visit-only selector */}
+              {hasCartItems && (
+                <div className="mt-8 bg-white/[0.04] rounded-2xl p-6 border border-white/10">
+                  <h3 className="font-bold text-white mb-4">선택 내역</h3>
+                  <div className="space-y-2 mb-4">
+                    {lineItems.map((li) => (
+                      <div key={li.planId} className="flex justify-between text-sm">
+                        <span className="text-slate-300">{li.plan.name} x {li.qty}{li.isVisit ? '명' : '개'}</span>
+                        <span className="text-white font-medium">{(li.supplyAmount * 1.1).toLocaleString()}원</span>
                       </div>
-                    </div>
+                    ))}
                   </div>
-
+                  <div className="flex justify-between pt-3 border-t border-white/10 mb-4">
+                    <span className="font-bold text-white">총 결제 금액 (VAT 포함)</span>
+                    <span className="text-xl font-black text-purple-400">{totalPrice.toLocaleString()}원</span>
+                  </div>
                   <button
-                    onClick={() => setCurrentStep(1)}
+                    onClick={goToNextFromPlanSelection}
                     className="w-full py-4 rounded-2xl font-bold text-lg bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:-translate-y-0.5 shadow-lg shadow-purple-500/20 transition-all"
                   >
                     다음 단계로 <ArrowRight size={18} className="inline ml-1" />
@@ -875,8 +1024,8 @@ export default function Checkout() {
             </div>
           )}
 
-          {/* Steps 1~3: Selected plan card */}
-          {currentStep >= 1 && currentStep <= 3 && plan && (
+          {/* Steps 1~4: Selected plan card */}
+          {currentStep >= 1 && currentStep <= 4 && plan && (
             <div className="flex justify-center mb-10">
               <div className="w-full max-w-sm">
                 <PlanCard
@@ -1030,19 +1179,157 @@ export default function Checkout() {
             </div>
           )}
 
-          {/* Step 3: 결제 */}
-          {currentStep === 3 && plan && (
+          {/* Step 3: 인보이스 확인 (결제 전) */}
+          {currentStep === 3 && hasCartItems && (
+            <div className="bg-white/[0.03] border border-white/[0.08] rounded-3xl p-8 md:p-12">
+              <h2 className="text-xl font-black text-white mb-4">인보이스 확인</h2>
+              <p className="text-slate-400 text-sm mb-6">결제 전에 인보이스(견적서)를 확인해 주세요. 공급받는 자 정보를 입력한 뒤 PDF로 다운로드할 수 있습니다.</p>
+
+              {/* 공급받는 자 정보 */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 mb-2">공급받는 자 (회사명) *</label>
+                  <input type="text" placeholder="주식회사 OOO" value={clientForm.companyName} onChange={setClient('companyName')}
+                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-600 focus:outline-none focus:border-purple-500/50 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 mb-2">사업자등록번호 *</label>
+                  <input type="text" placeholder="000-00-00000" value={clientForm.bizRegNo} onChange={setClient('bizRegNo')}
+                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-600 focus:outline-none focus:border-purple-500/50 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 mb-2">주소 *</label>
+                  <input type="text" placeholder="서울특별시 OO구 OO로 000" value={clientForm.address} onChange={setClient('address')}
+                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-600 focus:outline-none focus:border-purple-500/50 text-sm" />
+                </div>
+              </div>
+
+              {/* 인보이스 문서 미리보기 (PDF 다운로드용) */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-white">인보이스 (견적서)</h3>
+                  <InvoicePdfButton invoiceRef={invoicePreviewRef} />
+                </div>
+                <div ref={invoicePreviewRef} className="bg-white text-slate-900 rounded-lg shadow-2xl p-8 md:p-12 max-w-4xl mx-auto overflow-hidden">
+                  <div className="flex justify-between items-start border-b-2 border-slate-900 pb-6 mb-8">
+                    <div>
+                      <h1 className="text-2xl font-extrabold text-slate-900">INVOICE</h1>
+                      <p className="text-slate-500 text-sm mt-1">견적서 (결제 전)</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-slate-400 uppercase tracking-wider font-bold">Date</p>
+                      <p className="text-sm font-medium text-slate-900">{new Date().toISOString().split('T')[0]}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                    <div>
+                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 border-b border-slate-100 pb-2">공급자</h3>
+                      <div className="text-sm text-slate-700 space-y-1">
+                        <p className="font-bold text-slate-900">주식회사 브랜드슬램</p>
+                        <p>사업자등록번호: 284-44-03016</p>
+                        <p>서울특별시 용산구 한강대로 366, 8층 804호</p>
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 border-b border-slate-100 pb-2">공급받는 자</h3>
+                      {clientForm.companyName || clientForm.bizRegNo || clientForm.address ? (
+                        <div className="text-sm text-slate-700 space-y-1">
+                          <p className="font-bold text-slate-900">{clientForm.companyName || '-'}</p>
+                          <p>사업자등록번호: {clientForm.bizRegNo || '-'}</p>
+                          <p>{clientForm.address || '-'}</p>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-slate-400 italic">상단에서 입력해 주세요</p>
+                      )}
+                    </div>
+                  </div>
+                  <table className="w-full text-sm mb-8">
+                    <thead>
+                      <tr className="bg-slate-50 border-y-2 border-slate-900 text-slate-500">
+                        <th className="py-3 px-4 text-left font-bold uppercase tracking-wider">Description</th>
+                        <th className="py-3 px-4 text-center font-bold uppercase tracking-wider">Qty</th>
+                        <th className="py-3 px-4 text-right font-bold uppercase tracking-wider">Unit Price</th>
+                        <th className="py-3 px-4 text-right font-bold uppercase tracking-wider">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-slate-700">
+                      {lineItems.map((li) => {
+                        const unitPrice = li.qty > 0 ? Math.round(li.supplyAmount / li.qty) : li.supplyAmount;
+                        return (
+                          <tr key={li.planId} className="border-b border-slate-100">
+                            <td className="py-4 px-4">
+                              <p className="font-bold text-slate-900">BrandSlam {li.plan.name.toUpperCase()} PLAN</p>
+                              <p className="text-xs text-slate-500">{li.plan.name} 글로벌 캠페인 운영</p>
+                            </td>
+                            <td className="py-4 px-4 text-center">{li.qty}{li.isVisit ? '명' : '개'}</td>
+                            <td className="py-4 px-4 text-right">{unitPrice.toLocaleString()}</td>
+                            <td className="py-4 px-4 text-right font-bold">{li.supplyAmount.toLocaleString()}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className="text-slate-500">공급가액</span>
+                      <span>{supplyPrice.toLocaleString()}원</span>
+                    </div>
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className="text-slate-500">부가세 (10%)</span>
+                      <span>{vatAmount.toLocaleString()}원</span>
+                    </div>
+                    <div className="flex justify-between pt-4 border-t-2 border-slate-200 font-bold text-lg">
+                      <span className="text-slate-900">총 결제 금액 (VAT 포함)</span>
+                      <span className="text-indigo-600">{totalPrice.toLocaleString()}원</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <button onClick={goPrev} className="flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-slate-400 bg-white/5 border border-white/10 hover:border-white/20 hover:text-white transition-all">
+                  <ArrowLeft size={18} /> 이전
+                </button>
+                <button
+                  onClick={goNext}
+                  className="flex-1 py-4 rounded-2xl font-bold text-lg bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:-translate-y-0.5 shadow-lg shadow-purple-500/20 transition-all"
+                >
+                  인보이스 확인 완료 · 결제하기 <ArrowRight size={18} className="inline ml-1" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 4: 결제 */}
+          {currentStep === 4 && hasCartItems && (
             <div className="bg-white/[0.03] border border-white/[0.08] rounded-3xl p-8 md:p-12">
               <h2 className="text-xl font-black text-white mb-8">결제 정보</h2>
 
               <div className="bg-white/[0.04] rounded-2xl p-6 mb-8 border border-white/10">
                 <h3 className="font-bold text-white mb-4">주문 내역</h3>
                 <div className="space-y-3 text-sm">
-                  <div className="flex justify-between"><span className="text-slate-500">요금제</span><span className="font-bold text-white">{plan.name}</span></div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">{plan.isVisit ? '진행 인원수' : '월 콘텐츠 수'}</span>
-                    <span className="font-bold text-white">{plan.count}{plan.isVisit ? '명' : '개'}</span>
-                  </div>
+                  {lineItems.length > 1 ? (
+                    <>
+                      {lineItems.map((li) => (
+                        <div key={li.planId} className="flex justify-between">
+                          <span className="text-slate-500">{li.plan.name} x {li.qty}{li.isVisit ? '명' : '개'}</span>
+                          <span className="font-bold text-white">{(li.supplyAmount * 1.1).toLocaleString()}원</span>
+                        </div>
+                      ))}
+                      <div className="flex justify-between pt-2 border-t border-white/10">
+                        <span className="text-slate-500">총 콘텐츠 수</span>
+                        <span className="font-bold text-white">{plan.count}개</span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex justify-between"><span className="text-slate-500">요금제</span><span className="font-bold text-white">{plan.name}</span></div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">{plan.isVisit ? '진행 인원수' : '월 콘텐츠 수'}</span>
+                        <span className="font-bold text-white">{plan.count}{plan.isVisit ? '명' : '개'}</span>
+                      </div>
+                    </>
+                  )}
                   <div className="flex justify-between"><span className="text-slate-500">이메일</span><span className="font-medium text-slate-300">{form.email}</span></div>
                   <div className="flex justify-between"><span className="text-slate-500">이름</span><span className="font-medium text-slate-300">{form.name}</span></div>
                   <div className="flex justify-between"><span className="text-slate-500">회사명</span><span className="font-medium text-slate-300">{form.company}</span></div>
@@ -1170,8 +1457,8 @@ export default function Checkout() {
             </div>
           )}
 
-          {/* Step 4: 완료 */}
-          {currentStep === 4 && plan && (
+          {/* Step 5: 완료 */}
+          {currentStep === 5 && hasCartItems && (
             <div className="bg-white/[0.03] border border-white/[0.08] rounded-3xl p-8 md:p-12">
               <div className="text-center mb-10">
                 <div className="relative w-20 h-20 mx-auto mb-6">
@@ -1190,7 +1477,18 @@ export default function Checkout() {
                 <h3 className="font-bold text-white mb-4">주문 정보</h3>
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between"><span className="text-slate-500">주문번호</span><span className="font-bold text-white">{orderNumber}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-500">요금제</span><span className="font-bold text-white">{plan.name}</span></div>
+                  {lineItems.length > 1 ? (
+                    <>
+                      {lineItems.map((li) => (
+                        <div key={li.planId} className="flex justify-between">
+                          <span className="text-slate-500">{li.plan.name} x {li.qty}{li.isVisit ? '명' : '개'}</span>
+                          <span className="font-bold text-white">{(li.supplyAmount * 1.1).toLocaleString()}원</span>
+                        </div>
+                      ))}
+                    </>
+                  ) : (
+                    <div className="flex justify-between"><span className="text-slate-500">요금제</span><span className="font-bold text-white">{plan.name}</span></div>
+                  )}
                   <div className="flex justify-between"><span className="text-slate-500">공급가액</span><span className="font-medium text-slate-300">{supplyPrice.toLocaleString()}원</span></div>
                   <div className="flex justify-between"><span className="text-slate-500">부가세 (10%)</span><span className="font-medium text-slate-300">{vatAmount.toLocaleString()}원</span></div>
                   <div className="flex justify-between"><span className="text-slate-500">결제 금액 (VAT 포함)</span><span className="font-bold text-purple-400">{totalPrice.toLocaleString()}원</span></div>

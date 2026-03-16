@@ -12,6 +12,57 @@ import Navbar from '../components/layout/Navbar';
 import Footer from '../components/layout/Footer';
 import sealImg from '../assets/seal.jpg';
 import testInfluencers from '../data/test-influencers.json';
+
+/** 팔로워 수 파싱 (11.5K → 11500) */
+const parseFollower = (val) => {
+  if (val == null || val === '') return 0;
+  const n = Number(val);
+  if (!isNaN(n)) return n;
+  const s = String(val).trim().toUpperCase();
+  const m = s.match(/^([\d.]+)\s*([KMB])?$/);
+  if (!m) return 0;
+  let num = parseFloat(m[1]);
+  if (m[2] === 'K') num *= 1000;
+  else if (m[2] === 'M') num *= 1e6;
+  return Math.round(num);
+};
+
+/** admin_delivery_creators raw → 표시용 4필드 (이름, 국가, SNS URL, 팔로워) */
+const toDisplayCreator = (r, idx) => {
+  const tt = parseFollower(r.tiktok_follower);
+  const ig = parseFollower(r.instagram_follower);
+  let platform, snsUrl, followers;
+  if (tt > 0 && ig > 0) {
+    if (tt >= ig) {
+      platform = 'TikTok';
+      snsUrl = r.tiktok_url;
+      followers = r.tiktok_follower;
+    } else {
+      platform = 'Instagram';
+      snsUrl = r.instagram_url;
+      followers = r.instagram_follower;
+    }
+  } else if (tt > 0) {
+    platform = 'TikTok';
+    snsUrl = r.tiktok_url;
+    followers = r.tiktok_follower;
+  } else {
+    platform = 'Instagram';
+    snsUrl = r.instagram_url;
+    followers = r.instagram_follower;
+  }
+  return {
+    id: r.id || idx + 1,
+    name: r.name || '-',
+    location: r.shipping_country || '-',
+    handle: snsUrl || '-',
+    platform: platform || 'SNS',
+    followers: String(followers ?? '0'),
+    status: 'Pending Review',
+    contact: '-',
+    _identifier: `${r.name}|${platform}`,
+  };
+};
 /**
  * [Logic 보존] Campaign Status Enum & Helper Functions
  */
@@ -242,7 +293,7 @@ const DemoInvoiceExample = () => {
         <div className="flex justify-between items-start border-b-2 border-slate-900 pb-8 mb-10">
           <div>
             <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">INVOICE</h1>
-            <p className="text-slate-500 mt-2 font-medium">세금계산서 (예시)</p>
+            <p className="text-slate-500 mt-2 font-medium">청구서 (예시)</p>
           </div>
           <div className="text-right">
             <p className="text-xs text-slate-400 uppercase tracking-widest font-bold">Invoice No.</p>
@@ -345,7 +396,8 @@ const DemoInvoiceExample = () => {
 // --- [New Component] Invoice Detail View (계약서/송장) ---
 const InvoiceDetail = ({ campaign }) => {
     const invoiceRef = useRef(null);
-    const [isConfirmed, setIsConfirmed] = useState(false);
+    const [orderCampaigns, setOrderCampaigns] = useState([campaign]);
+    const [isConfirmed, setIsConfirmed] = useState(!!(campaign.client_address && campaign.client_biz_reg_no));
     const [clientForm, setClientForm] = useState({
         companyName: campaign.brand_name || '',
         address: campaign.client_address || '',
@@ -353,16 +405,37 @@ const InvoiceDetail = ({ campaign }) => {
     });
     const setClient = (field) => (e) => setClientForm(prev => ({ ...prev, [field]: e.target.value }));
 
+    // 동일 order_number의 모든 캠페인 조회 (다중 구매 시 라인아이템 집계)
+    useEffect(() => {
+        if (!campaign.order_number || String(campaign.id).startsWith('demo-')) return;
+        const fetchOrderCampaigns = async () => {
+            const { data } = await supabase.from('campaigns').select('*').eq('order_number', campaign.order_number);
+            if (data?.length) setOrderCampaigns(data);
+        };
+        fetchOrderCampaigns();
+    }, [campaign.order_number, campaign.id]);
+
+    // 라인아이템: plan별로 그룹화 (qty, supplyAmount)
+    const lineItems = useMemo(() => {
+        const map = {};
+        for (const c of orderCampaigns) {
+            const plan = c.plan || 'Unknown';
+            if (!map[plan]) map[plan] = { plan, qty: 0, supplyAmount: 0 };
+            map[plan].qty += 1;
+            const unitSupply = c.plan_price ? Math.round(c.plan_price / 1.1) : 0;
+            map[plan].supplyAmount += unitSupply;
+        }
+        return Object.values(map);
+    }, [orderCampaigns]);
+
     const isDemo = String(campaign.id).startsWith('demo-');
 
-    const totalAmount = campaign.plan_price || Math.round(2490000 * 1.1);
-    const supplyPrice = Math.round(totalAmount / 1.1);
-    const vatAmount = totalAmount - supplyPrice;
+    const totalSupplyPrice = lineItems.reduce((s, li) => s + li.supplyAmount, 0);
+    const vatAmount = Math.round(totalSupplyPrice * 0.1);
+    const totalAmount = totalSupplyPrice + vatAmount;
+    const supplyPrice = totalSupplyPrice;
 
     const invoiceId = isDemo ? campaign.id.toUpperCase() : (campaign.order_number || campaign.id.slice(0, 8)).toUpperCase();
-    const qty = campaign.content_count || campaign.target_creators || 1;
-    const isVisitPlan = campaign.plan?.toLowerCase().includes('visit');
-    const unitPrice = qty > 0 ? Math.round(supplyPrice / qty) : supplyPrice;
     const invoiceDate = campaign.created_at ? new Date(campaign.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
     const clientValid = clientForm.companyName && clientForm.address && clientForm.bizRegNo;
 
@@ -375,7 +448,7 @@ const InvoiceDetail = ({ campaign }) => {
                     brand_name: clientForm.companyName,
                     client_address: clientForm.address,
                     client_biz_reg_no: clientForm.bizRegNo,
-                }).eq('id', campaign.id);
+                }).eq('order_number', campaign.order_number);
             } catch { /* 저장 실패해도 UI는 진행 */ }
         }
         setIsConfirmed(true);
@@ -411,10 +484,11 @@ const InvoiceDetail = ({ campaign }) => {
                     <div className="flex justify-between w-full max-w-4xl mx-auto">
                         {[
                             { id: 1, label: "플랜 선택", icon: Package, done: true },
-                            { id: 2, label: "결제 접수", icon: CreditCard, done: true },
-                            { id: 3, label: "계약 확정", icon: FileText, active: !isConfirmed, done: isConfirmed },
-                            { id: 4, label: "캠페인 세팅", icon: Rocket, active: isConfirmed, done: false },
-                            { id: 5, label: "착수", icon: CheckCircle2, done: false }
+                            { id: 2, label: "인보이스 확인", icon: FileText, done: true },
+                            { id: 3, label: "결제", icon: CreditCard, done: true },
+                            { id: 4, label: "계약 확정", icon: FileText, active: !isConfirmed, done: isConfirmed },
+                            { id: 5, label: "캠페인 세팅", icon: Rocket, active: isConfirmed, done: false },
+                            { id: 6, label: "착수", icon: CheckCircle2, done: false }
                         ].map((step) => (
                             <div key={step.id} className="flex flex-col items-center gap-3 bg-[#020617] px-2 z-10">
                                 <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border-2 transition-all ${
@@ -487,7 +561,7 @@ const InvoiceDetail = ({ campaign }) => {
                 <div className="flex justify-between items-start border-b-2 border-slate-900 pb-8 mb-10 relative z-10">
                     <div>
                         <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">INVOICE</h1>
-                        <p className="text-slate-500 mt-2 font-medium">{isConfirmed ? '세금계산서' : '견적서 (확정 전)'}</p>
+                        <p className="text-slate-500 mt-2 font-medium">{isConfirmed ? '청구서' : '견적서 (확정 전)'}</p>
                     </div>
                     <div className="text-right">
                         <p className="text-xs text-slate-400 uppercase tracking-widest font-bold">Invoice No.</p>
@@ -536,15 +610,21 @@ const InvoiceDetail = ({ campaign }) => {
                         </tr>
                     </thead>
                     <tbody className="text-slate-700">
-                        <tr className="border-b border-slate-100">
-                            <td className="py-5 px-4">
-                                <p className="font-bold text-slate-900 text-base">BrandSlam {campaign.plan.toUpperCase()} PLAN</p>
-                                <p className="text-xs text-slate-500 mt-1">{campaign.product_name || campaign.plan} 글로벌 캠페인 운영 및 매니지먼트</p>
-                            </td>
-                            <td className="py-5 px-4 text-center">{qty}{isVisitPlan ? '명' : '개'}</td>
-                            <td className="py-5 px-4 text-right text-slate-500">{unitPrice.toLocaleString()}</td>
-                            <td className="py-5 px-4 text-right font-bold text-slate-900">{supplyPrice.toLocaleString()}</td>
-                        </tr>
+                        {lineItems.map((li) => {
+                            const isVisitPlan = li.plan?.toLowerCase().includes('visit');
+                            const unitPrice = li.qty > 0 ? Math.round(li.supplyAmount / li.qty) : li.supplyAmount;
+                            return (
+                                <tr key={li.plan} className="border-b border-slate-100">
+                                    <td className="py-5 px-4">
+                                        <p className="font-bold text-slate-900 text-base">BrandSlam {li.plan.toUpperCase()} PLAN</p>
+                                        <p className="text-xs text-slate-500 mt-1">{li.plan} 글로벌 캠페인 운영 및 매니지먼트</p>
+                                    </td>
+                                    <td className="py-5 px-4 text-center">{li.qty}{isVisitPlan ? '명' : '개'}</td>
+                                    <td className="py-5 px-4 text-right text-slate-500">{unitPrice.toLocaleString()}</td>
+                                    <td className="py-5 px-4 text-right font-bold text-slate-900">{li.supplyAmount.toLocaleString()}</td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
                 </table>
 
@@ -642,13 +722,48 @@ const InvoiceDetail = ({ campaign }) => {
 };
 
 // --- Detail Component: Candidate List (섭외 중 / 납품) ---
-const CandidateList = ({ candidates, targetCount, matchedCount, isDeliveryTest }) => {
+const CandidateList = ({ candidates, targetCount, matchedCount, isDeliveryTest, campaign, user, existingDrops = [] }) => {
     const progress = Math.min(Math.round((matchedCount / targetCount) * 100), 100);
+    const maxDropCount = Math.floor((targetCount || 50) * 0.3);
+    const [droppedIds, setDroppedIds] = useState(() => new Set(existingDrops.map((d) => d.creator_identifier)));
+
+    useEffect(() => {
+        if (!user || !campaign || !isDeliveryTest) return;
+        const refType = campaign.id === 'admin-delivery-test' ? 'admin_preview' : 'campaign';
+        const refId = campaign.id === 'admin-delivery-test' ? 'BS-US-FARMSKIN' : String(campaign.id);
+        supabase
+            .from('creator_drops')
+            .select('creator_identifier')
+            .eq('reference_type', refType)
+            .eq('reference_id', refId)
+            .eq('dropped_by_user_id', user.id)
+            .then(({ data }) => {
+                if (data?.length) setDroppedIds((prev) => new Set([...prev, ...data.map((d) => d.creator_identifier).filter(Boolean)]));
+            });
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- user.id, campaign.id만 의존 (객체 참조 변경 방지)
+    }, [user?.id, campaign?.id, isDeliveryTest]);
+    const [saving, setSaving] = useState(false);
+
+    const droppedCount = droppedIds.size;
+    const canDropMore = droppedCount < maxDropCount;
 
     const handleDownloadCSV = () => {
         if (isDeliveryTest) {
-            const headers = ['name', 'handle', 'platform', 'followers', 'location', 'contact'];
-            const csv = [headers.join(','), ...(candidates || []).map((c) => headers.map((h) => `"${String(c[h] || '').replace(/"/g, '""')}"`).join(','))].join('\n');
+            const filtered = (candidates || []).filter((c) => !droppedIds.has(c._identifier || `${c.name}|${c.platform}`));
+            const headers = ['name', 'shipping_country', 'sns_url', 'followers'];
+            const csv = [
+                headers.join(','),
+                ...filtered.map((c) =>
+                    [
+                        c.name,
+                        c.location,
+                        c.handle,
+                        c.followers,
+                    ]
+                        .map((v) => `"${String(v || '').replace(/"/g, '""')}"`)
+                        .join(',')
+                ),
+            ].join('\n');
             const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
@@ -660,6 +775,51 @@ const CandidateList = ({ candidates, targetCount, matchedCount, isDeliveryTest }
         }
     };
 
+    const handleDropToggle = (creator) => {
+        const id = creator._identifier || `${creator.name}|${creator.platform}`;
+        setDroppedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) {
+                next.delete(id);
+            } else {
+                if (next.size >= maxDropCount) return prev;
+                next.add(id);
+            }
+            return next;
+        });
+    };
+
+    const handleSaveDrops = async () => {
+        if (!user || !campaign) return;
+        setSaving(true);
+        try {
+            const refType = campaign.id === 'admin-delivery-test' ? 'admin_preview' : 'campaign';
+            const refId = campaign.id === 'admin-delivery-test' ? 'BS-US-FARMSKIN' : String(campaign.id);
+            await supabase.from('creator_drops').delete().eq('reference_type', refType).eq('reference_id', refId).eq('dropped_by_user_id', user.id);
+            const toInsert = Array.from(droppedIds).map((identifier) => {
+                const [name] = identifier.split('|');
+                return {
+                    reference_type: refType,
+                    reference_id: refId,
+                    creator_name: name,
+                    creator_identifier: identifier,
+                    dropped_by_user_id: user.id,
+                    dropped_by_email: user.email,
+                };
+            });
+            if (toInsert.length > 0) {
+                const { error } = await supabase.from('creator_drops').insert(toInsert);
+                if (error) throw error;
+            }
+            alert(`드랍 ${droppedCount}명이 저장되었습니다.`);
+        } catch (e) {
+            console.error(e);
+            alert('드랍 저장 실패: ' + (e?.message || e));
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const handleDeleteCreator = (e, creatorName) => {
         e.stopPropagation();
         if (window.confirm(`[인플루언서 교체 안내]\n\n${creatorName} 님을 정말 교체하시겠습니까?\n\n* 섭외 중 단계에서는 제공된 리스트의 30%까지만 교체/삭제가 가능합니다.`)) {
@@ -667,14 +827,21 @@ const CandidateList = ({ candidates, targetCount, matchedCount, isDeliveryTest }
         }
     };
 
+    const displayCandidates = candidates || [];
+    const isDeliveryTestView = isDeliveryTest;
+
     return (
         <div className="space-y-10 animate-fade-in-up">
             <div className="bg-white/5 backdrop-blur-xl p-8 rounded-[2.5rem] border border-white/10 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/5 blur-[100px] rounded-full"></div>
                 <div className="flex justify-between items-end mb-6 relative z-10">
                     <div>
-                        <h4 className="font-black text-white text-2xl tracking-tighter">{isDeliveryTest ? '납품 리스트' : '섭외 진행 현황'}</h4>
-                        <p className="text-sm text-slate-500 mt-2 font-light tracking-tight">{isDeliveryTest ? '인플루언서 리스트 (테스트 데이터)' : '목표 인원 달성 시 자동으로 제품 배송 단계로 전환됩니다.'}</p>
+                        <h4 className="font-black text-white text-2xl tracking-tighter">{isDeliveryTestView ? '납품 리스트' : '섭외 진행 현황'}</h4>
+                        <p className="text-sm text-slate-500 mt-2 font-light tracking-tight">
+                            {isDeliveryTestView
+                                ? `인플루언서 리스트 · 드랍 가능: 최대 ${maxDropCount}명 (30%)`
+                                : '목표 인원 달성 시 자동으로 제품 배송 단계로 전환됩니다.'}
+                        </p>
                     </div>
                     <div className="text-right">
                         <span className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400 tracking-tighter">{progress}%</span>
@@ -694,73 +861,135 @@ const CandidateList = ({ candidates, targetCount, matchedCount, isDeliveryTest }
             <div className="bg-white/5 backdrop-blur-md rounded-[2.5rem] border border-white/10 overflow-hidden shadow-2xl">
                 <div className="px-8 py-6 border-b border-white/5 flex justify-between items-center bg-white/5">
                     <h3 className="font-black text-white flex items-center gap-3 tracking-tighter">
-                        <UserCheck size={20} className="text-cyan-400"/> {isDeliveryTest ? '인플루언서 리스트 (50명)' : '리스트 (Real-time)'}
+                        <UserCheck size={20} className="text-cyan-400"/> {isDeliveryTestView ? `인플루언서 리스트 (${displayCandidates.length}명)` : '리스트 (Real-time)'}
                     </h3>
-                    <button 
-                        onClick={handleDownloadCSV}
-                        className="text-[10px] font-black tracking-widest uppercase px-4 py-2 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 text-slate-300 transition-all flex items-center gap-2"
-                    >
-                        <Download size={14}/> CSV Export
-                    </button>
+                    <div className="flex items-center gap-3">
+                        {isDeliveryTestView && user && (
+                            <button
+                                onClick={handleSaveDrops}
+                                disabled={saving || droppedCount === 0}
+                                className="text-[10px] font-black tracking-widest uppercase px-4 py-2 bg-amber-500/20 border border-amber-500/30 rounded-xl hover:bg-amber-500/30 text-amber-400 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {saving ? '저장 중...' : `드랍 ${droppedCount}명 저장`}
+                            </button>
+                        )}
+                        <button 
+                            onClick={handleDownloadCSV}
+                            className="text-[10px] font-black tracking-widest uppercase px-4 py-2 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 text-slate-300 transition-all flex items-center gap-2"
+                        >
+                            <Download size={14}/> CSV Export
+                        </button>
+                    </div>
                 </div>
                 
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
                         <thead className="bg-white/5 text-slate-500 font-black uppercase tracking-widest text-[10px] border-b border-white/5">
                             <tr>
-                                <th className="px-8 py-5">인플루언서</th>
-                                <th className="px-8 py-5">채널/팔로워</th>
-                                <th className="px-8 py-5">상세정보(Masked)</th>
-                                <th className="px-8 py-5">프로세스</th>
-                                <th className="px-8 py-5 text-right">매니지먼트</th>
+                                {isDeliveryTestView && <th className="px-8 py-5 w-14">드랍</th>}
+                                <th className="px-8 py-5">이름</th>
+                                <th className="px-8 py-5">국가</th>
+                                <th className="px-8 py-5">SNS 주소</th>
+                                <th className="px-8 py-5">팔로워 수</th>
+                                {!isDeliveryTestView && (
+                                    <>
+                                        <th className="px-8 py-5">상세정보(Masked)</th>
+                                        <th className="px-8 py-5">프로세스</th>
+                                        <th className="px-8 py-5 text-right">매니지먼트</th>
+                                    </>
+                                )}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
-                            {candidates && candidates.map((creator) => (
-                                <tr key={creator.id} className="hover:bg-white/5 transition-all group">
-                                    <td className="px-8 py-6">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-black text-sm shadow-lg group-hover:scale-110 transition-transform">
-                                                {creator.name.charAt(0)}
-                                            </div>
-                                            <div>
+                            {displayCandidates.map((creator) => {
+                                const identifier = creator._identifier || `${creator.name}|${creator.platform}`;
+                                const isDropped = droppedIds.has(identifier);
+                                return (
+                                    <tr
+                                        key={creator.id}
+                                        className={`hover:bg-white/5 transition-all group ${isDropped ? 'opacity-50 bg-red-500/5' : ''}`}
+                                    >
+                                        {isDeliveryTestView && (
+                                            <td className="px-8 py-6">
+                                                <label className="flex items-center gap-2 cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isDropped}
+                                                        onChange={() => handleDropToggle(creator)}
+                                                        disabled={!isDropped && !canDropMore}
+                                                        className="w-4 h-4 rounded border-white/30 bg-white/5 text-amber-500 focus:ring-amber-500/50"
+                                                    />
+                                                    <span className="text-[10px] text-slate-500">드랍</span>
+                                                </label>
+                                            </td>
+                                        )}
+                                        <td className="px-8 py-6">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-black text-sm shadow-lg group-hover:scale-110 transition-transform">
+                                                    {creator.name?.charAt(0) || '-'}
+                                                </div>
                                                 <p className="font-bold text-white text-base tracking-tight">{creator.name}</p>
-                                                <a href="#" className="text-xs text-cyan-400/70 hover:text-cyan-400 transition-colors">{creator.handle}</a>
                                             </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-8 py-6">
-                                        <div className="flex flex-col gap-1">
-                                            <span className="font-bold text-slate-300 uppercase tracking-tighter">{creator.platform}</span>
-                                            <span className="text-[10px] text-slate-500 font-black tracking-widest">{creator.followers} FOLLOWERS</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-8 py-6">
-                                        <div className="flex flex-col gap-1.5">
-                                            <span className="text-slate-400 text-xs font-light">{maskData(creator.location, 'general')}</span>
-                                            <span className="text-slate-600 text-[10px] font-medium">{maskData(creator.contact, 'email')}</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-8 py-6">
-                                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
-                                            creator.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_10px_rgba(52,211,153,0.2)]' :
-                                            creator.status === 'Rejected' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                                            'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
-                                        }`}>
-                                            {creator.status === 'Approved' ? '섭외완료' : creator.status === 'Rejected' ? '거절됨' : '검토중'}
-                                        </span>
-                                    </td>
-                                    <td className="px-8 py-6 text-right">
-                                        <button 
-                                            className="text-slate-500 hover:text-cyan-400 p-2.5 rounded-xl hover:bg-white/5 transition-all opacity-0 group-hover:opacity-100 shadow-xl"
-                                            title="다른 인플루언서로 교체 요청"
-                                            onClick={(e) => handleDeleteCreator(e, creator.name)}
-                                        >
-                                            <RefreshCw size={18} />
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
+                                        </td>
+                                        {isDeliveryTestView ? (
+                                            <>
+                                                <td className="px-8 py-6 text-slate-300">{creator.location || '-'}</td>
+                                                <td className="px-8 py-6">
+                                                    {creator.handle && creator.handle !== '-' ? (
+                                                        <a
+                                                            href={creator.handle.startsWith('http') ? creator.handle : '#'}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="text-cyan-400 hover:text-cyan-300 text-sm truncate max-w-[200px] block"
+                                                        >
+                                                            <ExternalLink size={12} className="inline mr-1" />
+                                                            {creator.platform}
+                                                        </a>
+                                                    ) : (
+                                                        <span className="text-slate-500">-</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-8 py-6">
+                                                    <span className="text-[10px] text-slate-400 font-black tracking-widest">{creator.followers} FOLLOWERS</span>
+                                                </td>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <td className="px-8 py-6">
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="font-bold text-slate-300 uppercase tracking-tighter">{creator.platform}</span>
+                                                        <span className="text-[10px] text-slate-500 font-black tracking-widest">{creator.followers} FOLLOWERS</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-8 py-6">
+                                                    <div className="flex flex-col gap-1.5">
+                                                        <span className="text-slate-400 text-xs font-light">{maskData(creator.location, 'general')}</span>
+                                                        <span className="text-slate-600 text-[10px] font-medium">{maskData(creator.contact, 'email')}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-8 py-6">
+                                                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
+                                                        creator.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_10px_rgba(52,211,153,0.2)]' :
+                                                        creator.status === 'Rejected' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                                                        'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+                                                    }`}>
+                                                        {creator.status === 'Approved' ? '섭외완료' : creator.status === 'Rejected' ? '거절됨' : '검토중'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-8 py-6 text-right">
+                                                    <button 
+                                                        className="text-slate-500 hover:text-cyan-400 p-2.5 rounded-xl hover:bg-white/5 transition-all opacity-0 group-hover:opacity-100 shadow-xl"
+                                                        title="다른 인플루언서로 교체 요청"
+                                                        onClick={(e) => handleDeleteCreator(e, creator.name)}
+                                                    >
+                                                        <RefreshCw size={18} />
+                                                    </button>
+                                                </td>
+                                            </>
+                                        )}
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>
@@ -1396,7 +1625,7 @@ const KickoffView = ({ campaign }) => {
 };
 
 // --- Main Campaign Detail Container ---
-const CampaignDetail = ({ campaign, isDemoMode }) => {
+const CampaignDetail = ({ campaign, isDemoMode, user }) => {
   if (!campaign) return <div className="flex flex-col items-center justify-center py-40 text-slate-700 font-black uppercase tracking-[0.3em]"><Package size={48} className="mb-4 opacity-20"/> Select Campaign</div>;
 
   if (campaign.status === CampaignStatus.PAYMENT_PENDING) {
@@ -1409,22 +1638,32 @@ const CampaignDetail = ({ campaign, isDemoMode }) => {
   }
 
   if (campaign.status === CampaignStatus.CONTACTING) {
-      const candidates = campaign.candidates || (campaign.creators || []).map((c, i) => ({
-        id: c.id || i + 1,
-        name: c.name || c.handle || '-',
-        handle: c.handle || c.name || '-',
-        platform: c.platform || 'SNS',
-        followers: String(c.followers || c.follower_count || '0'),
-        location: c.location || '-',
-        status: c.status || 'Pending Review',
-        contact: c.contact || c.email || '-',
-      }));
+      const isDeliveryTest = campaign.id === 'admin-delivery-test';
+      const candidates = isDeliveryTest
+        ? (campaign.candidates || []).map((c) => ({
+            ...c,
+            _identifier: c._identifier || `${c.name}|${c.platform}`,
+          }))
+        : (campaign.candidates || campaign.creators || []).map((c, i) => ({
+            id: c.id || i + 1,
+            name: c.name || c.handle || '-',
+            handle: c.handle || c.name || '-',
+            platform: c.platform || 'SNS',
+            followers: String(c.followers || c.follower_count || '0'),
+            location: c.location || '-',
+            status: c.status || 'Pending Review',
+            contact: c.contact || c.email || '-',
+            _identifier: `${c.name || c.handle}|${c.platform || 'SNS'}`,
+          }));
       return (
           <CandidateList 
             candidates={candidates} 
             targetCount={campaign.target_creators || 50} 
             matchedCount={campaign.matched_creators || 0}
-            isDeliveryTest={campaign.id === 'admin-delivery-test'}
+            isDeliveryTest={isDeliveryTest}
+            campaign={campaign}
+            user={user}
+            existingDrops={[]}
           />
       );
   }
@@ -1480,6 +1719,15 @@ export default function Dashboard() {
         let campaignList = data || [];
         const isAdminUser = adminEmails.length > 0 && user?.email && adminEmails.includes(user.email.toLowerCase());
         if (isAdminUser) {
+          let deliveryCandidates = testInfluencers;
+          const { data: adminCreators } = await supabase
+            .from('admin_delivery_creators')
+            .select('*')
+            .eq('list_slug', 'BS-US-FARMSKIN')
+            .order('created_at', { ascending: true });
+          if (adminCreators?.length) {
+            deliveryCandidates = adminCreators.map((r, i) => toDisplayCreator(r, i));
+          }
           const deliveryTestCampaign = {
             id: 'admin-delivery-test',
             order_number: 'BS-DELIVERY-TEST',
@@ -1487,11 +1735,11 @@ export default function Dashboard() {
             status: CampaignStatus.CONTACTING,
             brand_name: '납품 테스트 (관리자 전용)',
             product_name: 'BS-US-FARMSKIN',
-            target_creators: 50,
-            matched_creators: 50,
-            candidates: testInfluencers,
+            target_creators: deliveryCandidates.length,
+            matched_creators: deliveryCandidates.length,
+            candidates: deliveryCandidates,
             plan_price: 2390000,
-            content_count: 50,
+            content_count: deliveryCandidates.length,
             customer_name: '-',
             customer_email: user.email,
           };
@@ -1756,7 +2004,7 @@ export default function Dashboard() {
                             <StatusBadge status={selectedCampaign?.status} />
                         </div>
                         <div className="relative z-10">
-                            <CampaignDetail campaign={selectedCampaign} isDemoMode={isDemoMode} />
+                            <CampaignDetail campaign={selectedCampaign} isDemoMode={isDemoMode} user={user} />
                         </div>
                     </div>
                 )}
