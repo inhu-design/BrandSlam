@@ -41,8 +41,8 @@ export default async function handler(req, res) {
   }
   const payMethod = (method || 'card').toLowerCase();
   const isBank = payMethod === 'bank';
-  // 실시간 계좌이체: gopaymethod 빈값으로 전체 결제수단 표시 (Bank 미계약 시에도 창이 열리도록)
-  const gopaymethod = isBank ? '' : 'Card';
+  // Card:Bank = 신용카드 + 실시간 계좌이체만 (무통장입금/가상계좌 제외)
+  const gopaymethod = isBank ? 'Card:Bank' : 'Card';
   const acceptmethod = isBank ? 'centerCd(Y)' : 'card';
 
   const priceStr = String(Number(price));
@@ -61,7 +61,8 @@ export default async function handler(req, res) {
 
   const base = (process.env.INICIS_RETURN_BASE_URL || 'https://www.slam-global.com').replace(/\/$/, '');
   const returnUrl = `${base}/api/inicis/payment-callback`;
-  const closeUrl = `${base}/checkout`;
+  // 결제창 닫기 시 메인으로 이동 후 새로고침 3회 (스크롤 락·폼 초기화 방지)
+  const closeUrl = `${base}/?pc=1`;
 
   // 테스트: stgstdpay.inicis.com / 운영: stdpay.inicis.com (기본)
   const paymentUrl = (process.env.INICIS_PAYMENT_URL || 'https://stdpay.inicis.com/stdpay/INIStdPay.php').replace(/\/$/, '');
