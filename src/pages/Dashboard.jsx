@@ -1432,6 +1432,7 @@ export default function Dashboard() {
   };
   const [user, setUser] = useState(null);
   const [campaigns, setCampaigns] = useState([]);
+  const [paidOrders, setPaidOrders] = useState([]);
   const [selectedCampaignId, setSelectedCampaignId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isDemoMode, setIsDemoMode] = useState(false);
@@ -1461,6 +1462,15 @@ export default function Dashboard() {
           setSelectedCampaignId(null);
           setIsDemoMode(false); 
         }
+
+        const { data: ordersData } = await supabase
+          .from('orders')
+          .select('order_number, plan_name, plan_price, status, created_at')
+          .eq('email', user.email)
+          .eq('status', 'paid')
+          .order('created_at', { ascending: false })
+          .limit(20);
+        setPaidOrders(ordersData || []);
       } else {
         // [수정됨] 비로그인 유저: 데모 모드 노출
         setCampaigns(DEMO_CAMPAIGNS);
@@ -1536,6 +1546,37 @@ export default function Dashboard() {
                 </button>
             )}
         </div>
+
+        {user && paidOrders.length > 0 && (
+          <div className="mb-10 p-6 bg-white/[0.03] border border-white/10 rounded-2xl relative z-10">
+            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+              <CreditCard size={20} className="text-purple-400" /> 결제 내역
+            </h2>
+            <p className="text-slate-500 text-sm mb-4">KG이니시스 승인 건은 아래와 같습니다. 통합내역조회는 PG사 반영 후 일정이 소요될 수 있습니다.</p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-white/10 text-slate-500 font-medium">
+                    <th className="py-3 pr-4">주문번호</th>
+                    <th className="py-3 pr-4">상품명</th>
+                    <th className="py-3 pr-4">결제금액</th>
+                    <th className="py-3">결제일시</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paidOrders.map((o) => (
+                    <tr key={o.order_number} className="border-b border-white/5 hover:bg-white/[0.03]">
+                      <td className="py-3 pr-4 font-mono text-slate-300">{o.order_number}</td>
+                      <td className="py-3 pr-4 text-white">{o.plan_name}</td>
+                      <td className="py-3 pr-4 text-purple-400 font-semibold">{Number(o.plan_price).toLocaleString()}원</td>
+                      <td className="py-3 text-slate-400">{o.created_at ? new Date(o.created_at).toLocaleString('ko-KR') : '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {isPasswordMode && user && (
             <div className="mb-12 bg-white/5 backdrop-blur-3xl p-8 rounded-[2.5rem] shadow-2xl border border-purple-500/30 animate-fade-in-up max-w-xl">

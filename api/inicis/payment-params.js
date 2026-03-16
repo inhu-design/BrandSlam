@@ -33,12 +33,16 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Invalid JSON body' });
   }
 
-  const { oid, price, goodname, buyername, buyertel, buyeremail } = body;
+  const { oid, price, goodname, buyername, buyertel, buyeremail, method } = body;
   if (!oid || price == null || !goodname || !buyername || !buyertel || !buyeremail) {
     return res.status(400).json({
       error: 'Missing required fields: oid, price, goodname, buyername, buyertel, buyeremail',
     });
   }
+  const payMethod = (method || 'card').toLowerCase();
+  const isVBank = payMethod === 'vbank' || payMethod === 'vacct' || payMethod === 'bank';
+  const gopaymethod = isVBank ? 'VBank' : 'Card';
+  const acceptmethod = isVBank ? 'vbank' : 'card';
 
   const priceStr = String(Number(price));
   const timestamp = String(Date.now());
@@ -79,7 +83,7 @@ export default async function handler(req, res) {
     returnUrl,
     closeUrl,
     use_chkfake: 'Y',
-    gopaymethod: 'Card',  // 이니시스 웹표준 필수: 요청 지불수단 (Card=신용카드)
-    acceptmethod: 'card',
+    gopaymethod,
+    acceptmethod,
   });
 }

@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, ArrowRight, Check, UserPlus, FileText,
   CreditCard, ExternalLink, AlertTriangle, CheckCircle2, Sparkles, X, Loader2,
-  Minus, Plus, MapPin
+  Minus, Plus, MapPin, Landmark
 } from 'lucide-react';
 import Navbar from '../components/layout/Navbar';
 import Footer from '../components/layout/Footer';
@@ -11,17 +11,10 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
 const PLANS = {
-  TestPayment: { id: 'TestPayment', name: '결제 테스트 (1,000원)', price: '1,000', priceNum: 1000, count: 1, desc: 'KG이니시스 결제 연동 테스트용', isTest: true },
   Starter: { id: 'Starter', name: 'Starter', price: '590,000', priceNum: 590000, count: 10, desc: '콘텐츠 10개 보장' },
   Growth: { id: 'Growth', name: 'Growth', price: '990,000', priceNum: 990000, count: 20, desc: '콘텐츠 20개 보장', isBest: true },
   Scale50: { id: 'Scale50', name: 'Scale50', price: '2,390,000', priceNum: 2390000, count: 50, desc: '콘텐츠 50개 보장' },
   Visit: { id: 'Visit', name: 'Visit Content', pricePerPerson: 300000, isVisit: true, desc: '방문형 콘텐츠 · 인당 300,000원' },
-};
-
-const BANK_INFO = {
-  bank: 'SC제일은행',
-  account: '325-20-322490',
-  holder: '주식회사브랜드슬램',
 };
 
 const LEGAL_CONTENTS = {
@@ -291,11 +284,6 @@ const PlanCard = ({ plan, selected, onClick, showChange, onChangeClick }) => (
         MOST POPULAR
       </span>
     )}
-    {plan.isTest && (
-      <span className="absolute -top-4 left-1/2 -translate-x-1/2 bg-amber-500 text-slate-900 px-3 py-1.5 rounded-full text-[10px] font-black tracking-widest shadow-lg">
-        결제 테스트용
-      </span>
-    )}
     <h3 className="text-xl font-black text-white mb-2 tracking-tight">{plan.name}</h3>
     <div className="flex items-baseline gap-1 mb-2">
       <span className="text-3xl font-black text-purple-400">{plan.price}</span>
@@ -467,64 +455,6 @@ export default function Checkout() {
 
   const step1Valid = form.email && passwordValid && form.name && form.phone && form.company;
 
-  const handleSubmitOrder = async () => {
-    if (paymentInProgressRef.current) return;
-    paymentInProgressRef.current = true;
-    setSubmitting(true);
-    const now = new Date();
-    const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
-    const orderNum = `BS-${datePart}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
-    setOrderNumber(orderNum);
-
-    try {
-      if (isSettingPassword) {
-        await supabase.auth.updateUser({ password: form.password });
-        await supabase.auth.updateUser({
-          data: { ...(user?.user_metadata || {}), password_set: true },
-        });
-      }
-      await supabase.auth.updateUser({
-        data: { ...(user?.user_metadata || {}), name: form.name, phone: form.phone, company: form.company },
-      });
-    } catch { /* 프로필 업데이트 실패해도 주문은 진행 */ }
-
-    try {
-      await supabase.from('orders').insert([{
-        order_number: orderNum,
-        plan_name: plan.name,
-        plan_price: totalPrice,
-        content_count: plan.count,
-        email: form.email,
-        name: form.name,
-        phone: form.phone,
-        company: form.company,
-        status: 'pending_payment',
-      }]);
-    } catch { /* 저장 실패해도 결과 표시 */ }
-
-    try {
-      await supabase.from('campaigns').insert([{
-        user_id: user.id,
-        order_number: orderNum,
-        plan: plan.name,
-        status: 'PAYMENT_PENDING',
-        brand_name: form.company,
-        product_name: plan.name,
-        target_creators: plan.count || 0,
-        matched_creators: 0,
-        plan_price: totalPrice,
-        content_count: plan.count || 0,
-        customer_name: form.name,
-        customer_email: form.email,
-        customer_phone: form.phone,
-      }]);
-    } catch { /* campaigns 저장 실패해도 결과 표시 */ }
-
-    setSubmitting(false);
-    setCurrentStep(4);
-    paymentInProgressRef.current = false;
-  };
-
   const rollbackOrder = async (orderNum) => {
     try {
       const base = window.location.origin;
@@ -538,7 +468,7 @@ export default function Checkout() {
     }
   };
 
-  const handleCardPayment = async () => {
+  const handleInicisPayment = async (inicisMethod = 'card') => {
     if (paymentInProgressRef.current) return;
     paymentInProgressRef.current = true;
     setSubmitting(true);
@@ -574,13 +504,14 @@ export default function Checkout() {
           buyername: form.name,
           buyertel: form.phone,
           buyeremail: form.email,
+          method: inicisMethod,
         }),
       });
       params = await res.json();
       if (!res.ok || params.error) {
         paymentInProgressRef.current = false;
         setSubmitting(false);
-        alert(params.error || '결제 정보 생성에 실패했습니다. 계좌이체를 이용해 주시거나 관리자에게 문의하세요.');
+        alert(params.error || '결제 정보 생성에 실패했습니다. 다시 시도해 주세요.');
         return;
       }
     } catch (e) {
@@ -716,6 +647,9 @@ export default function Checkout() {
       alert('카드 결제창을 여는 도중 문제가 발생했습니다. 계좌이체를 이용해 주시길 부탁드립니다.');
     }
   };
+
+  const handleCardPayment = () => handleInicisPayment('card');
+  const handleVBankPayment = () => handleInicisPayment('vbank');
 
   const goNext = () => setCurrentStep(s => s + 1);
 
@@ -1079,7 +1013,7 @@ export default function Checkout() {
                       : 'bg-white/[0.04] border-white/10 text-slate-400 hover:border-white/20'
                   }`}
                 >
-                  <CreditCard size={20} /> 계좌이체
+                  <Landmark size={20} /> 무통장입금
                 </button>
                 <button
                   type="button"
@@ -1095,29 +1029,9 @@ export default function Checkout() {
               </div>
 
               {paymentMethod === 'bank' && (
-                <>
-                  <h3 className="font-bold text-white mb-4">계좌이체 정보</h3>
-                  <div className="bg-white/[0.04] rounded-2xl p-6 mb-6 border border-white/10">
-                    <div className="space-y-3 text-sm">
-                      <div className="flex justify-between"><span className="text-slate-500">은행</span><span className="font-bold text-white">{BANK_INFO.bank}</span></div>
-                      <div className="flex justify-between"><span className="text-slate-500">계좌번호</span><span className="font-bold text-white">{BANK_INFO.account}</span></div>
-                      <div className="flex justify-between"><span className="text-slate-500">예금주</span><span className="font-bold text-white">{BANK_INFO.holder}</span></div>
-                      <div className="flex justify-between pt-3 border-t border-white/10">
-                        <span className="font-bold text-white">입금 금액 (VAT 포함)</span>
-                        <span className="text-xl font-black text-purple-400">{totalPrice.toLocaleString()}원</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-2xl p-5 mb-8">
-                    <div className="flex gap-3">
-                      <AlertTriangle size={20} className="text-yellow-400 flex-shrink-0 mt-0.5" />
-                      <div className="text-sm">
-                        <p className="font-bold text-yellow-300">입금 기한: 오늘 오후 11시 59분까지</p>
-                        <p className="text-yellow-400/70 mt-1">입금자명은 가입하신 이름({form.name})과 동일하게 입금해주세요.</p>
-                      </div>
-                    </div>
-                  </div>
-                </>
+                <div className="bg-white/[0.04] rounded-2xl p-5 mb-8 border border-white/10">
+                  <p className="text-sm text-slate-400">무통장입금(가상계좌)으로 결제합니다. 아래 버튼을 누르면 KG이니시스 결제창이 열리고, 입금할 가상계좌 번호·은행·입금 기한을 발급받을 수 있습니다. 발급받은 계좌로 입금하시면 자동으로 결제가 완료됩니다.</p>
+                </div>
               )}
 
               {paymentMethod === 'card' && (
@@ -1143,11 +1057,11 @@ export default function Checkout() {
                 </button>
                 {paymentMethod === 'bank' ? (
                   <button
-                    onClick={handleSubmitOrder}
+                    onClick={handleVBankPayment}
                     disabled={submitting}
                     className="flex-1 py-4 rounded-2xl font-bold text-lg bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:-translate-y-0.5 shadow-lg shadow-purple-500/20 transition-all disabled:opacity-50"
                   >
-                    {submitting ? '처리 중...' : '입금 완료'}
+                    {submitting ? '발급 중...' : '가상계좌 발급받기'}
                   </button>
                 ) : (
                   <button
