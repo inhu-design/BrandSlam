@@ -41,8 +41,9 @@ export default async function handler(req, res) {
   }
   const payMethod = (method || 'card').toLowerCase();
   const isBank = payMethod === 'bank';
-  const gopaymethod = isBank ? 'Bank' : 'Card';
-  const acceptmethod = isBank ? 'bank' : 'card';
+  // 실시간 계좌이체: gopaymethod 빈값으로 전체 결제수단 표시 (Bank 미계약 시에도 창이 열리도록)
+  const gopaymethod = isBank ? '' : 'Card';
+  const acceptmethod = isBank ? 'centerCd(Y)' : 'card';
 
   const priceStr = String(Number(price));
   const timestamp = String(Date.now());

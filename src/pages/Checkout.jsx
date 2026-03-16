@@ -606,11 +606,11 @@ export default function Checkout() {
 
       const keys = ['version', 'mid', 'oid', 'price', 'currency', 'goodname', 'buyername', 'buyertel', 'buyeremail', 'timestamp', 'signature', 'verification', 'mKey', 'returnUrl', 'closeUrl', 'use_chkfake', 'gopaymethod', 'acceptmethod'];
       keys.forEach((k) => {
-        if (params[k] != null && params[k] !== '') {
+        if (params[k] != null) {
           const input = document.createElement('input');
           input.type = 'hidden';
           input.name = k;
-          input.value = params[k];
+          input.value = String(params[k]);
           formEl.appendChild(input);
         }
       });
@@ -638,7 +638,6 @@ export default function Checkout() {
             const intervalId = setInterval(() => {
               if (!payWindow.closed) return;
               clearInterval(intervalId);
-              restoreScroll();
               const pending = pendingPaymentOrderRef.current;
               const success = paymentSuccessOrderRef.current;
               if (pending && pending !== success) {
@@ -646,6 +645,8 @@ export default function Checkout() {
                 pendingPaymentOrderRef.current = null;
                 paymentSuccessOrderRef.current = null;
               }
+              // 스크롤 락·폼 초기화 방지: 메인으로 이동 후 새로고침
+              window.location.replace('/?pc=1');
             }, 300);
           } else {
             restoreScroll();
