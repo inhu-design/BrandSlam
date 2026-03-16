@@ -372,14 +372,15 @@ export default function Checkout() {
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'smooth' }); }, [currentStep]);
 
   const restoreScroll = () => {
-    document.body.style.overflow = '';
-    document.body.style.position = '';
-    document.body.style.width = '';
-    document.body.style.height = '';
-    document.documentElement.style.overflow = '';
-    document.documentElement.style.position = '';
-    document.documentElement.style.width = '';
-    document.documentElement.style.height = '';
+    [document.body, document.documentElement].forEach((el) => {
+      el.style.removeProperty('overflow');
+      el.style.removeProperty('position');
+      el.style.removeProperty('width');
+      el.style.removeProperty('height');
+      el.style.setProperty('overflow', 'auto', 'important');
+    });
+    document.body.classList.remove('modal-open', 'overflow-hidden');
+    document.documentElement.classList.remove('modal-open', 'overflow-hidden');
   };
 
   useEffect(() => {
@@ -407,7 +408,7 @@ export default function Checkout() {
         pendingPaymentOrderRef.current = null;
         paymentSuccessOrderRef.current = null;
       }
-    }, 1500);
+    }, 500);
   };
   scheduleRollbackIfAbandonedRef.current = scheduleRollbackIfAbandoned;
   useEffect(() => {
@@ -421,11 +422,27 @@ export default function Checkout() {
         scheduleRollbackIfAbandonedRef.current?.();
       }
     };
+    const onPageHide = () => {
+      restoreScroll();
+      const pending = pendingPaymentOrderRef.current;
+      const success = paymentSuccessOrderRef.current;
+      if (pending && success !== pending) {
+        const url = `${window.location.origin}/api/checkout/rollback-order`;
+        fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ order_number: pending }),
+          keepalive: true,
+        }).catch(() => {});
+      }
+    };
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', onPageHide);
     return () => {
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', onPageHide);
       if (focusRollbackTimerRef.current) clearTimeout(focusRollbackTimerRef.current);
     };
   }, []);
@@ -581,7 +598,7 @@ export default function Checkout() {
       // 💡 주의: action, method, target 속성을 직접 설정하지 마세요! INIStdPay.js가 알아서 처리합니다.
       formEl.style.display = 'none';
 
-      const keys = ['version', 'mid', 'oid', 'price', 'currency', 'goodname', 'buyername', 'buyertel', 'buyeremail', 'timestamp', 'signature', 'verification', 'mKey', 'returnUrl', 'closeUrl', 'use_chkfake', 'gopaymethod', 'acceptmethod'];
+      const keys = ['version', 'mid', 'oid', 'price', 'currency', 'goodname', 'buyername', 'buyertel', 'buyeremail', 'timestamp', 'signature', 'verification', 'mKey', 'returnUrl', 'closeUrl', 'use_chkfake', 'gopaymethod', 'acceptmethod', 'vbank_dt', 'vbank_tm'];
       keys.forEach((k) => {
         if (params[k] != null && params[k] !== '') {
           const input = document.createElement('input');
@@ -650,6 +667,56 @@ export default function Checkout() {
 
   const handleCardPayment = () => handleInicisPayment('card');
   const handleVBankPayment = () => handleInicisPayment('vbank');
+
+  const adminEmails = (import.meta.env.VITE_ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+  const isAdmin = adminEmails.length > 0 && user?.email && adminEmails.includes(user.email.toLowerCase());
+
+  const handleAdminSkipPayment = async () => {
+    if (!isAdmin || paymentInProgressRef.current || !plan) return;
+    paymentInProgressRef.current = true;
+    setSubmitting(true);
+    const now = new Date();
+    const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    const orderNum = `BS-${datePart}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+    setOrderNumber(orderNum);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) {
+        alert('로그인 세션이 없습니다. 다시 로그인해 주세요.');
+        return;
+      }
+      const res = await fetch(`${window.location.origin}/api/checkout/admin-skip-payment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          order_number: orderNum,
+          plan_name: plan.name,
+          plan_price: totalPrice,
+          content_count: plan.count,
+          email: form.email,
+          name: form.name,
+          phone: form.phone,
+          company: form.company,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || '결제 스킵에 실패했습니다.');
+        return;
+      }
+      setCurrentStep(4);
+    } catch (e) {
+      console.error(e);
+      alert('결제 스킵에 실패했습니다.');
+    } finally {
+      paymentInProgressRef.current = false;
+      setSubmitting(false);
+    }
+  };
 
   const goNext = () => setCurrentStep(s => s + 1);
 
@@ -1073,6 +1140,18 @@ export default function Checkout() {
                   </button>
                 )}
               </div>
+              {isAdmin && (
+                <div className="mt-6 pt-6 border-t border-white/10">
+                  <button
+                    type="button"
+                    onClick={handleAdminSkipPayment}
+                    disabled={submitting}
+                    className="w-full py-3 rounded-xl text-sm font-medium text-amber-400/90 bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 transition-all disabled:opacity-50"
+                  >
+                    테스트: 결제 스킵 (관리자 전용)
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

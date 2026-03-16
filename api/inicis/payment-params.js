@@ -42,7 +42,13 @@ export default async function handler(req, res) {
   const payMethod = (method || 'card').toLowerCase();
   const isVBank = payMethod === 'vbank' || payMethod === 'vacct' || payMethod === 'bank';
   const gopaymethod = isVBank ? 'VBank' : 'Card';
-  const acceptmethod = isVBank ? 'vbank' : 'card';
+  // 가상계좌: 입금 기한 필수. vbank(YYYYMMDD:HHmm) 또는 vbank_dt + vbank_tm
+  const now = new Date();
+  const expDate = new Date(now);
+  expDate.setDate(expDate.getDate() + 7);
+  const vbankDt = expDate.toISOString().slice(0, 10).replace(/-/g, '');
+  const vbankTm = '2359';
+  const acceptmethod = isVBank ? `vbank(${vbankDt}:${vbankTm})` : 'card';
 
   const priceStr = String(Number(price));
   const timestamp = String(Date.now());
@@ -65,7 +71,7 @@ export default async function handler(req, res) {
   // 테스트: stgstdpay.inicis.com / 운영: stdpay.inicis.com (기본)
   const paymentUrl = (process.env.INICIS_PAYMENT_URL || 'https://stdpay.inicis.com/stdpay/INIStdPay.php').replace(/\/$/, '');
 
-  return res.status(200).json({
+  const payload = {
     version: '1.0',
     mid: INICIS_MID,
     paymentUrl,
@@ -85,5 +91,10 @@ export default async function handler(req, res) {
     use_chkfake: 'Y',
     gopaymethod,
     acceptmethod,
-  });
+  };
+  if (isVBank) {
+    payload.vbank_dt = vbankDt;
+    payload.vbank_tm = vbankTm;
+  }
+  return res.status(200).json(payload);
 }
