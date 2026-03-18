@@ -298,7 +298,11 @@ function CampaignSetupPage() {
         await supabase.from('campaign_setup_submissions').insert([
           { campaign_id: campaignId, user_id: user?.id, form_data: payload },
         ]);
-        await supabase.from('campaigns').update({ status: 'KICKOFF' }).eq('id', campaignId).eq('user_id', user.id);
+        const productName = (restForm.productName || '').trim();
+        await supabase.from('campaigns').update({
+          status: 'KICKOFF',
+          ...(productName && { product_name: productName }),
+        }).eq('id', campaignId).eq('user_id', user.id);
       }
       navigate('/dashboard', { replace: true });
     } catch (err) {

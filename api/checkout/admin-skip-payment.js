@@ -90,7 +90,7 @@ export default async function handler(req, res) {
         const qty = Math.max(1, Number(item.qty) || 1);
         const unitPrice = Number(item.unit_price) || 0;
         const unitTotal = unitPrice > 0 ? Math.round(unitPrice * 1.1) : Math.round((Number(item.supply_amount) || 0) * 1.1);
-        const unitContentCount = item.is_visit ? 1 : Math.max(1, Math.round((Number(item.content_count) || 0) / qty));
+        const unitContentCount = item.is_visit ? 1 : Math.max(1, Number(item.content_count) || 1);
         for (let i = 0; i < qty; i++) {
           campaignRows.push({
             user_id: user.id,

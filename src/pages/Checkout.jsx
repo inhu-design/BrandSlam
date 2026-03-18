@@ -553,7 +553,14 @@ export default function Checkout() {
       return;
     }
 
-    // 2) 결제창이 정상적으로 열릴 수 있을 때만 주문/캠페인 생성
+    // 2) 결제창이 정상적으로 열릴 수 있을 때만 주문 생성 (캠페인은 결제 완료 후 생성)
+    const orderItems = lineItems.map((li) => ({
+      plan_name: li.plan.name,
+      qty: li.qty,
+      unit_price: li.unitPrice,
+      content_count: li.isVisit ? 1 : li.plan.count,
+      is_visit: !!li.isVisit,
+    }));
     try {
       await supabase.from('orders').insert([{
         order_number: orderNum,
@@ -565,6 +572,10 @@ export default function Checkout() {
         phone: form.phone,
         company: clientForm.companyName || form.company,
         status: 'pending_payment',
+        user_id: user.id,
+        client_address: clientForm.address || null,
+        client_biz_reg_no: clientForm.bizRegNo || null,
+        order_items: orderItems,
       }]);
     } catch {
       paymentInProgressRef.current = false;
@@ -573,43 +584,7 @@ export default function Checkout() {
       return;
     }
 
-    // 다중 구매: 라인아이템별로 qty만큼 캠페인 생성
-    const campaignRows = [];
-    for (const li of lineItems) {
-      const unitSupply = li.unitPrice;
-      const unitTotal = Math.round(unitSupply * 1.1);
-      const unitCount = li.isVisit ? 1 : li.plan.count;
-      for (let i = 0; i < li.qty; i++) {
-        campaignRows.push({
-          user_id: user.id,
-          order_number: orderNum,
-          plan: li.plan.name,
-          status: 'PAYMENT_PENDING',
-          brand_name: clientForm.companyName || form.company,
-          product_name: li.plan.name,
-          target_creators: unitCount,
-          matched_creators: 0,
-          plan_price: unitTotal,
-          content_count: unitCount,
-          customer_name: form.name,
-          customer_email: form.email,
-          customer_phone: form.phone,
-          client_address: clientForm.address || null,
-          client_biz_reg_no: clientForm.bizRegNo || null,
-        });
-      }
-    }
-    try {
-      await supabase.from('campaigns').insert(campaignRows);
-    } catch {
-      await rollbackOrder(orderNum);
-      paymentInProgressRef.current = false;
-      setSubmitting(false);
-      alert('캠페인 저장에 실패했습니다. 다시 시도해 주세요.');
-      return;
-    }
-
-    // 3) 결제창 오픈. 실패하면 방금 만든 주문/캠페인 롤백
+    // 3) 결제창 오픈. 실패하면 방금 만든 주문 롤백
     try {
       const formId = 'inicis-pay-form';
       let formEl = document.getElementById(formId);
@@ -676,32 +651,13 @@ export default function Checkout() {
     const orderNum = `BS-${datePart}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
     const planSummary = lineItems.map((li) => `${li.plan.name} x ${li.qty}`).join(', ');
     const totalContentCount = lineItems.reduce((s, li) => s + li.count, 0);
-
-    const campaignRows = [];
-    for (const li of lineItems) {
-      const unitSupply = li.unitPrice;
-      const unitTotal = Math.round(unitSupply * 1.1);
-      const unitCount = li.isVisit ? 1 : li.plan.count;
-      for (let i = 0; i < li.qty; i++) {
-        campaignRows.push({
-          user_id: user.id,
-          order_number: orderNum,
-          plan: li.plan.name,
-          status: 'PAYMENT_PENDING',
-          brand_name: clientForm.companyName || form.company,
-          product_name: li.plan.name,
-          target_creators: unitCount,
-          matched_creators: 0,
-          plan_price: unitTotal,
-          content_count: unitCount,
-          customer_name: form.name,
-          customer_email: form.email,
-          customer_phone: form.phone,
-          client_address: clientForm.address || null,
-          client_biz_reg_no: clientForm.bizRegNo || null,
-        });
-      }
-    }
+    const orderItems = lineItems.map((li) => ({
+      plan_name: li.plan.name,
+      qty: li.qty,
+      unit_price: li.unitPrice,
+      content_count: li.isVisit ? 1 : li.plan.count,
+      is_visit: !!li.isVisit,
+    }));
 
     try {
       if (isSettingPassword) {
@@ -721,8 +677,11 @@ export default function Checkout() {
         phone: form.phone,
         company: clientForm.companyName || form.company,
         status: 'pending_payment',
+        user_id: user.id,
+        client_address: clientForm.address || null,
+        client_biz_reg_no: clientForm.bizRegNo || null,
+        order_items: orderItems,
       }]);
-      await supabase.from('campaigns').insert(campaignRows);
       setOrderNumber(orderNum);
       setBankOrderNumber(orderNum);
     } catch (e) {
@@ -795,8 +754,8 @@ export default function Checkout() {
       qty: li.qty,
       unit_price: li.unitPrice,
       supply_amount: li.supplyAmount,
-      content_count: li.count,
-      is_visit: li.isVisit,
+      content_count: li.isVisit ? 1 : li.plan.count,
+      is_visit: !!li.isVisit,
     }));
     try {
       const { data: { session } } = await supabase.auth.getSession();

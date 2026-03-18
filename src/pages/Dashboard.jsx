@@ -1701,6 +1701,9 @@ export default function Dashboard() {
   const [newPassword, setNewPassword] = useState('');
   const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
   const [isPasswordMode, setIsPasswordMode] = useState(false);
+  const [impersonateEmail, setImpersonateEmail] = useState('');
+  const [impersonateLoading, setImpersonateLoading] = useState(false);
+  const [impersonateExpanded, setImpersonateExpanded] = useState(false);
 
   const adminEmails = useMemo(() => (import.meta.env.VITE_ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean), []);
 
@@ -1790,6 +1793,42 @@ export default function Dashboard() {
     alert("본 서비스는 부가 서비스를 구독 중인 브랜드에만 제공됩니다. (현재 준비 중)");
   };
 
+  const handleImpersonateLogin = async () => {
+    const email = impersonateEmail.trim();
+    if (!email || !email.includes('@')) {
+      alert('유효한 고객 이메일을 입력해주세요.');
+      return;
+    }
+    setImpersonateLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) {
+        alert('로그인 세션이 없습니다.');
+        return;
+      }
+      const res = await fetch(`${window.location.origin}/api/admin/impersonate-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || '링크 생성에 실패했습니다.');
+        return;
+      }
+      if (data.impersonate_url) {
+        window.open(data.impersonate_url, '_blank', 'noopener,noreferrer');
+        alert('새 탭에서 고객 화면이 열립니다. (링크는 1회용입니다)');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('링크 생성 중 오류가 발생했습니다.');
+    } finally {
+      setImpersonateLoading(false);
+    }
+  };
+
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#020617]"><div className="w-12 h-12 border-4 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin"></div></div>;
 
   const selectedCampaign = campaigns.find(c => c.id === selectedCampaignId);
@@ -1811,6 +1850,43 @@ export default function Dashboard() {
             <div className="mb-10 p-5 bg-amber-500/10 border border-amber-500/30 rounded-3xl flex items-center gap-4 text-amber-200 text-sm animate-fade-in-down">
                 <AlertCircle size={20} className="text-amber-400 shrink-0" />
                 <span className="font-light tracking-tight"><b className="font-black text-amber-400 uppercase tracking-widest">납품 테스트</b> — BS-US-FARMSKIN 엑셀에서 추출한 50명 인플루언서 데이터입니다. 고객 노출 전 관리자 전용 미리보기입니다.</span>
+            </div>
+        )}
+
+        {user && adminEmails.includes(user.email?.toLowerCase()) && (
+            <div className="mb-10 p-5 bg-slate-800/50 border border-slate-600/30 rounded-3xl animate-fade-in-down">
+                <button
+                    onClick={() => setImpersonateExpanded(!impersonateExpanded)}
+                    className="w-full flex items-center justify-between text-left"
+                >
+                    <span className="font-bold text-slate-300 flex items-center gap-2">
+                        <UserCheck size={18} className="text-cyan-400" /> 고객 화면으로 로그인 (관리자 전용)
+                    </span>
+                    <ChevronRight size={18} className={`text-slate-500 transition-transform ${impersonateExpanded ? 'rotate-90' : ''}`} />
+                </button>
+                {impersonateExpanded && (
+                    <div className="mt-4 pt-4 border-t border-slate-600/30 space-y-3">
+                        <p className="text-slate-500 text-sm">고객 이메일만 입력하면 비밀번호 없이 해당 고객 화면으로 진입할 수 있습니다. (Supabase에 등록된 이메일)</p>
+                        <div className="flex flex-wrap gap-3">
+                            <input
+                                type="email"
+                                placeholder="customer@example.com"
+                                value={impersonateEmail}
+                                onChange={(e) => setImpersonateEmail(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleImpersonateLogin()}
+                                className="flex-1 min-w-[200px] px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 text-sm"
+                            />
+                            <button
+                                onClick={handleImpersonateLogin}
+                                disabled={impersonateLoading}
+                                className="px-5 py-2.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 rounded-xl font-bold text-sm text-white transition-all flex items-center gap-2"
+                            >
+                                {impersonateLoading ? <RefreshCw size={16} className="animate-spin" /> : null}
+                                새 탭에서 고객으로 열기
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         )}
 

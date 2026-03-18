@@ -47,7 +47,7 @@ export default async function handler(req, res) {
 
   const { data: order, error: orderError } = await supabaseAdmin
     .from('orders')
-    .select('id, email, status')
+    .select('id, email, status, user_id, order_items, name, phone, company, client_address, client_biz_reg_no')
     .eq('order_number', orderNumber)
     .single();
 
@@ -66,6 +66,41 @@ export default async function handler(req, res) {
   }
 
   try {
+    // 결제 완료 시 order_items로 campaigns 생성 (캠페인은 입금 확인 시점에만 생성)
+    const orderItems = Array.isArray(order.order_items) ? order.order_items : [];
+    const userId = order.user_id || user.id;
+    if (userId && orderItems.length > 0) {
+      const campaignRows = [];
+      for (const item of orderItems) {
+        const planName = item.plan_name || '';
+        const qty = Math.max(1, Number(item.qty) || 1);
+        const unitPrice = Number(item.unit_price) || 0;
+        const unitTotal = unitPrice > 0 ? Math.round(unitPrice * 1.1) : 0;
+        const unitCount = item.is_visit ? 1 : Math.max(1, Number(item.content_count) || 1);
+        for (let i = 0; i < qty; i++) {
+          campaignRows.push({
+            user_id: userId,
+            order_number: orderNumber,
+            plan: planName,
+            status: 'PAYMENT_PENDING',
+            brand_name: order.company || '',
+            product_name: planName,
+            target_creators: unitCount,
+            matched_creators: 0,
+            plan_price: unitTotal,
+            content_count: unitCount,
+            customer_name: order.name || '',
+            customer_email: order.email || '',
+            customer_phone: order.phone || '',
+            client_address: order.client_address || null,
+            client_biz_reg_no: order.client_biz_reg_no || null,
+          });
+        }
+      }
+      if (campaignRows.length > 0) {
+        await supabaseAdmin.from('campaigns').insert(campaignRows);
+      }
+    }
     await supabaseAdmin.from('orders').update({ status: 'paid' }).eq('order_number', orderNumber);
     return res.status(200).json({ ok: true, order_number: orderNumber });
   } catch (err) {
