@@ -61,25 +61,29 @@ export default async function handler(req, res) {
   }
 
   try {
+    const baseUrl = (req.headers.origin || req.headers['x-forwarded-host'] || 'https://www.slam-global.com').replace(/\/$/, '');
+    const redirectTo = `${baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`}/dashboard`;
+
     const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'magiclink',
       email: customerEmail,
-      options: {
-        redirectTo: `${req.headers.origin || 'https://www.slam-global.com'}/dashboard`,
-      },
+      options: { redirectTo },
     });
 
     if (linkError) {
       return res.status(400).json({ error: linkError.message || 'Failed to generate link' });
     }
 
-    const hashedToken = linkData?.properties?.hashed_token;
-    if (!hashedToken) {
-      return res.status(500).json({ error: 'No token in response' });
+    // action_link: Supabase가 생성한 전체 URL (바로 사용 가능)
+    // hashed_token: /auth/impersonate 페이지에서 verifyOtp용
+    let impersonateUrl = linkData?.properties?.action_link;
+    if (!impersonateUrl) {
+      const hashedToken = linkData?.properties?.hashed_token;
+      if (!hashedToken) {
+        return res.status(500).json({ error: 'No token in response' });
+      }
+      impersonateUrl = `${baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`}/auth/impersonate?token_hash=${encodeURIComponent(hashedToken)}`;
     }
-
-    const baseUrl = req.headers.origin || 'https://www.slam-global.com';
-    const impersonateUrl = `${baseUrl}/auth/impersonate?token_hash=${encodeURIComponent(hashedToken)}`;
 
     return res.status(200).json({
       ok: true,

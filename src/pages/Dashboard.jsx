@@ -1812,7 +1812,17 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ email }),
       });
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        const text = await res.text();
+        const msg = res.status === 404
+          ? 'API 경로를 찾을 수 없습니다. Vercel에 api/admin/impersonate-login.js가 배포되었는지 확인하세요.'
+          : `서버 응답 오류 (${res.status}): ${text?.slice(0, 100) || '비정상 응답'}`;
+        alert(msg);
+        return;
+      }
       if (!res.ok) {
         alert(data.error || '링크 생성에 실패했습니다.');
         return;
@@ -1823,7 +1833,8 @@ export default function Dashboard() {
       }
     } catch (e) {
       console.error(e);
-      alert('링크 생성 중 오류가 발생했습니다.');
+      const msg = e?.message || String(e);
+      alert(`링크 생성 중 오류: ${msg.includes('fetch') || msg.includes('Failed') ? '네트워크 오류 또는 API 미배포' : msg}`);
     } finally {
       setImpersonateLoading(false);
     }
