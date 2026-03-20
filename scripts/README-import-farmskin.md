@@ -24,6 +24,14 @@ set SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 npm run import:farmskin -- "C:\경로\BS-US-FARMSKIN.xlsx"
 ```
 
+PowerShell (Windows):
+
+```powershell
+$env:SUPABASE_SERVICE_ROLE_KEY="서비스롤-키"; npm run import:farmskin -- "C:\Users\...\팜스킨 4명수정.xlsx"
+```
+
+스크립트는 `list_slug = BS-US-FARMSKIN` 행을 **전부 삭제한 뒤** 엑셀 내용으로 다시 채웁니다.
+
 ## 3. Supabase 마이그레이션
 
 **리스트 확정 / 드랍 기한** 기능: `supabase-migration-delivery-list-sessions.sql` 을 반드시 실행하세요. (미실행 시 `delivery_list_sessions` 테이블 오류) — 단계는 `docs/supabase-setup-ko.md` 참고.
