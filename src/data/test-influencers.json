@@ -34,11 +34,16 @@
     "location": "US",
     "status": "Pending Review",
     "contact": "-",
-    "tiktok_url": null,
-    "tiktok_follower": null,
+    "tiktok_url": "https://www.tiktok.com/@ditsa41",
+    "tiktok_follower": "917",
     "instagram_url": "https://www.instagram.com/bakedbyditzy?igsh=c3U0MnBrY3puZ2t1&utm_source=qr",
     "instagram_follower": "1732",
     "sns_channels": [
+      {
+        "platform": "TikTok",
+        "url": "https://www.tiktok.com/@ditsa41",
+        "followers": "917"
+      },
       {
         "platform": "Instagram",
         "url": "https://www.instagram.com/bakedbyditzy?igsh=c3U0MnBrY3puZ2t1&utm_source=qr",
@@ -96,17 +101,22 @@
   {
     "id": 5,
     "name": "Stephanie Padilla",
-    "handle": "https://www.instagram.com/itz_stephy_p?igsh=cmZ6OGFsNXpwdHg3&utm_source=qr",
-    "platform": "Instagram",
-    "followers": "1111",
+    "handle": "https://www.tiktok.com/@itz_stephy_p",
+    "platform": "TikTok",
+    "followers": "3147",
     "location": "US",
     "status": "Pending Review",
     "contact": "-",
-    "tiktok_url": null,
-    "tiktok_follower": null,
+    "tiktok_url": "https://www.tiktok.com/@itz_stephy_p",
+    "tiktok_follower": "3147",
     "instagram_url": "https://www.instagram.com/itz_stephy_p?igsh=cmZ6OGFsNXpwdHg3&utm_source=qr",
     "instagram_follower": "1111",
     "sns_channels": [
+      {
+        "platform": "TikTok",
+        "url": "https://www.tiktok.com/@itz_stephy_p",
+        "followers": "3147"
+      },
       {
         "platform": "Instagram",
         "url": "https://www.instagram.com/itz_stephy_p?igsh=cmZ6OGFsNXpwdHg3&utm_source=qr",
@@ -170,11 +180,16 @@
     "location": "CA",
     "status": "Pending Review",
     "contact": "-",
-    "tiktok_url": null,
-    "tiktok_follower": null,
+    "tiktok_url": "https://www.tiktok.com/@freakysreviews",
+    "tiktok_follower": "1725",
     "instagram_url": "https://www.instagram.com/preetichima?igsh=YXF4enR0dnhhb2lp&utm_source=qr",
     "instagram_follower": "2395",
     "sns_channels": [
+      {
+        "platform": "TikTok",
+        "url": "https://www.tiktok.com/@freakysreviews",
+        "followers": "1725"
+      },
       {
         "platform": "Instagram",
         "url": "https://www.instagram.com/preetichima?igsh=YXF4enR0dnhhb2lp&utm_source=qr",
@@ -243,11 +258,16 @@
     "location": "US",
     "status": "Pending Review",
     "contact": "-",
-    "tiktok_url": null,
-    "tiktok_follower": null,
+    "tiktok_url": "https://www.tiktok.com/@ashleycaarvajal?_t=8iHCr9Z1qC6&_r=1&fbclid=PAZXh0bgNhZW0CMTEAc3J0YwZhcHBfaWQMMjU2MjgxMDQwNTU4AAGn_JmSRaSs65HCSP-timWUFK7SrpENKVDb1Kci6FYDASf3sO8BqW9Lh2o_L1M_aem_ytGgEW5J2i3mvVkjwytM8A",
+    "tiktok_follower": "3444",
     "instagram_url": "https://www.instagram.com/ashleycaarvajal?igsh=N2cwa2Z2NHpreDVk",
     "instagram_follower": "4214",
     "sns_channels": [
+      {
+        "platform": "TikTok",
+        "url": "https://www.tiktok.com/@ashleycaarvajal?_t=8iHCr9Z1qC6&_r=1&fbclid=PAZXh0bgNhZW0CMTEAc3J0YwZhcHBfaWQMMjU2MjgxMDQwNTU4AAGn_JmSRaSs65HCSP-timWUFK7SrpENKVDb1Kci6FYDASf3sO8BqW9Lh2o_L1M_aem_ytGgEW5J2i3mvVkjwytM8A",
+        "followers": "3444"
+      },
       {
         "platform": "Instagram",
         "url": "https://www.instagram.com/ashleycaarvajal?igsh=N2cwa2Z2NHpreDVk",
@@ -421,11 +441,16 @@
     "location": "US",
     "status": "Pending Review",
     "contact": "-",
-    "tiktok_url": null,
-    "tiktok_follower": null,
+    "tiktok_url": "https://www.tiktok.com/@witandarte",
+    "tiktok_follower": "1285",
     "instagram_url": "https://www.instagram.com/witandarte/",
     "instagram_follower": "4637",
     "sns_channels": [
+      {
+        "platform": "TikTok",
+        "url": "https://www.tiktok.com/@witandarte",
+        "followers": "1285"
+      },
       {
         "platform": "Instagram",
         "url": "https://www.instagram.com/witandarte/",
@@ -552,11 +577,16 @@
     "location": "US",
     "status": "Pending Review",
     "contact": "-",
-    "tiktok_url": null,
-    "tiktok_follower": null,
+    "tiktok_url": "https://www.tiktok.com/@nattyslife_ugc",
+    "tiktok_follower": "1217",
     "instagram_url": "https://www.instagram.com/nattyslife_ugc?igsh=YmM0czNjaXN3cmdz&utm_source=qr",
     "instagram_follower": "4036",
     "sns_channels": [
+      {
+        "platform": "TikTok",
+        "url": "https://www.tiktok.com/@nattyslife_ugc",
+        "followers": "1217"
+      },
       {
         "platform": "Instagram",
         "url": "https://www.instagram.com/nattyslife_ugc?igsh=YmM0czNjaXN3cmdz&utm_source=qr",
@@ -641,11 +671,16 @@
     "location": "US",
     "status": "Pending Review",
     "contact": "-",
-    "tiktok_url": null,
-    "tiktok_follower": null,
+    "tiktok_url": "https://www.tiktok.com/@yanka_ugc",
+    "tiktok_follower": "1321",
     "instagram_url": "https://www.instagram.com/yanka.ugc?igsh=NTc4MTIwNjQ2YQ%3D%3D&utm_source=qr",
     "instagram_follower": "1850",
     "sns_channels": [
+      {
+        "platform": "TikTok",
+        "url": "https://www.tiktok.com/@yanka_ugc",
+        "followers": "1321"
+      },
       {
         "platform": "Instagram",
         "url": "https://www.instagram.com/yanka.ugc?igsh=NTc4MTIwNjQ2YQ%3D%3D&utm_source=qr",
@@ -662,11 +697,16 @@
     "location": "US",
     "status": "Pending Review",
     "contact": "-",
-    "tiktok_url": null,
-    "tiktok_follower": null,
+    "tiktok_url": "https://www.tiktok.com/@brandidoesrny",
+    "tiktok_follower": "280",
     "instagram_url": "https://www.instagram.com/brandidoesrny?igsh=MXg4eTExazIweXB2ag%3D%3D&utm_source=qr",
     "instagram_follower": "1178",
     "sns_channels": [
+      {
+        "platform": "TikTok",
+        "url": "https://www.tiktok.com/@brandidoesrny",
+        "followers": "280"
+      },
       {
         "platform": "Instagram",
         "url": "https://www.instagram.com/brandidoesrny?igsh=MXg4eTExazIweXB2ag%3D%3D&utm_source=qr",
@@ -814,11 +854,16 @@
     "location": "US",
     "status": "Pending Review",
     "contact": "-",
-    "tiktok_url": null,
-    "tiktok_follower": null,
+    "tiktok_url": "https://www.tiktok.com/@soyannagonzalez?_t=ZS-8wDNcOMR89x&_r=1&fbclid=PAZXh0bgNhZW0CMTEAc3J0YwZhcHBfaWQMMjU2MjgxMDQwNTU4AAGnST0hzFOmhjw7W06VEv4D0AjeaE65jYUbao9scDnw9ypLzHAxwXHKj-k388w_aem_-v8cmMOjt8dCXoMjQq4usg",
+    "tiktok_follower": "817",
     "instagram_url": "https://www.instagram.com/soyannagonzalez?igsh=MTZwZGJzbHNxcmFudg%3D%3D&utm_source=qr",
     "instagram_follower": "2406",
     "sns_channels": [
+      {
+        "platform": "TikTok",
+        "url": "https://www.tiktok.com/@soyannagonzalez?_t=ZS-8wDNcOMR89x&_r=1&fbclid=PAZXh0bgNhZW0CMTEAc3J0YwZhcHBfaWQMMjU2MjgxMDQwNTU4AAGnST0hzFOmhjw7W06VEv4D0AjeaE65jYUbao9scDnw9ypLzHAxwXHKj-k388w_aem_-v8cmMOjt8dCXoMjQq4usg",
+        "followers": "817"
+      },
       {
         "platform": "Instagram",
         "url": "https://www.instagram.com/soyannagonzalez?igsh=MTZwZGJzbHNxcmFudg%3D%3D&utm_source=qr",
@@ -835,11 +880,16 @@
     "location": "CA",
     "status": "Pending Review",
     "contact": "-",
-    "tiktok_url": null,
-    "tiktok_follower": null,
+    "tiktok_url": "https://www.tiktok.com/@makeupbypriyankasoni",
+    "tiktok_follower": "259",
     "instagram_url": "https://www.instagram.com/prismaticpalettebypriyanka?igsh=MTh0Z2l5dzJuN2xsZg%3D%3D&utm_source=qr",
     "instagram_follower": "12000",
     "sns_channels": [
+      {
+        "platform": "TikTok",
+        "url": "https://www.tiktok.com/@makeupbypriyankasoni",
+        "followers": "259"
+      },
       {
         "platform": "Instagram",
         "url": "https://www.instagram.com/prismaticpalettebypriyanka?igsh=MTh0Z2l5dzJuN2xsZg%3D%3D&utm_source=qr",
@@ -882,11 +932,16 @@
     "location": "US",
     "status": "Pending Review",
     "contact": "-",
-    "tiktok_url": null,
-    "tiktok_follower": null,
+    "tiktok_url": "https://www.tiktok.com/@dolcetto.diary",
+    "tiktok_follower": "270",
     "instagram_url": "https://www.instagram.com/dolcetto.diary/",
     "instagram_follower": "1093",
     "sns_channels": [
+      {
+        "platform": "TikTok",
+        "url": "https://www.tiktok.com/@dolcetto.diary",
+        "followers": "270"
+      },
       {
         "platform": "Instagram",
         "url": "https://www.instagram.com/dolcetto.diary/",
@@ -1071,11 +1126,16 @@
     "location": "US",
     "status": "Pending Review",
     "contact": "-",
-    "tiktok_url": null,
-    "tiktok_follower": null,
+    "tiktok_url": "https://www.tiktok.com/@Zamyudy",
+    "tiktok_follower": "206",
     "instagram_url": "https://www.instagram.com/beauty_byyudy?igsh=MXhyZWhsNjd2cHo0Mg%3D%3D&utm_source=qr",
     "instagram_follower": "5270",
     "sns_channels": [
+      {
+        "platform": "TikTok",
+        "url": "https://www.tiktok.com/@Zamyudy",
+        "followers": "206"
+      },
       {
         "platform": "Instagram",
         "url": "https://www.instagram.com/beauty_byyudy?igsh=MXhyZWhsNjd2cHo0Mg%3D%3D&utm_source=qr",
@@ -1092,11 +1152,16 @@
     "location": "CA",
     "status": "Pending Review",
     "contact": "-",
-    "tiktok_url": null,
-    "tiktok_follower": null,
+    "tiktok_url": "https://www.tiktok.com/@dazzlewithsimran",
+    "tiktok_follower": "313",
     "instagram_url": "https://www.instagram.com/dazzlewithsimran?igsh=MTc0ZWJjenp0cnU2Yg%3D%3D&utm_source=qr",
     "instagram_follower": "7115",
     "sns_channels": [
+      {
+        "platform": "TikTok",
+        "url": "https://www.tiktok.com/@dazzlewithsimran",
+        "followers": "313"
+      },
       {
         "platform": "Instagram",
         "url": "https://www.instagram.com/dazzlewithsimran?igsh=MTc0ZWJjenp0cnU2Yg%3D%3D&utm_source=qr",
