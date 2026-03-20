@@ -33,14 +33,38 @@ function parseFollower(val) {
   return Math.round(num);
 }
 
-/** 엑셀 행 → 표준 레코드 */
+/** 엑셀 열 이름이 시트마다 조금 달라도 읽기 (공백·대소문자 무시) */
+function pickCell(row, ...wantedKeys) {
+  for (const k of wantedKeys) {
+    if (row[k] != null && String(row[k]).trim() !== '') return row[k];
+  }
+  const norm = (s) => String(s).toLowerCase().replace(/\s+/g, ' ').trim();
+  const rowEntries = Object.entries(row);
+  for (const want of wantedKeys) {
+    const w = norm(want);
+    const hit = rowEntries.find(([key]) => norm(key) === w);
+    if (hit && hit[1] != null && String(hit[1]).trim() !== '') return hit[1];
+  }
+  return null;
+}
+
+function trimCell(v) {
+  if (v == null) return null;
+  const s = String(v).trim();
+  return s === '' ? null : s;
+}
+
+/** 엑셀 행 → 표준 레코드 (TikTok·인스타 컬럼이 둘 다 있으면 둘 다 보존) */
 function rowToRecord(row, idx) {
-  const name = row['name'] || row['Name'] || '';
-  const shippingCountry = row['Shipping country'] || row['shipping country'] || row['Shipping Country'] || '';
-  const tiktokUrl = row['Tiktok_URL'] || row['tiktok url'] || null;
-  const tiktokFollower = row['Tiktok_Follower'] != null ? String(row['Tiktok_Follower']) : null;
-  const instagramUrl = row['Instagram_URL'] || row['instagram url'] || null;
-  const instagramFollower = row['Instagram_Follower'] != null ? String(row['Instagram_Follower']) : null;
+  const name = pickCell(row, 'name', 'Name') || '';
+  const shippingCountry = trimCell(pickCell(row, 'Shipping country', 'Shipping Country', 'shipping country')) || '';
+  const tiktokUrl = trimCell(pickCell(row, 'Tiktok_URL', 'TikTok_URL', 'tiktok_url', 'Tiktok URL', 'TikTok URL'));
+  const tiktokFollowerRaw = pickCell(row, 'Tiktok_Follower', 'TikTok_Follower', 'tiktok_follower', 'Tiktok Follower');
+  const instagramUrl = trimCell(pickCell(row, 'Instagram_URL', 'instagram_url', 'Instagram URL', 'Instagram url'));
+  const instagramFollowerRaw = pickCell(row, 'Instagram_Follower', 'instagram_follower', 'Instagram Follower');
+
+  const tiktokFollower = tiktokFollowerRaw != null && String(tiktokFollowerRaw).trim() !== '' ? String(tiktokFollowerRaw).trim() : null;
+  const instagramFollower = instagramFollowerRaw != null && String(instagramFollowerRaw).trim() !== '' ? String(instagramFollowerRaw).trim() : null;
 
   const ttCount = parseFollower(tiktokFollower);
   const igCount = parseFollower(instagramFollower);
@@ -103,18 +127,35 @@ async function main() {
 
   console.log(`Parsed ${records.length} creators`);
 
-  // 1) JSON 저장 (대시보드 fallback)
+  // 1) JSON 저장 (대시보드 fallback) — TikTok·인스타 둘 다 노출용 sns_channels + 원본 4필드
   const jsonPath = join(__dirname, '../src/data/test-influencers.json');
-  const jsonData = records.map((r) => ({
-    id: r.id,
-    name: r.name,
-    handle: r.handle,
-    platform: r.platform,
-    followers: r.followers,
-    location: r.location,
-    status: r.status,
-    contact: r.contact,
-  }));
+  const jsonData = records.map((r) => {
+    const sns_channels = [];
+    if (r.tiktok_url || r.tiktok_follower) {
+      sns_channels.push({ platform: 'TikTok', url: r.tiktok_url || null, followers: String(r.tiktok_follower ?? '0') });
+    }
+    if (r.instagram_url || r.instagram_follower) {
+      sns_channels.push({ platform: 'Instagram', url: r.instagram_url || null, followers: String(r.instagram_follower ?? '0') });
+    }
+    if (sns_channels.length === 0) {
+      sns_channels.push({ platform: 'SNS', url: r.tiktok_url || r.instagram_url || null, followers: '0' });
+    }
+    return {
+      id: r.id,
+      name: r.name,
+      handle: r.handle,
+      platform: r.platform,
+      followers: r.followers,
+      location: r.location,
+      status: r.status,
+      contact: r.contact,
+      tiktok_url: r.tiktok_url,
+      tiktok_follower: r.tiktok_follower,
+      instagram_url: r.instagram_url,
+      instagram_follower: r.instagram_follower,
+      sns_channels,
+    };
+  });
   writeFileSync(jsonPath, JSON.stringify(jsonData, null, 2), 'utf8');
   console.log('Written:', jsonPath);
 
