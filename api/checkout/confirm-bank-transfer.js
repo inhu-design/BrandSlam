@@ -6,6 +6,7 @@
  */
 import { createClient } from '@supabase/supabase-js';
 import { supabase as supabaseAdmin } from '../lib/supabase-server.js';
+import { buildCampaignRowsFromOrderItems } from '../lib/build-campaign-rows-from-order-items.js';
 
 const supabaseUrl = process.env.SUPABASE_URL || 'https://grlayjybcxrcaufnwysb.supabase.co';
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdybGF5anliY3hyY2F1Zm53eXNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUzNDM4NzksImV4cCI6MjA4MDkxOTg3OX0.Voj60xKccEl2_r8EzLVO-fot5WiEiUHb6UTfya2ql8Q';
@@ -47,7 +48,7 @@ export default async function handler(req, res) {
 
   const { data: order, error: orderError } = await supabaseAdmin
     .from('orders')
-    .select('id, email, status, user_id, order_items, name, phone, company, client_address, client_biz_reg_no')
+    .select('id, email, status, user_id, order_items, plan_name, name, phone, company, client_address, client_biz_reg_no')
     .eq('order_number', orderNumber)
     .single();
 
@@ -70,33 +71,21 @@ export default async function handler(req, res) {
     const orderItems = Array.isArray(order.order_items) ? order.order_items : [];
     const userId = order.user_id || user.id;
     if (userId && orderItems.length > 0) {
-      const campaignRows = [];
-      for (const item of orderItems) {
-        const planName = item.plan_name || '';
-        const qty = Math.max(1, Number(item.qty) || 1);
-        const unitPrice = Number(item.unit_price) || 0;
-        const unitTotal = unitPrice > 0 ? Math.round(unitPrice * 1.1) : 0;
-        const unitCount = item.is_visit ? 1 : Math.max(1, Number(item.content_count) || 1);
-        for (let i = 0; i < qty; i++) {
-          campaignRows.push({
-            user_id: userId,
-            order_number: orderNumber,
-            plan: planName,
-            status: 'PAYMENT_PENDING',
-            brand_name: order.company || '',
-            product_name: planName,
-            target_creators: unitCount,
-            matched_creators: 0,
-            plan_price: unitTotal,
-            content_count: unitCount,
-            customer_name: order.name || '',
-            customer_email: order.email || '',
-            customer_phone: order.phone || '',
-            client_address: order.client_address || null,
-            client_biz_reg_no: order.client_biz_reg_no || null,
-          });
-        }
-      }
+      const campaignRows = buildCampaignRowsFromOrderItems(
+        orderItems,
+        {
+          user_id: userId,
+          order_number: orderNumber,
+          status: 'PAYMENT_PENDING',
+          brand_name: order.company || '',
+          customer_name: order.name || '',
+          customer_email: order.email || '',
+          customer_phone: order.phone || '',
+          client_address: order.client_address || null,
+          client_biz_reg_no: order.client_biz_reg_no || null,
+        },
+        { orderPlanName: order.plan_name },
+      );
       if (campaignRows.length > 0) {
         await supabaseAdmin.from('campaigns').insert(campaignRows);
       }

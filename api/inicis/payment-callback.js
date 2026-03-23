@@ -4,6 +4,7 @@
  * - resultCode "00" 또는 "0000" 등 성공 시 orders만 paid로 갱신 (campaigns는 PAYMENT_PENDING 유지 → 송장·캠페인 세팅 후 착수)
  */
 import { supabase } from '../lib/supabase-server.js';
+import { buildCampaignRowsFromOrderItems } from '../lib/build-campaign-rows-from-order-items.js';
 
 const baseUrl = (process.env.INICIS_RETURN_BASE_URL || 'https://www.slam-global.com').replace(/\/$/, '');
 
@@ -39,38 +40,26 @@ export default async function handler(req, res) {
     try {
       const { data: order } = await supabase
         .from('orders')
-        .select('user_id, order_items, name, email, phone, company, client_address, client_biz_reg_no')
+        .select('user_id, order_items, plan_name, name, email, phone, company, client_address, client_biz_reg_no')
         .eq('order_number', orderId)
         .single();
 
       if (order?.user_id && Array.isArray(order.order_items) && order.order_items.length > 0) {
-        const campaignRows = [];
-        for (const item of order.order_items) {
-          const planName = item.plan_name || '';
-          const qty = Math.max(1, Number(item.qty) || 1);
-          const unitPrice = Number(item.unit_price) || 0;
-          const unitTotal = unitPrice > 0 ? Math.round(unitPrice * 1.1) : 0;
-          const unitCount = item.is_visit ? 1 : Math.max(1, Number(item.content_count) || 1);
-          for (let i = 0; i < qty; i++) {
-            campaignRows.push({
-              user_id: order.user_id,
-              order_number: orderId,
-              plan: planName,
-              status: 'PAYMENT_PENDING',
-              brand_name: order.company || '',
-              product_name: planName,
-              target_creators: unitCount,
-              matched_creators: 0,
-              plan_price: unitTotal,
-              content_count: unitCount,
-              customer_name: order.name || '',
-              customer_email: order.email || '',
-              customer_phone: order.phone || '',
-              client_address: order.client_address || null,
-              client_biz_reg_no: order.client_biz_reg_no || null,
-            });
-          }
-        }
+        const campaignRows = buildCampaignRowsFromOrderItems(
+          order.order_items,
+          {
+            user_id: order.user_id,
+            order_number: orderId,
+            status: 'PAYMENT_PENDING',
+            brand_name: order.company || '',
+            customer_name: order.name || '',
+            customer_email: order.email || '',
+            customer_phone: order.phone || '',
+            client_address: order.client_address || null,
+            client_biz_reg_no: order.client_biz_reg_no || null,
+          },
+          { orderPlanName: order.plan_name },
+        );
         if (campaignRows.length > 0) {
           await supabase.from('campaigns').insert(campaignRows);
         }

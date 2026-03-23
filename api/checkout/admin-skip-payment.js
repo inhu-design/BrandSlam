@@ -6,6 +6,7 @@
  */
 import { createClient } from '@supabase/supabase-js';
 import { supabase as supabaseAdmin } from '../lib/supabase-server.js';
+import { buildCampaignRowsFromOrderItems } from '../lib/build-campaign-rows-from-order-items.js';
 
 const supabaseUrl = process.env.SUPABASE_URL || 'https://grlayjybcxrcaufnwysb.supabase.co';
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdybGF5anliY3hyY2F1Zm53eXNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUzNDM4NzksImV4cCI6MjA4MDkxOTg3OX0.Voj60xKccEl2_r8EzLVO-fot5WiEiUHb6UTfya2ql8Q';
@@ -83,34 +84,23 @@ export default async function handler(req, res) {
       status: 'paid',
     }]);
 
-    const campaignRows = [];
+    let campaignRows = [];
     if (orderItems && orderItems.length > 0) {
-      for (const item of orderItems) {
-        const pn = item.plan_name || '';
-        const qty = Math.max(1, Number(item.qty) || 1);
-        const unitPrice = Number(item.unit_price) || 0;
-        const unitTotal = unitPrice > 0 ? Math.round(unitPrice * 1.1) : Math.round((Number(item.supply_amount) || 0) * 1.1);
-        const unitContentCount = item.is_visit ? 1 : Math.max(1, Number(item.content_count) || 1);
-        for (let i = 0; i < qty; i++) {
-          campaignRows.push({
-            user_id: user.id,
-            order_number: orderNumber,
-            plan: pn,
-            status: 'KICKOFF',
-            brand_name: company,
-            product_name: pn,
-            target_creators: unitContentCount,
-            matched_creators: 0,
-            plan_price: unitTotal,
-            content_count: unitContentCount,
-            customer_name: name,
-            customer_email: emailVal,
-            customer_phone: phone,
-            client_address: clientAddress || null,
-            client_biz_reg_no: clientBizRegNo || null,
-          });
-        }
-      }
+      campaignRows = buildCampaignRowsFromOrderItems(
+        orderItems,
+        {
+          user_id: user.id,
+          order_number: orderNumber,
+          status: 'KICKOFF',
+          brand_name: company,
+          customer_name: name,
+          customer_email: emailVal,
+          customer_phone: phone,
+          client_address: clientAddress || null,
+          client_biz_reg_no: clientBizRegNo || null,
+        },
+        { orderPlanName: planName },
+      );
     } else {
       campaignRows.push({
         user_id: user.id,

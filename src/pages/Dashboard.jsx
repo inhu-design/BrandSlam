@@ -373,6 +373,49 @@ const MetricCard = ({ icon: Icon, label, value, color }) => (
   </div>
 );
 
+/** orders.order_items (JSONB 또는 문자열) */
+const parseOrderItems = (raw) => {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') {
+    try {
+      const p = JSON.parse(raw);
+      return Array.isArray(p) ? p : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
+/**
+ * 결제 orders 행 기준 인보이스 라인 (Visit x N + unit_price*qty 공급가).
+ * 있으면 campaigns N건 집계보다 우선합니다.
+ */
+const buildLineItemsFromOrderSummary = (order) => {
+  if (!order) return null;
+  const items = parseOrderItems(order.order_items);
+  if (items.length === 0) return null;
+  const lines = [];
+  for (const item of items) {
+    const planName = item.plan_name || 'Product';
+    const qty = Math.max(1, Number(item.qty) || 1);
+    const unitSupply = Number(item.unit_price) || 0;
+    const contentCount = Math.max(1, Number(item.content_count) || 1);
+    const isVisit = !!item.is_visit;
+    const lineQty = isVisit ? qty : qty * contentCount;
+    const supplyAmount = Math.round(qty * unitSupply);
+    lines.push({
+      plan: planName,
+      qty: lineQty,
+      supplyAmount,
+      unitSupply,
+      isVisit,
+    });
+  }
+  return lines.length ? lines : null;
+};
+
 const CampaignCard = ({ campaign, onClick, isActive }) => (
   <div 
     onClick={onClick}
@@ -386,7 +429,9 @@ const CampaignCard = ({ campaign, onClick, isActive }) => (
     <div className="flex justify-between items-start mb-4 relative z-10">
       <div className="min-w-0">
         <span className="text-[10px] font-black text-cyan-400 mb-1 block tracking-[0.2em] uppercase">{campaign.plan} PLAN</span>
-        <h3 className="font-bold text-white text-base truncate pr-2">{campaign.product_name || '상품명 미정'}</h3>
+        <h3 className="font-bold text-white text-base truncate pr-2">
+          {campaign.product_name || campaign.order_summary?.plan_name || '상품명 미정'}
+        </h3>
       </div>
     </div>
     <div className="flex items-center justify-between mt-4 relative z-10">
@@ -553,24 +598,34 @@ const InvoiceDetail = ({ campaign }) => {
         fetchOrderCampaigns();
     }, [campaign.order_number, campaign.id]);
 
-    // 라인아이템: plan별로 그룹화 (qty, supplyAmount)
+    // 라인아이템: ① orders.order_items (결제 원본) 우선 ② 없으면 동일 주문의 campaigns 집계
     const lineItems = useMemo(() => {
+        const fromOrder = buildLineItemsFromOrderSummary(campaign.order_summary);
+        if (fromOrder?.length) return fromOrder;
         const map = {};
         for (const c of orderCampaigns) {
             const plan = c.plan || 'Unknown';
-            if (!map[plan]) map[plan] = { plan, qty: 0, supplyAmount: 0 };
+            if (!map[plan]) map[plan] = { plan, qty: 0, supplyAmount: 0, isVisit: plan.toLowerCase().includes('visit') };
             map[plan].qty += 1;
             const unitSupply = c.plan_price ? Math.round(c.plan_price / 1.1) : 0;
             map[plan].supplyAmount += unitSupply;
         }
-        return Object.values(map);
-    }, [orderCampaigns]);
+        return Object.values(map).map((li) => ({
+            ...li,
+            unitSupply: li.qty > 0 ? Math.round(li.supplyAmount / li.qty) : li.supplyAmount,
+            isVisit: li.isVisit,
+        }));
+    }, [campaign.order_summary, orderCampaigns]);
 
     const isDemo = String(campaign.id).startsWith('demo-');
 
-    const totalSupplyPrice = lineItems.reduce((s, li) => s + li.supplyAmount, 0);
-    const vatAmount = Math.round(totalSupplyPrice * 0.1);
-    const totalAmount = totalSupplyPrice + vatAmount;
+    const lineSupplySum = lineItems.reduce((s, li) => s + li.supplyAmount, 0);
+    const orderTotalInclVat = Number(campaign.order_summary?.plan_price);
+    const useOrderContractTotal = Number.isFinite(orderTotalInclVat) && orderTotalInclVat > 0;
+
+    const totalSupplyPrice = useOrderContractTotal ? Math.round(orderTotalInclVat / 1.1) : lineSupplySum;
+    const vatAmount = useOrderContractTotal ? orderTotalInclVat - totalSupplyPrice : Math.round(lineSupplySum * 0.1);
+    const totalAmount = useOrderContractTotal ? orderTotalInclVat : lineSupplySum + vatAmount;
     const supplyPrice = totalSupplyPrice;
 
     const invoiceId = isDemo ? campaign.id.toUpperCase() : (campaign.order_number || campaign.id.slice(0, 8)).toUpperCase();
@@ -748,16 +803,26 @@ const InvoiceDetail = ({ campaign }) => {
                         </tr>
                     </thead>
                     <tbody className="text-slate-700">
-                        {lineItems.map((li) => {
-                            const isVisitPlan = li.plan?.toLowerCase().includes('visit');
-                            const unitPrice = li.qty > 0 ? Math.round(li.supplyAmount / li.qty) : li.supplyAmount;
+                        {lineItems.map((li, idx) => {
+                            const isVisitPlan = li.isVisit ?? li.plan?.toLowerCase().includes('visit');
+                            const unitPrice =
+                                li.unitSupply != null && li.unitSupply > 0
+                                    ? li.unitSupply
+                                    : li.qty > 0
+                                      ? Math.round(li.supplyAmount / li.qty)
+                                      : li.supplyAmount;
+                            const rowKey = `${li.plan}-${idx}`;
                             return (
-                                <tr key={li.plan} className="border-b border-slate-100">
+                                <tr key={rowKey} className="border-b border-slate-100">
                                     <td className="py-5 px-4">
-                                        <p className="font-bold text-slate-900 text-base">BrandSlam {li.plan.toUpperCase()} PLAN</p>
-                                        <p className="text-xs text-slate-500 mt-1">{li.plan} 글로벌 캠페인 운영 및 매니지먼트</p>
+                                        <p className="font-bold text-slate-900 text-base">BrandSlam {String(li.plan).toUpperCase()} PLAN</p>
+                                        <p className="text-xs text-slate-500 mt-1">
+                                            {isVisitPlan
+                                                ? `${li.plan} ${li.qty}건 · 글로벌 방문형 콘텐츠`
+                                                : `${li.plan} 글로벌 캠페인 운영 및 매니지먼트`}
+                                        </p>
                                     </td>
-                                    <td className="py-5 px-4 text-center">{li.qty}{isVisitPlan ? '명' : '개'}</td>
+                                    <td className="py-5 px-4 text-center">{li.qty}{isVisitPlan ? '건' : '개'}</td>
                                     <td className="py-5 px-4 text-right text-slate-500">{unitPrice.toLocaleString()}</td>
                                     <td className="py-5 px-4 text-right font-bold text-slate-900">{li.supplyAmount.toLocaleString()}</td>
                                 </tr>
@@ -2568,6 +2633,20 @@ export default function Dashboard() {
           );
         }
 
+        const orderNumbers = [...new Set(campaignList.map((c) => c.order_number).filter(Boolean))];
+        if (orderNumbers.length > 0) {
+          const { data: orderRows } = await supabase
+            .from('orders')
+            .select('order_number, plan_name, plan_price, order_items, content_count')
+            .in('order_number', orderNumbers);
+          const orderByNum = Object.fromEntries((orderRows || []).map((o) => [o.order_number, o]));
+          campaignList = campaignList.map((c) =>
+            c.order_number && orderByNum[c.order_number]
+              ? { ...c, order_summary: orderByNum[c.order_number] }
+              : c,
+          );
+        }
+
         if (campaignList.length > 0) {
           setCampaigns(campaignList);
           setSelectedCampaignId(campaignList[0].id);
@@ -2898,7 +2977,9 @@ export default function Dashboard() {
                         <div className="flex flex-col md:flex-row md:items-center justify-between mb-12 pb-10 border-b border-white/5 gap-8 relative z-10">
                             <div>
                                 <div className="flex items-center gap-4 mb-3">
-                                    <h2 className="text-3xl md:text-5xl font-black text-white tracking-tighter uppercase leading-none">{selectedCampaign?.product_name || 'Campaign'}</h2>
+                                    <h2 className="text-3xl md:text-5xl font-black text-white tracking-tighter uppercase leading-none">
+                                      {selectedCampaign?.product_name || selectedCampaign?.order_summary?.plan_name || 'Campaign'}
+                                    </h2>
                                     <span className="text-[10px] font-black px-4 py-1.5 bg-cyan-500/10 text-cyan-400 rounded-full border border-cyan-400/20 tracking-widest uppercase">{selectedCampaign?.plan}</span>
                                 </div>
                                 <p className="text-slate-500 text-lg font-light flex items-center gap-3 tracking-tight">
