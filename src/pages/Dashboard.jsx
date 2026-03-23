@@ -1825,25 +1825,7 @@ const CandidateList = ({ candidates, targetCount, matchedCount, isDeliveryTest, 
                                 <th className="px-8 py-5">SNS 주소</th>
                                 <th className="px-8 py-5">팔로워 수</th>
                                 {isDeliveryTestView && (
-                                    <th className="px-8 py-5 min-w-[10rem] max-w-[11rem] text-right align-top">
-                                        <div className="flex flex-col items-end gap-1.5 ml-auto">
-                                            <span className="whitespace-nowrap">드랍</span>
-                                            <span className="font-medium normal-case tracking-normal text-[9px] text-amber-400/90 leading-snug break-words text-right">
-                                                리스트 납품 다음 날부터 영업일 {DROP_DEADLINE_BUSINESS_DAYS}일째 말일 23:59(KST)까지 가능. 주말·공휴일 제외.
-                                            </span>
-                                            {sentAt && dropDeadlineLabelKr ? (
-                                                <span
-                                                    className={`font-bold normal-case tracking-tight text-[9px] leading-snug text-right ${dropWindowExpired ? 'text-red-400/95' : dropNearDeadline ? 'text-red-300/95' : 'text-cyan-400/90'}`}
-                                                >
-                                                    {dropWindowExpired ? '마감됨' : `마감 ${dropDeadlineLabelKr}`}
-                                                </span>
-                                            ) : (
-                                                <span className="font-normal normal-case text-[9px] text-slate-500 leading-snug text-right">
-                                                    세션 생성 후 마감일이 표시됩니다.
-                                                </span>
-                                            )}
-                                        </div>
-                                    </th>
+                                    <th className="px-8 py-5 min-w-[4rem] text-right whitespace-nowrap">드랍</th>
                                 )}
                                 {!isDeliveryTestView && (
                                     <>
@@ -1859,20 +1841,25 @@ const CandidateList = ({ candidates, targetCount, matchedCount, isDeliveryTest, 
                                 <tr className="bg-amber-500/[0.06] border-b border-amber-500/15">
                                     <td colSpan={5} className="px-8 py-3 text-[11px] text-slate-400 leading-relaxed">
                                         <span className="font-black text-amber-400/95 uppercase tracking-wider text-[10px] mr-2">안내</span>
-                                        드랍은 납품일(한국 날짜) 다음 날부터 세는 영업일 {DROP_DEADLINE_BUSINESS_DAYS}일이 끝나는 날{' '}
-                                        <strong className="text-amber-200/90">23:59 한국시간</strong>까지 가능합니다. 토·일·공휴일은 영업일에서 제외됩니다.
-                                        {sentAt && dropDeadlineLabelKr ? (
-                                            <>
-                                                {' '}
-                                                <strong className="text-slate-300">이번 마감:</strong> {dropDeadlineLabelKr}
-                                                {dropNearDeadline ? (
-                                                    <span className="text-red-300 font-bold"> · 24시간 이내 마감</span>
-                                                ) : null}
-                                                {dropWindowExpired ? (
-                                                    <span className="text-red-400/95 font-bold"> · 현재 기한이 지난 상태입니다.</span>
-                                                ) : null}
-                                            </>
-                                        ) : null}
+                                        <span className="block">
+                                            드랍은 납품일(한국 날짜) 다음 날부터 세는 영업일 {DROP_DEADLINE_BUSINESS_DAYS}일이 끝나는 날{' '}
+                                            <strong className="text-amber-200/90">23:59 한국시간</strong>까지 가능합니다.
+                                        </span>
+                                        <span className="block mt-1.5">
+                                            토·일·공휴일은 영업일에서 제외됩니다.
+                                            {sentAt && dropDeadlineLabelKr ? (
+                                                <>
+                                                    {' '}
+                                                    <strong className="text-slate-300">이번 마감:</strong> {dropDeadlineLabelKr}
+                                                    {dropNearDeadline ? (
+                                                        <span className="text-red-300 font-bold"> · 24시간 이내 마감</span>
+                                                    ) : null}
+                                                    {dropWindowExpired ? (
+                                                        <span className="text-red-400/95 font-bold"> · 현재 기한이 지난 상태입니다.</span>
+                                                    ) : null}
+                                                </>
+                                            ) : null}
+                                        </span>
                                     </td>
                                 </tr>
                             )}
@@ -1894,45 +1881,30 @@ const CandidateList = ({ candidates, targetCount, matchedCount, isDeliveryTest, 
                                         {isDeliveryTestView ? (
                                             <>
                                                 {renderDeliveryDataCells(creator)}
-                                                <td className="px-8 py-6 text-right min-w-[4rem] align-top">
-                                                    <div className="flex flex-col items-end gap-2 max-w-[11rem] ml-auto">
-                                                        {dropWindowExpired && sentAt ? (
-                                                            <span className="text-[9px] font-bold text-red-400/95 text-right leading-snug">
-                                                                마감 지남 — 영업일 기준 기한 초과
-                                                            </span>
-                                                        ) : dropNearDeadline && sentAt ? (
-                                                            <span className="text-[9px] font-bold text-amber-300 text-right leading-snug">
-                                                                곧 마감 — {dropDeadlineLabelKr}
-                                                            </span>
-                                                        ) : sentAt && dropDeadlineLabelKr ? (
-                                                            <span className="text-[9px] text-slate-500 text-right leading-snug">
-                                                                마감 {dropDeadlineLabelKr}
-                                                            </span>
-                                                        ) : null}
-                                                        <label
-                                                            className={`inline-flex items-center gap-2 justify-end whitespace-nowrap ${canDrop ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
-                                                            title={
-                                                                !canDrop
-                                                                    ? (dropConfirmed
-                                                                        ? '리스트가 확정되어 드랍을 변경할 수 없습니다.'
-                                                                        : '영업일 기준 드랍 마감 시각이 지났습니다.')
-                                                                    : (!isDropped && !canDropMore
-                                                                        ? `드랍은 최대 ${maxDropCount}명(전체 ${listTotal}명의 30%)까지 가능합니다. 다른 인원의 드랍을 해제한 뒤 저장하면 다시 선택할 수 있습니다.`
-                                                                        : dropDeadlineLabelKr
-                                                                          ? `마감: ${dropDeadlineLabelKr} (영업일·한국시간 기준)`
-                                                                          : undefined)
-                                                            }
-                                                        >
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={isDropped}
-                                                                onChange={() => handleDropToggle(creator)}
-                                                                disabled={!canDrop || (!isDropped && !canDropMore)}
-                                                                className="w-4 h-4 rounded border-white/30 bg-white/5 text-amber-500 focus:ring-amber-500/50 shrink-0 disabled:cursor-not-allowed"
-                                                            />
-                                                            <span className="text-[10px] text-slate-500">드랍</span>
-                                                        </label>
-                                                    </div>
+                                                <td className="px-8 py-6 text-right min-w-[4rem]">
+                                                    <label
+                                                        className={`inline-flex items-center gap-2 justify-end whitespace-nowrap ${canDrop ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
+                                                        title={
+                                                            !canDrop
+                                                                ? (dropConfirmed
+                                                                    ? '리스트가 확정되어 드랍을 변경할 수 없습니다.'
+                                                                    : '영업일 기준 드랍 마감 시각이 지났습니다.')
+                                                                : (!isDropped && !canDropMore
+                                                                    ? `드랍은 최대 ${maxDropCount}명(전체 ${listTotal}명의 30%)까지 가능합니다. 다른 인원의 드랍을 해제한 뒤 저장하면 다시 선택할 수 있습니다.`
+                                                                    : dropDeadlineLabelKr
+                                                                      ? `마감: ${dropDeadlineLabelKr} (영업일·한국시간 기준)`
+                                                                      : undefined)
+                                                        }
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isDropped}
+                                                            onChange={() => handleDropToggle(creator)}
+                                                            disabled={!canDrop || (!isDropped && !canDropMore)}
+                                                            className="w-4 h-4 rounded border-white/30 bg-white/5 text-amber-500 focus:ring-amber-500/50 shrink-0 disabled:cursor-not-allowed"
+                                                        />
+                                                        <span className="text-[10px] text-slate-500">드랍</span>
+                                                    </label>
                                                 </td>
                                             </>
                                         ) : (
