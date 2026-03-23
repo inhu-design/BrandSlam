@@ -1417,13 +1417,6 @@ const CandidateList = ({ candidates, targetCount, matchedCount, isDeliveryTest, 
                                     : `인플루언서 리스트 · 드랍 ${droppedCount}/${maxDropCount}명 (전체 ${listTotal}명의 30%)${sentAt ? ` · ${Math.ceil(daysRemaining)}일 남음` : ''}`)
                                 : '목표 인원 달성 시 자동으로 제품 배송 단계로 전환됩니다.'}
                         </p>
-                        {isDeliveryTestView && !dropConfirmed && troublessDropGrace && rawExpired && (
-                            <p className="text-xs text-cyan-300/90 mt-2 font-medium">
-                              이번 Troubless PDRN 선크림 캠페인만 예외로, 드랍 마감이{' '}
-                              <strong className="text-cyan-200">{TROUBLESS_PDRN_SUNSCREEN_DROP_GRACE_END_YMD}</strong> 23:59까지
-                              연장되었습니다.
-                            </p>
-                          )}
                         {isDeliveryTestView && !dropConfirmed && canDrop && dropLimitReached && (
                             <p className="text-xs text-amber-400/95 mt-3 font-medium leading-relaxed max-w-xl">
                                 드랍은 전체 {listTotal}명 중 최대 <strong className="text-amber-300">30%({maxDropCount}명)</strong>까지만 선택할 수 있습니다.
