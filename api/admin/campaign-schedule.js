@@ -22,6 +22,13 @@ const SCHEDULE_COLUMNS = [
   'schedule_upload_start_date',
   'schedule_upload_deadline_date',
   'schedule_tracking_end_date',
+  'schedule_visit_content_guide_date',
+  'schedule_visit_reannounce_1_date',
+  'schedule_visit_reannounce_2_date',
+  'schedule_visit_notice_start_date',
+  'schedule_visit_notice_end_date',
+  'schedule_visit_festival_start_date',
+  'schedule_visit_festival_end_date',
 ];
 
 const UUID_RE =
@@ -99,7 +106,7 @@ export default async function handler(req, res) {
     const { data, error } = await supabaseAdmin
       .from('campaigns')
       .select(
-        `id, brand_name, product_name, order_number, ${SCHEDULE_COLUMNS.join(', ')}`,
+        `id, brand_name, product_name, order_number, plan, ${SCHEDULE_COLUMNS.join(', ')}`,
       )
       .eq('id', campaignId)
       .maybeSingle();

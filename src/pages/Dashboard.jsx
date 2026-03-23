@@ -2089,6 +2089,77 @@ function mergeCampaignSchedule(computed, campaign) {
   return merged;
 }
 
+/**
+ * Visit 플랜: 결제(또는 착수)일 기준으로 명단 납품까지 단축 (행사 스케줄 맞춤).
+ * 예: 결제 3/23 → 모집 마감 3/26, 명단 납품 3/27 (웰코스 마케팅 일정과 정합)
+ */
+function getVisitPreListSchedule(startDate) {
+  const base = startDate || toYMD(new Date());
+  const listDeliveryDate = addDays(base, 4);
+  const recruitmentEnd = addDays(listDeliveryDate, -1);
+  return {
+    base,
+    recruitmentStart: base,
+    recruitmentEnd,
+    contentGuideEnd: recruitmentEnd,
+    listDeliveryDate,
+    replacementWindowStart: listDeliveryDate,
+    replacementWindowEnd: addBizDays(listDeliveryDate, 3),
+    recruitmentWeeks: null,
+    shippingType: 'us',
+  };
+}
+
+/** Visit 플랜: 명단 납품일 기준 마케팅 일정 (웰코스 KWAILNARA 캠페인 일정과 동일 오프셋) */
+function visitMilestonesFromListDelivery(listStr) {
+  return {
+    visitContentGuideCommDate: addDays(listStr, 7),
+    reannounce1Date: addDays(listStr, 28),
+    reannounce2Date: addDays(listStr, 42),
+    individualNoticeStart: addDays(listStr, 46),
+    individualNoticeEnd: addDays(listStr, 51),
+    festivalStartDate: addDays(listStr, 47),
+    festivalEndDate: addDays(listStr, 51),
+    scheduleEndDate: addDays(listStr, 51),
+  };
+}
+
+/**
+ * Visit / Visit Content: 착수~명단은 단축 템플릿, 이후는 명단 납품일 기준 방문·행사 일정.
+ */
+function getVisitCampaignSchedule(startDate) {
+  const pre = getVisitPreListSchedule(startDate);
+  const list = pre.listDeliveryDate;
+  return {
+    kind: 'visit',
+    ...pre,
+    ...visitMilestonesFromListDelivery(list),
+  };
+}
+
+function mergeVisitSchedule(computed, campaign) {
+  if (!computed) return computed;
+  const merged = { ...computed };
+  const o = campaign || {};
+  if (o.schedule_list_delivery_date) {
+    merged.listDeliveryDate = o.schedule_list_delivery_date;
+    merged.replacementWindowStart = o.schedule_list_delivery_date;
+    merged.replacementWindowEnd = addBizDays(o.schedule_list_delivery_date, 3);
+    merged.recruitmentEnd = addDays(o.schedule_list_delivery_date, -1);
+    merged.contentGuideEnd = merged.recruitmentEnd;
+    Object.assign(merged, visitMilestonesFromListDelivery(o.schedule_list_delivery_date));
+  }
+  if (o.schedule_visit_content_guide_date) merged.visitContentGuideCommDate = o.schedule_visit_content_guide_date;
+  if (o.schedule_visit_reannounce_1_date) merged.reannounce1Date = o.schedule_visit_reannounce_1_date;
+  if (o.schedule_visit_reannounce_2_date) merged.reannounce2Date = o.schedule_visit_reannounce_2_date;
+  if (o.schedule_visit_notice_start_date) merged.individualNoticeStart = o.schedule_visit_notice_start_date;
+  if (o.schedule_visit_notice_end_date) merged.individualNoticeEnd = o.schedule_visit_notice_end_date;
+  if (o.schedule_visit_festival_start_date) merged.festivalStartDate = o.schedule_visit_festival_start_date;
+  if (o.schedule_visit_festival_end_date) merged.festivalEndDate = o.schedule_visit_festival_end_date;
+  merged.scheduleEndDate = merged.festivalEndDate;
+  return merged;
+}
+
 const KickoffSummaryRow = ({ label, value }) => (
   <div>
     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">{label}</p>
@@ -2176,6 +2247,31 @@ const DdayCard = ({ label, dateStr, subLabel }) => {
   );
 };
 
+const DdayRangeCard = ({ label, startStr, endStr, subLabel }) => {
+  const today = toYMD(new Date());
+  const has = startStr && endStr;
+  let headline = '-';
+  if (has) {
+    if (today >= startStr && today <= endStr) headline = '진행 중';
+    else if (today < startStr) headline = `D-${getDaysDiff(today, startStr)}`;
+    else headline = `D+${getDaysDiff(endStr, today)}`;
+  }
+  return (
+    <div className="bg-white/5 border border-white/10 rounded-2xl p-5 flex flex-col min-w-[160px]">
+      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">{label}</span>
+      {subLabel && <span className="text-[10px] text-slate-500 mb-1">{subLabel}</span>}
+      {has ? (
+        <>
+          <span className="text-2xl font-black text-white tabular-nums">{headline}</span>
+          <span className="text-xs text-slate-400 mt-1 tabular-nums">{startStr} ~ {endStr}</span>
+        </>
+      ) : (
+        <span className="text-slate-500 text-sm">-</span>
+      )}
+    </div>
+  );
+};
+
 // --- 캠페인 타임라인 (간트 스타일) ---
 const CampaignTimeline = ({ schedule }) => {
   if (!schedule) return null;
@@ -2234,6 +2330,72 @@ const CampaignTimeline = ({ schedule }) => {
   );
 };
 
+const VisitCampaignTimeline = ({ schedule }) => {
+  if (!schedule || schedule.kind !== 'visit') return null;
+  const end = schedule.scheduleEndDate || schedule.festivalEndDate;
+  const totalDays = Math.max(1, getDaysDiff(schedule.base, end));
+  const getLeft = (dateStr) => {
+    const days = getDaysDiff(schedule.base, dateStr);
+    return Math.max(0, Math.min(100, (days / totalDays) * 100));
+  };
+  const confirmEnd =
+    schedule.contentGuideEnd === schedule.recruitmentEnd
+      ? schedule.listDeliveryDate
+      : schedule.contentGuideEnd;
+  const phases = [
+    { label: '모집', start: schedule.base, end: schedule.recruitmentEnd, color: 'bg-cyan-500/80' },
+    { label: '소통·확정', start: schedule.recruitmentEnd, end: confirmEnd, color: 'bg-violet-500/80' },
+    { label: '명단·교체', start: schedule.listDeliveryDate, end: schedule.replacementWindowEnd, color: 'bg-amber-500/80' },
+    { label: '가이드 제작·소통', start: schedule.replacementWindowEnd, end: schedule.visitContentGuideCommDate, color: 'bg-teal-500/80' },
+    { label: '재공지', start: schedule.visitContentGuideCommDate, end: schedule.reannounce2Date, color: 'bg-orange-500/80' },
+    { label: '개별 일정 안내', start: schedule.individualNoticeStart, end: schedule.individualNoticeEnd, color: 'bg-fuchsia-500/80' },
+    { label: 'Festival', start: schedule.festivalStartDate, end: schedule.festivalEndDate, color: 'bg-rose-500/80' },
+  ];
+  const milestones = [
+    { label: 'List Delivery', date: schedule.listDeliveryDate },
+    { label: 'Guide & Comm', date: schedule.visitContentGuideCommDate },
+    { label: 'Re-announce 1', date: schedule.reannounce1Date },
+    { label: 'Re-announce 2', date: schedule.reannounce2Date },
+    { label: 'Festival', date: schedule.festivalStartDate, end: schedule.festivalEndDate },
+  ];
+  return (
+    <div className="space-y-4">
+      <div className="relative h-12 rounded-xl bg-slate-800/50 overflow-hidden flex">
+        {phases.map((p, i) => {
+          const left = getLeft(p.start);
+          const width = Math.max(3, getLeft(p.end) - left);
+          return (
+            <div
+              key={i}
+              className={`absolute top-0 h-full rounded ${p.color} transition-all`}
+              style={{ left: left + '%', width: width + '%' }}
+              title={`${p.label} ${p.start} ~ ${p.end}`}
+            />
+          );
+        })}
+      </div>
+      <div className="flex flex-wrap gap-2 justify-between text-[10px] font-bold text-slate-400">
+        {phases.map((p, i) => (
+          <span key={i} className="flex items-center gap-1.5">
+            <span className={`w-2 h-2 rounded-full ${p.color.replace('/80', '')}`} />
+            {p.label}
+          </span>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-4 pt-2 border-t border-white/10">
+        {milestones.map((m, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <span className="text-slate-500 uppercase tracking-wider">{m.label}</span>
+            <span className="text-white font-mono text-sm">
+              {m.end ? `${formatShort(m.date)}–${formatShort(m.end)}` : formatShort(m.date)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 // --- 가이드라인 세팅 블록 ---
 const GuidelineSettingBlock = ({ status = 'pending' }) => {
   const statusConfig = {
@@ -2271,15 +2433,57 @@ const ScheduleRulesCallout = ({ shippingType }) => (
   </div>
 );
 
+const ScheduleRulesCalloutVisit = () => (
+  <div className="bg-slate-800/50 border border-white/10 rounded-2xl p-5">
+    <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Visit Content 일정 룰 (템플릿)</h5>
+    <ul className="text-sm text-slate-400 space-y-2 font-light">
+      <li>• <strong className="text-slate-300">인플루언서 모집:</strong> 착수일 기준 D+3일까지 (~명단 전일)</li>
+      <li>• <strong className="text-slate-300">명단 납품:</strong> 착수일 기준 D+4일 (행사 일정에 맞춘 Visit 단축 룰)</li>
+      <li>• <strong className="text-slate-300">콘텐츠 가이드 제작·소통:</strong> 명단 납품일 + 7일</li>
+      <li>• <strong className="text-slate-300">재공지:</strong> 명단 납품일 + 28일, + 42일</li>
+      <li>• <strong className="text-slate-300">개별 일정 안내:</strong> 명단 납품일 + 46일 ~ + 51일</li>
+      <li>• <strong className="text-slate-300">Festival(방문):</strong> 명단 납품일 + 47일 ~ + 51일</li>
+    </ul>
+  </div>
+);
+
+const VisitScheduleSummary = () => (
+  <div className="bg-white/5 backdrop-blur-xl p-6 rounded-[2.5rem] border border-white/10">
+    <h4 className="font-black text-white text-lg mb-3 flex items-center gap-2">
+      <Plane size={20} className="text-cyan-400" />
+      Visit 진행 일정 요약
+    </h4>
+    <ul className="text-sm text-slate-400 space-y-2 font-light">
+      <li>• 착수 후 단축 모집·확정 → 명단 납품 → 리스트 교체(3영업일)</li>
+      <li>• 가이드 제작·소통 → 1·2차 재공지</li>
+      <li>• 인플루언서 개별 일정 안내 구간</li>
+      <li>• Festival(현장 방문) 구간 — 행사 캘린더와 함께 확인해 주세요</li>
+    </ul>
+  </div>
+);
+
+function adminEditorIsVisitPlan(campaign) {
+  return campaign?.plan && String(campaign.plan).toLowerCase().includes('visit');
+}
+
 function AdminCampaignScheduleEditor({ campaign, onSaved, className = '' }) {
   const cid = campaign?.id;
   const canEdit = cid && CAMPAIGN_ROW_UUID_RE.test(cid);
+  const isVisit = adminEditorIsVisitPlan(campaign);
+
   const [fields, setFields] = useState(() => ({
     schedule_list_delivery_date: campaign?.schedule_list_delivery_date || '',
     schedule_shipping_date: campaign?.schedule_shipping_date || '',
     schedule_upload_start_date: campaign?.schedule_upload_start_date || '',
     schedule_upload_deadline_date: campaign?.schedule_upload_deadline_date || '',
     schedule_tracking_end_date: campaign?.schedule_tracking_end_date || '',
+    schedule_visit_content_guide_date: campaign?.schedule_visit_content_guide_date || '',
+    schedule_visit_reannounce_1_date: campaign?.schedule_visit_reannounce_1_date || '',
+    schedule_visit_reannounce_2_date: campaign?.schedule_visit_reannounce_2_date || '',
+    schedule_visit_notice_start_date: campaign?.schedule_visit_notice_start_date || '',
+    schedule_visit_notice_end_date: campaign?.schedule_visit_notice_end_date || '',
+    schedule_visit_festival_start_date: campaign?.schedule_visit_festival_start_date || '',
+    schedule_visit_festival_end_date: campaign?.schedule_visit_festival_end_date || '',
   }));
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
@@ -2291,6 +2495,13 @@ function AdminCampaignScheduleEditor({ campaign, onSaved, className = '' }) {
       schedule_upload_start_date: campaign?.schedule_upload_start_date || '',
       schedule_upload_deadline_date: campaign?.schedule_upload_deadline_date || '',
       schedule_tracking_end_date: campaign?.schedule_tracking_end_date || '',
+      schedule_visit_content_guide_date: campaign?.schedule_visit_content_guide_date || '',
+      schedule_visit_reannounce_1_date: campaign?.schedule_visit_reannounce_1_date || '',
+      schedule_visit_reannounce_2_date: campaign?.schedule_visit_reannounce_2_date || '',
+      schedule_visit_notice_start_date: campaign?.schedule_visit_notice_start_date || '',
+      schedule_visit_notice_end_date: campaign?.schedule_visit_notice_end_date || '',
+      schedule_visit_festival_start_date: campaign?.schedule_visit_festival_start_date || '',
+      schedule_visit_festival_end_date: campaign?.schedule_visit_festival_end_date || '',
     });
     setMsg('');
   }, [
@@ -2300,6 +2511,14 @@ function AdminCampaignScheduleEditor({ campaign, onSaved, className = '' }) {
     campaign?.schedule_upload_start_date,
     campaign?.schedule_upload_deadline_date,
     campaign?.schedule_tracking_end_date,
+    campaign?.schedule_visit_content_guide_date,
+    campaign?.schedule_visit_reannounce_1_date,
+    campaign?.schedule_visit_reannounce_2_date,
+    campaign?.schedule_visit_notice_start_date,
+    campaign?.schedule_visit_notice_end_date,
+    campaign?.schedule_visit_festival_start_date,
+    campaign?.schedule_visit_festival_end_date,
+    campaign?.plan,
   ]);
 
   if (!canEdit) return null;
@@ -2341,11 +2560,25 @@ function AdminCampaignScheduleEditor({ campaign, onSaved, className = '' }) {
     const body = {
       campaign_id: cid,
       schedule_list_delivery_date: trimOrNull(fields.schedule_list_delivery_date),
-      schedule_shipping_date: trimOrNull(fields.schedule_shipping_date),
-      schedule_upload_start_date: trimOrNull(fields.schedule_upload_start_date),
-      schedule_upload_deadline_date: trimOrNull(fields.schedule_upload_deadline_date),
-      schedule_tracking_end_date: trimOrNull(fields.schedule_tracking_end_date),
     };
+    if (isVisit) {
+      Object.assign(body, {
+        schedule_visit_content_guide_date: trimOrNull(fields.schedule_visit_content_guide_date),
+        schedule_visit_reannounce_1_date: trimOrNull(fields.schedule_visit_reannounce_1_date),
+        schedule_visit_reannounce_2_date: trimOrNull(fields.schedule_visit_reannounce_2_date),
+        schedule_visit_notice_start_date: trimOrNull(fields.schedule_visit_notice_start_date),
+        schedule_visit_notice_end_date: trimOrNull(fields.schedule_visit_notice_end_date),
+        schedule_visit_festival_start_date: trimOrNull(fields.schedule_visit_festival_start_date),
+        schedule_visit_festival_end_date: trimOrNull(fields.schedule_visit_festival_end_date),
+      });
+    } else {
+      Object.assign(body, {
+        schedule_shipping_date: trimOrNull(fields.schedule_shipping_date),
+        schedule_upload_start_date: trimOrNull(fields.schedule_upload_start_date),
+        schedule_upload_deadline_date: trimOrNull(fields.schedule_upload_deadline_date),
+        schedule_tracking_end_date: trimOrNull(fields.schedule_tracking_end_date),
+      });
+    }
     postSchedule(body);
   };
 
@@ -2358,6 +2591,13 @@ function AdminCampaignScheduleEditor({ campaign, onSaved, className = '' }) {
       schedule_upload_start_date: null,
       schedule_upload_deadline_date: null,
       schedule_tracking_end_date: null,
+      schedule_visit_content_guide_date: null,
+      schedule_visit_reannounce_1_date: null,
+      schedule_visit_reannounce_2_date: null,
+      schedule_visit_notice_start_date: null,
+      schedule_visit_notice_end_date: null,
+      schedule_visit_festival_start_date: null,
+      schedule_visit_festival_end_date: null,
     });
   };
 
@@ -2376,17 +2616,34 @@ function AdminCampaignScheduleEditor({ campaign, onSaved, className = '' }) {
   return (
     <div className={`rounded-2xl border border-amber-500/25 bg-amber-500/5 p-6 ${className}`}>
       <h5 className="text-[10px] font-black text-amber-400/90 uppercase tracking-widest mb-4 flex items-center gap-2">
-        <Settings size={16} /> 관리자 · 착수 일정 수동 저장
+        <Settings size={16} /> 관리자 · 착수 일정 수동 저장{isVisit ? ' (Visit Content)' : ''}
       </h5>
       <p className="text-xs text-slate-500 mb-4 font-light">
-        비워 두면 해당 항목은 템플릿 자동 일정을 따릅니다. 저장은 관리자 계정(API·ADMIN_EMAILS)만 가능합니다.
+        {isVisit
+          ? 'Visit 플랜은 명단 납품 이후 일정이 방문·행사 기준 템플릿입니다. 비운 칸은 템플릿을 따릅니다.'
+          : '비워 두면 해당 항목은 템플릿 자동 일정을 따릅니다.'}{' '}
+        저장은 관리자 계정(API·ADMIN_EMAILS)만 가능합니다.
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
         {row('schedule_list_delivery_date', '명단 납품')}
-        {row('schedule_shipping_date', '배송일')}
-        {row('schedule_upload_start_date', '업로드 시작')}
-        {row('schedule_upload_deadline_date', '업로드 마감')}
-        {row('schedule_tracking_end_date', '트래킹 종료 (미입력 시 업로드 시작+90일)')}
+        {isVisit ? (
+          <>
+            {row('schedule_visit_content_guide_date', '콘텐츠 가이드 제작·소통')}
+            {row('schedule_visit_reannounce_1_date', '인플루언서 재공지 1차')}
+            {row('schedule_visit_reannounce_2_date', '인플루언서 재공지 2차')}
+            {row('schedule_visit_notice_start_date', '개별 일정 안내 시작')}
+            {row('schedule_visit_notice_end_date', '개별 일정 안내 종료')}
+            {row('schedule_visit_festival_start_date', 'Festival(방문) 시작')}
+            {row('schedule_visit_festival_end_date', 'Festival(방문) 종료')}
+          </>
+        ) : (
+          <>
+            {row('schedule_shipping_date', '배송일')}
+            {row('schedule_upload_start_date', '업로드 시작')}
+            {row('schedule_upload_deadline_date', '업로드 마감')}
+            {row('schedule_tracking_end_date', '트래킹 종료 (미입력 시 업로드 시작+90일)')}
+          </>
+        )}
       </div>
       <div className="flex flex-wrap gap-3 items-center">
         <button
@@ -2535,12 +2792,16 @@ const KickoffView = ({ campaign, user, isAdminUser = false, onCampaignScheduleUp
   // 일정 산출: 계약/결제일 = campaign.start_date 또는 제출일, 배송타입 = form 기반 추정
   const startDateForSchedule = campaign?.start_date || (submission?.created_at ? submission.created_at.split('T')[0] : null) || toYMD(new Date());
   const shippingType = fd.shippingRegion === 'domestic' ? 'domestic' : 'us';
-  const computedSchedule = getCampaignSchedule(startDateForSchedule, {
-    shippingType,
-    recruitmentWeeks: 3,
-    requestedShippingDate: fd.requestedShippingDate || null,
-  });
-  const schedule = mergeCampaignSchedule(computedSchedule, campaign);
+  const computedSchedule = isVisitPlan
+    ? getVisitCampaignSchedule(startDateForSchedule)
+    : getCampaignSchedule(startDateForSchedule, {
+        shippingType,
+        recruitmentWeeks: 3,
+        requestedShippingDate: fd.requestedShippingDate || null,
+      });
+  const schedule = isVisitPlan
+    ? mergeVisitSchedule(computedSchedule, campaign)
+    : mergeCampaignSchedule(computedSchedule, campaign);
   const guidelineStatus = fd.guidelineStatus || 'pending';
 
   return (
@@ -2645,7 +2906,9 @@ const KickoffView = ({ campaign, user, isAdminUser = false, onCampaignScheduleUp
           <div>
             <h3 className="font-black text-white text-xl tracking-tight">캠페인 진행 일정</h3>
             <p className="text-slate-500 text-sm font-light">
-              기본은 계약/결제일·세팅 폼 기준 자동 산출입니다. 관리자가 저장한 날짜가 있으면 해당 항목은 수동 일정이 우선합니다.
+              {isVisitPlan
+                ? 'Visit Content 플랜: 계약·세팅 기준으로 모집~명단까지 산출 후, 명단 납품일 기준 방문·행사 일정 템플릿이 적용됩니다. 관리자 저장 값이 있으면 해당 항목이 우선합니다.'
+                : '기본은 계약/결제일·세팅 폼 기준 자동 산출입니다. 관리자가 저장한 날짜가 있으면 해당 항목은 수동 일정이 우선합니다.'}
             </p>
           </div>
         </div>
@@ -2658,12 +2921,41 @@ const KickoffView = ({ campaign, user, isAdminUser = false, onCampaignScheduleUp
         )}
 
         {/* D-day 카드 */}
-        <div className="flex flex-wrap gap-4">
-          <DdayCard label="명단 납품" dateStr={schedule?.listDeliveryDate} subLabel="List Delivery" />
-          <DdayCard label="배송일" dateStr={schedule?.shippingDate} subLabel="Shipping Date" />
-          <DdayCard label="업로드 시작" dateStr={schedule?.uploadStartDate} subLabel="Upload Start" />
-          <DdayCard label="업로드 마감" dateStr={schedule?.uploadDeadlineDate} subLabel="배송일+30일" />
-        </div>
+        {isVisitPlan ? (
+          <div className="flex flex-wrap gap-4">
+            <DdayCard label="인플루언서 모집" dateStr={schedule?.recruitmentEnd} subLabel="~까지" />
+            <DdayCard label="명단 납품" dateStr={schedule?.listDeliveryDate} subLabel="List Delivery" />
+            <DdayCard
+              label="콘텐츠 가이드 제작·소통"
+              dateStr={schedule?.visitContentGuideCommDate}
+              subLabel="Content Guide"
+            />
+            <DdayCard
+              label="인플루언서 재공지"
+              dateStr={schedule?.reannounce1Date}
+              subLabel={`2차 ${formatShort(schedule?.reannounce2Date)}`}
+            />
+            <DdayRangeCard
+              label="개별 일정 안내"
+              startStr={schedule?.individualNoticeStart}
+              endStr={schedule?.individualNoticeEnd}
+              subLabel="Influencer schedule notice"
+            />
+            <DdayRangeCard
+              label="Festival (방문)"
+              startStr={schedule?.festivalStartDate}
+              endStr={schedule?.festivalEndDate}
+              subLabel="현장 행사 구간"
+            />
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-4">
+            <DdayCard label="명단 납품" dateStr={schedule?.listDeliveryDate} subLabel="List Delivery" />
+            <DdayCard label="배송일" dateStr={schedule?.shippingDate} subLabel="Shipping Date" />
+            <DdayCard label="업로드 시작" dateStr={schedule?.uploadStartDate} subLabel="Upload Start" />
+            <DdayCard label="업로드 마감" dateStr={schedule?.uploadDeadlineDate} subLabel="배송일+30일" />
+          </div>
+        )}
 
         {/* 캠페인 타임라인 (간트) */}
         <div className="bg-white/5 backdrop-blur-xl p-8 rounded-[2.5rem] border border-white/10">
@@ -2671,26 +2963,34 @@ const KickoffView = ({ campaign, user, isAdminUser = false, onCampaignScheduleUp
             <BarChart3 size={20} className="text-cyan-400" />
             캠페인 캘린더 (타임라인)
           </h4>
-          <CampaignTimeline schedule={schedule} />
-          <p className="text-[10px] text-slate-500 mt-4 uppercase tracking-widest">Recruitment → 소통·확정 → 명단 납품 → 리스트 교체(3영업일) → 배송 확정 → 업로드 기간 → 90일 트래킹</p>
+          {isVisitPlan ? <VisitCampaignTimeline schedule={schedule} /> : <CampaignTimeline schedule={schedule} />}
+          <p className="text-[10px] text-slate-500 mt-4 uppercase tracking-widest">
+            {isVisitPlan
+              ? 'Recruitment → 소통·확정 → 명단·교체 → 가이드 제작·소통 → 재공지 → 개별 일정 안내 → Festival'
+              : 'Recruitment → 소통·확정 → 명단 납품 → 리스트 교체(3영업일) → 배송 확정 → 업로드 기간 → 90일 트래킹'}
+          </p>
         </div>
 
         {/* 룰 안내 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <ScheduleRulesCallout shippingType={schedule?.shippingType || 'us'} />
-          <div className="bg-white/5 backdrop-blur-xl p-6 rounded-[2.5rem] border border-white/10">
-            <h4 className="font-black text-white text-lg mb-3 flex items-center gap-2">
-              <Truck size={20} className="text-emerald-400" />
-              진행 일정 요약
-            </h4>
-            <ul className="text-sm text-slate-400 space-y-2 font-light">
-              <li>• 모집: {schedule?.recruitmentWeeks || 3}주</li>
-              <li>• 인플루언서 소통·확정: 1주</li>
-              <li>• 명단 최초 납품 → 리스트 교체 3영업일</li>
-              <li>• 업로드 시작: {schedule?.shippingType === 'us' ? '배송 3일 후' : '배송 10일 후'}</li>
-              <li>• 업로드 마감: 배송일+30일 / 트래킹: 90일</li>
-            </ul>
-          </div>
+          {isVisitPlan ? <ScheduleRulesCalloutVisit /> : <ScheduleRulesCallout shippingType={schedule?.shippingType || 'us'} />}
+          {isVisitPlan ? (
+            <VisitScheduleSummary />
+          ) : (
+            <div className="bg-white/5 backdrop-blur-xl p-6 rounded-[2.5rem] border border-white/10">
+              <h4 className="font-black text-white text-lg mb-3 flex items-center gap-2">
+                <Truck size={20} className="text-emerald-400" />
+                진행 일정 요약
+              </h4>
+              <ul className="text-sm text-slate-400 space-y-2 font-light">
+                <li>• 모집: {schedule?.recruitmentWeeks || 3}주</li>
+                <li>• 인플루언서 소통·확정: 1주</li>
+                <li>• 명단 최초 납품 → 리스트 교체 3영업일</li>
+                <li>• 업로드 시작: {schedule?.shippingType === 'us' ? '배송 3일 후' : '배송 10일 후'}</li>
+                <li>• 업로드 마감: 배송일+30일 / 트래킹: 90일</li>
+              </ul>
+            </div>
+          )}
         </div>
 
         {/* 가이드라인 세팅 */}
