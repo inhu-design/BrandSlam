@@ -159,6 +159,18 @@ const normalizeDropIdentifier = (id) => {
 /** admin 납품 테스트 외, 특정 고객 캠페인에 동일 엑셀 풀(BS-US-FARMSKIN)을 연결할 때 사용 */
 const LINKED_DELIVERY_LIST_SLUG = 'BS-US-FARMSKIN';
 
+/** Farmskin Troubless GLASS GLOW+ PDRN COLLAGEN SUNSCREEN 캠페인만 (수동 예외·연동용) */
+const isTroublessPdrnSunscreenCampaign = (campaign) => {
+  const hay = `${campaign?.product_name || ''} ${campaign?.brand_name || ''}`.toLowerCase();
+  return hay.includes('troubless') && hay.includes('pdrn') && hay.includes('sunscreen');
+};
+
+/** 수동 예외: 해당 캠페인만 드랍 마감을 표준 3일 외에 이 날짜까지 연장 (포함, 당일 23:59:59까지) */
+const TROUBLESS_PDRN_SUNSCREEN_DROP_GRACE_END_YMD = '2026-03-24';
+
+const TROUBLESS_PDRN_SUNSCREEN_NOTION_GUIDELINE_URL =
+  'https://spiral-playground-cff.notion.site/Troubless-Glass-Glow-PDRN-Collagen-Sunscreen-313259eb52488199b978e195eb1404b9';
+
 /**
  * 고객 대시보드에 납품 리스트·드랍 UI를 노출할 캠페인 판별.
  * 우선순위: VITE_LINKED_DELIVERY_CAMPAIGN_ID → 이메일 + 제품명 키워드
@@ -169,8 +181,7 @@ const campaignMatchesLinkedDeliveryList = (campaign, user) => {
   if (envId && String(campaign.id) === envId) return true;
   const email = (user?.email || '').toLowerCase().trim();
   if (email !== 'heather@fromom.net') return false;
-  const hay = `${campaign.product_name || ''} ${campaign.brand_name || ''}`.toLowerCase();
-  return hay.includes('troubless') && hay.includes('pdrn') && hay.includes('sunscreen');
+  return isTroublessPdrnSunscreenCampaign(campaign);
 };
 
 /** creator_drops / delivery_list_sessions 에 저장할 참조 키 */
@@ -1048,8 +1059,19 @@ const CandidateList = ({ candidates, targetCount, matchedCount, isDeliveryTest, 
     const dropConfirmedAt = session?.drop_confirmed_at ? new Date(session.drop_confirmed_at) : null;
     const now = new Date();
     const msPerDay = 24 * 60 * 60 * 1000;
-    const daysRemaining = sentAt ? Math.max(0, DROP_WINDOW_DAYS - (now - sentAt) / msPerDay) : DROP_WINDOW_DAYS;
-    const dropWindowExpired = sentAt ? daysRemaining <= 0 : false;
+    const rawDaysRemaining = sentAt ? Math.max(0, DROP_WINDOW_DAYS - (now - sentAt) / msPerDay) : DROP_WINDOW_DAYS;
+    const rawExpired = !!(sentAt && rawDaysRemaining <= 0);
+    const troublessDropGrace =
+      isTroublessPdrnSunscreenCampaign(campaign) &&
+      sentAt &&
+      toYMD(now) <= TROUBLESS_PDRN_SUNSCREEN_DROP_GRACE_END_YMD;
+    let daysRemaining = rawDaysRemaining;
+    if (troublessDropGrace && rawExpired) {
+      const [gy, gm, gd] = TROUBLESS_PDRN_SUNSCREEN_DROP_GRACE_END_YMD.split('-').map(Number);
+      const graceEnd = new Date(gy, gm - 1, gd, 23, 59, 59, 999);
+      daysRemaining = Math.max(0, (graceEnd - now) / msPerDay);
+    }
+    const dropWindowExpired = rawExpired && !troublessDropGrace;
     const dropConfirmed = !!dropConfirmedAt;
     const canDrop = !dropConfirmed && !sessionLoading && (!sentAt || !dropWindowExpired);
 
@@ -1395,6 +1417,13 @@ const CandidateList = ({ candidates, targetCount, matchedCount, isDeliveryTest, 
                                     : `인플루언서 리스트 · 드랍 ${droppedCount}/${maxDropCount}명 (전체 ${listTotal}명의 30%)${sentAt ? ` · ${Math.ceil(daysRemaining)}일 남음` : ''}`)
                                 : '목표 인원 달성 시 자동으로 제품 배송 단계로 전환됩니다.'}
                         </p>
+                        {isDeliveryTestView && !dropConfirmed && troublessDropGrace && rawExpired && (
+                            <p className="text-xs text-cyan-300/90 mt-2 font-medium">
+                              이번 Troubless PDRN 선크림 캠페인만 예외로, 드랍 마감이{' '}
+                              <strong className="text-cyan-200">{TROUBLESS_PDRN_SUNSCREEN_DROP_GRACE_END_YMD}</strong> 23:59까지
+                              연장되었습니다.
+                            </p>
+                          )}
                         {isDeliveryTestView && !dropConfirmed && canDrop && dropLimitReached && (
                             <p className="text-xs text-amber-400/95 mt-3 font-medium leading-relaxed max-w-xl">
                                 드랍은 전체 {listTotal}명 중 최대 <strong className="text-amber-300">30%({maxDropCount}명)</strong>까지만 선택할 수 있습니다.
@@ -2554,7 +2583,35 @@ const VisitCampaignTimeline = ({ schedule }) => {
 };
 
 // --- 가이드라인 세팅 블록 ---
-const GuidelineSettingBlock = ({ status = 'pending' }) => {
+const GuidelineSettingBlock = ({ status = 'pending', notionGuidelineUrl = null }) => {
+  if (notionGuidelineUrl) {
+    return (
+      <div className="rounded-2xl border p-6 bg-emerald-500/10 border-emerald-500/20">
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+            <FileText size={24} className="text-emerald-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h4 className="font-bold text-lg text-emerald-400">콘텐츠 가이드라인 (Notion)</h4>
+            <p className="text-slate-400 text-sm mt-1 font-light">
+              Troubless GLASS GLOW+ PDRN COLLAGEN SUNSCREEN 캠페인용 가이드를 Notion에서 확인해 주세요.
+            </p>
+            <a
+              href={notionGuidelineUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 mt-4 px-4 py-2.5 rounded-xl bg-white/10 border border-emerald-500/30 text-emerald-200 font-bold text-sm hover:bg-white/15 transition-colors break-all"
+            >
+              <ExternalLink size={16} className="shrink-0" /> Notion에서 가이드라인 열기
+            </a>
+            <p className="text-[10px] text-slate-500 mt-3 uppercase tracking-widest">
+              가이드 품질 관리: 부적절·과도한 요청 시 피드백 및 수정 요청이 있을 수 있습니다.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
   const statusConfig = {
     pending: { label: '가이드라인 대기 중', desc: '캠페인 시작 시 바로 받기 어려우면 1~2주 내 공유 요청드립니다.', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
     shared: { label: '가이드라인 공유 완료', desc: '담당자가 브랜드 가이드라인을 공유했습니다. 확인 후 피드백이 있으면 요청해 주세요.', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
@@ -3156,7 +3213,12 @@ const KickoffView = ({ campaign, user, isAdminUser = false, onCampaignScheduleUp
             <FileText size={20} className="text-amber-400" />
             가이드라인 세팅
           </h4>
-          <GuidelineSettingBlock status={guidelineStatus} />
+          <GuidelineSettingBlock
+            status={guidelineStatus}
+            notionGuidelineUrl={
+              isTroublessPdrnSunscreenCampaign(campaign) ? TROUBLESS_PDRN_SUNSCREEN_NOTION_GUIDELINE_URL : null
+            }
+          />
         </div>
       </div>
 
