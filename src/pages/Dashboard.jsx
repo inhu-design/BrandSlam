@@ -2330,27 +2330,52 @@ const CampaignTimeline = ({ schedule }) => {
   );
 };
 
+/** Visit 타임라인: 구간 길이 = 실제 캘린더 일수 비율, 재공지는 1차·2차 사이로 분리 */
+function buildVisitTimelineSegments(schedule) {
+  const s = schedule;
+  const add = (start, end, label, color) => {
+    if (!start || !end || start > end) return;
+    const daySpan = getDaysDiff(start, end);
+    if (daySpan < 1) return;
+    return { start, end, label, color, daySpan };
+  };
+  const segs = [];
+  const push = (o) => {
+    if (o) segs.push(o);
+  };
+  push(add(s.base, s.recruitmentEnd, '모집', 'bg-cyan-500'));
+  push(add(s.recruitmentEnd, s.listDeliveryDate, '소통·확정', 'bg-violet-500'));
+  push(add(s.listDeliveryDate, s.replacementWindowEnd, '명단·교체', 'bg-amber-500'));
+  push(add(s.replacementWindowEnd, s.visitContentGuideCommDate, '가이드 제작·소통', 'bg-teal-500'));
+  push(add(s.visitContentGuideCommDate, s.reannounce1Date, '1차 재공지 전', 'bg-orange-600'));
+  push(add(s.reannounce1Date, s.reannounce2Date, '1차→2차 재공지', 'bg-orange-500'));
+  push(add(s.reannounce2Date, s.individualNoticeStart, '개별 안내 전', 'bg-slate-600'));
+
+  const nS = s.individualNoticeStart;
+  const nE = s.individualNoticeEnd;
+  const fS = s.festivalStartDate;
+  const fE = s.festivalEndDate || s.scheduleEndDate;
+  if (nS && nE && fS && fE) {
+    if (nS < fS) push(add(nS, fS, '개별 일정 안내', 'bg-fuchsia-600'));
+    const festStart = nS >= fS ? nS : fS;
+    if (festStart <= fE) push(add(festStart, fE, 'Festival', 'bg-rose-500'));
+    if (fE < nE) push(add(fE, nE, '개별 안내(잔여)', 'bg-fuchsia-500/90'));
+  } else {
+    push(add(nS, nE, '개별 일정 안내', 'bg-fuchsia-500'));
+    push(add(fS, fE, 'Festival', 'bg-rose-500'));
+  }
+  return segs;
+}
+
 const VisitCampaignTimeline = ({ schedule }) => {
   if (!schedule || schedule.kind !== 'visit') return null;
-  const end = schedule.scheduleEndDate || schedule.festivalEndDate;
-  const totalDays = Math.max(1, getDaysDiff(schedule.base, end));
-  const getLeft = (dateStr) => {
-    const days = getDaysDiff(schedule.base, dateStr);
-    return Math.max(0, Math.min(100, (days / totalDays) * 100));
-  };
-  const confirmEnd =
-    schedule.contentGuideEnd === schedule.recruitmentEnd
-      ? schedule.listDeliveryDate
-      : schedule.contentGuideEnd;
-  const phases = [
-    { label: '모집', start: schedule.base, end: schedule.recruitmentEnd, color: 'bg-cyan-500/80' },
-    { label: '소통·확정', start: schedule.recruitmentEnd, end: confirmEnd, color: 'bg-violet-500/80' },
-    { label: '명단·교체', start: schedule.listDeliveryDate, end: schedule.replacementWindowEnd, color: 'bg-amber-500/80' },
-    { label: '가이드 제작·소통', start: schedule.replacementWindowEnd, end: schedule.visitContentGuideCommDate, color: 'bg-teal-500/80' },
-    { label: '재공지', start: schedule.visitContentGuideCommDate, end: schedule.reannounce2Date, color: 'bg-orange-500/80' },
-    { label: '개별 일정 안내', start: schedule.individualNoticeStart, end: schedule.individualNoticeEnd, color: 'bg-fuchsia-500/80' },
-    { label: 'Festival', start: schedule.festivalStartDate, end: schedule.festivalEndDate, color: 'bg-rose-500/80' },
-  ];
+  const segments = buildVisitTimelineSegments(schedule);
+  const totalSpan = segments.reduce((acc, g) => acc + g.daySpan, 0) || 1;
+
+  if (segments.length === 0) {
+    return <p className="text-slate-500 text-sm">일정 데이터가 부족해 타임라인을 그릴 수 없습니다.</p>;
+  }
+
   const milestones = [
     { label: 'List Delivery', date: schedule.listDeliveryDate },
     { label: 'Guide & Comm', date: schedule.visitContentGuideCommDate },
@@ -2358,39 +2383,104 @@ const VisitCampaignTimeline = ({ schedule }) => {
     { label: 'Re-announce 2', date: schedule.reannounce2Date },
     { label: 'Festival', date: schedule.festivalStartDate, end: schedule.festivalEndDate },
   ];
+
+  const ticks = [
+    { date: schedule.base, label: '착수' },
+    { date: schedule.recruitmentEnd, label: '모집' },
+    { date: schedule.listDeliveryDate, label: '명단' },
+    { date: schedule.replacementWindowEnd, label: '교체' },
+    { date: schedule.visitContentGuideCommDate, label: '가이드' },
+    { date: schedule.reannounce1Date, label: '재공지1' },
+    { date: schedule.reannounce2Date, label: '재공지2' },
+    { date: schedule.individualNoticeStart, label: '개별안내' },
+    { date: schedule.festivalStartDate, label: 'Festival' },
+    { date: schedule.festivalEndDate || schedule.scheduleEndDate, label: '종료' },
+  ].filter((t) => t.date);
+
   return (
     <div className="space-y-4">
-      <div className="relative h-12 rounded-xl bg-slate-800/50 overflow-hidden flex">
-        {phases.map((p, i) => {
-          const left = getLeft(p.start);
-          const width = Math.max(3, getLeft(p.end) - left);
-          return (
+      <p className="text-[11px] text-slate-500 font-light">
+        막대 길이는 <strong className="text-slate-400 font-medium">실제 일수</strong> 비율입니다. 구간에 마우스를 올리면 기간(일)과 날짜가 표시됩니다.
+      </p>
+
+      <div className="rounded-xl border border-white/10 bg-slate-900/40 overflow-hidden">
+        <div className="flex h-14 w-full min-h-[3.5rem]">
+          {segments.map((g, i) => (
             <div
-              key={i}
-              className={`absolute top-0 h-full rounded ${p.color} transition-all`}
-              style={{ left: left + '%', width: width + '%' }}
-              title={`${p.label} ${p.start} ~ ${p.end}`}
-            />
-          );
-        })}
+              key={`${g.start}-${g.end}-${i}`}
+              style={{ flex: g.daySpan }}
+              className={`${g.color} min-w-0 border-r border-slate-950/40 last:border-r-0 flex items-end justify-center pb-1 px-0.5`}
+              title={`${g.label}\n${g.start} ~ ${g.end} (${g.daySpan}일)`}
+            >
+              <span className="text-[8px] font-bold text-white/90 drop-shadow-sm text-center leading-tight line-clamp-2 hidden md:block pointer-events-none">
+                {g.daySpan >= 4 ? g.label : ''}
+              </span>
+            </div>
+          ))}
+        </div>
+        <div className="flex w-full border-t border-white/5 bg-slate-950/30">
+          {segments.map((g, i) => (
+            <div
+              key={`tick-${g.start}-${i}`}
+              style={{ flex: g.daySpan }}
+              className="min-w-0 border-r border-white/5 last:border-r-0 px-0.5 pt-1 pb-2"
+            >
+              <div
+                className="text-[8px] sm:text-[9px] text-cyan-400/90 font-mono tabular-nums text-center font-bold leading-tight"
+                title={`${g.start} ~ ${g.end}`}
+              >
+                {g.daySpan <= 2 ? (
+                  formatShort(g.start)
+                ) : (
+                  <>
+                    <span className="text-slate-500">{formatShort(g.start)}</span>
+                    <span className="text-slate-600 mx-0.5">→</span>
+                    <span>{formatShort(g.end)}</span>
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="px-2 py-1.5 text-[9px] text-slate-500 font-mono text-right border-t border-white/5">
+          전체 {totalSpan}일 · 종료 {schedule.festivalEndDate || schedule.scheduleEndDate}
+        </div>
       </div>
-      <div className="flex flex-wrap gap-2 justify-between text-[10px] font-bold text-slate-400">
-        {phases.map((p, i) => (
-          <span key={i} className="flex items-center gap-1.5">
-            <span className={`w-2 h-2 rounded-full ${p.color.replace('/80', '')}`} />
-            {p.label}
+
+      <div className="flex flex-wrap gap-x-4 gap-y-2 text-[10px] font-bold text-slate-400">
+        {segments.map((g, i) => (
+          <span key={`leg-${i}`} className="flex items-center gap-1.5 max-w-[200px]">
+            <span className={`w-2 h-2 rounded-sm shrink-0 ${g.color}`} />
+            <span className="leading-tight">
+              {g.label}{' '}
+              <span className="text-slate-600 font-normal font-mono">
+                ({g.daySpan}일)
+              </span>
+            </span>
           </span>
         ))}
       </div>
-      <div className="flex flex-wrap gap-4 pt-2 border-t border-white/10">
+
+      <div className="flex flex-wrap gap-x-6 gap-y-2 pt-2 border-t border-white/10">
         {milestones.map((m, i) => (
           <div key={i} className="flex items-center gap-2">
-            <span className="text-slate-500 uppercase tracking-wider">{m.label}</span>
+            <span className="text-slate-500 uppercase tracking-wider text-[10px]">{m.label}</span>
             <span className="text-white font-mono text-sm">
               {m.end ? `${formatShort(m.date)}–${formatShort(m.end)}` : formatShort(m.date)}
             </span>
           </div>
         ))}
+      </div>
+
+      <div className="rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2">
+        <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-2">주요 일정 눈금</p>
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-slate-400 font-mono">
+          {ticks.map((t, i) => (
+            <span key={i}>
+              <span className="text-slate-600">{t.label}</span> {t.date}
+            </span>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -2435,14 +2525,14 @@ const ScheduleRulesCallout = ({ shippingType }) => (
 
 const ScheduleRulesCalloutVisit = () => (
   <div className="bg-slate-800/50 border border-white/10 rounded-2xl p-5">
-    <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Visit Content 일정 룰 (템플릿)</h5>
+    <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Visit Content 일정 템플릿</h5>
     <ul className="text-sm text-slate-400 space-y-2 font-light">
       <li>• <strong className="text-slate-300">인플루언서 모집:</strong> 착수일 기준 D+3일까지 (~명단 전일)</li>
       <li>• <strong className="text-slate-300">명단 납품:</strong> 착수일 기준 D+4일 (행사 일정에 맞춘 Visit 단축 룰)</li>
       <li>• <strong className="text-slate-300">콘텐츠 가이드 제작·소통:</strong> 명단 납품일 + 7일</li>
-      <li>• <strong className="text-slate-300">재공지:</strong> 명단 납품일 + 28일, + 42일</li>
-      <li>• <strong className="text-slate-300">개별 일정 안내:</strong> 명단 납품일 + 46일 ~ + 51일</li>
-      <li>• <strong className="text-slate-300">Festival(방문):</strong> 명단 납품일 + 47일 ~ + 51일</li>
+      <li>• <strong className="text-slate-300">재공지:</strong> D-day 3주 전, 2주 전</li>
+      <li>• <strong className="text-slate-300">개별 일정 안내:</strong> D-day 1주 전</li>
+      <li>• <strong className="text-slate-300">방문:</strong> D-day</li>
     </ul>
   </div>
 );
