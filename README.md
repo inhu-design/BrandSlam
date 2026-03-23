@@ -14,3 +14,7 @@ The React Compiler is not enabled on this template because of its impact on dev 
 ## Expanding the ESLint configuration
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+
+## Checkout (카드 결제)
+
+- 기본: 심사 모드 — 안내 배너·팝업 후에도 결제창은 열림. `VITE_CARD_PAYMENT_ENABLED=true` 이면 안내 없이 바로 결제창.

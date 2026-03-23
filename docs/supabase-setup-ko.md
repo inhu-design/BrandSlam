@@ -20,6 +20,7 @@
 |------|------|
 | `supabase-migration-delivery-creators.sql` | 납품 인플루언서 풀 + `creator_drops` |
 | `supabase-migration-creator-drops-limit.sql` | (선택) BS-US-FARMSKIN 드랍 15명 DB 제한 |
+| `supabase-migration-checkout-drafts.sql` | 카드 결제: 결제 전 `orders` 대신 임시 저장용 `checkout_drafts` (결제 API 필수) |
 
 실행 후 **잠시 기다렸다가** 브라우저를 새로고침하세요. (스키마 캐시 반영 지연 시 1~2분 걸릴 수 있습니다.)
 

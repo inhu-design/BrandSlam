@@ -35,36 +35,80 @@ export default async function handler(req, res) {
   const successCodes = ['00', '0000', '0', '000'];
   const isSuccess = successCodes.includes(resultCode);
 
-  // 결제 완료 시: 1) order_items로 campaigns 생성, 2) orders를 paid로 갱신
+  // 결제 실패·취소: 임시 초안만 제거 (orders 행은 없음)
+  if (!isSuccess && orderId && supabase) {
+    try {
+      await supabase.from('checkout_drafts').delete().eq('oid', orderId);
+    } catch (err) {
+      console.error('[inicis payment-callback] draft delete', err);
+    }
+  }
+
+  // 결제 성공: orders 없으면 checkout_drafts → orders INSERT 후 캠페인 생성, paid 처리
   if (isSuccess && orderId && supabase) {
     try {
-      const { data: order } = await supabase
+      let { data: order } = await supabase
         .from('orders')
-        .select('user_id, order_items, plan_name, name, email, phone, company, client_address, client_biz_reg_no')
+        .select('user_id, order_items, plan_name, name, email, phone, company, client_address, client_biz_reg_no, status')
         .eq('order_number', orderId)
-        .single();
+        .maybeSingle();
 
-      if (order?.user_id && Array.isArray(order.order_items) && order.order_items.length > 0) {
-        const campaignRows = buildCampaignRowsFromOrderItems(
-          order.order_items,
-          {
-            user_id: order.user_id,
+      if (!order?.user_id) {
+        const { data: draftRow } = await supabase.from('checkout_drafts').select('payload').eq('oid', orderId).maybeSingle();
+        const p = draftRow?.payload;
+        if (p && p.user_id && Array.isArray(p.order_items) && p.order_items.length > 0) {
+          const insertRow = {
             order_number: orderId,
-            status: 'PAYMENT_PENDING',
-            brand_name: order.company || '',
-            customer_name: order.name || '',
-            customer_email: order.email || '',
-            customer_phone: order.phone || '',
-            client_address: order.client_address || null,
-            client_biz_reg_no: order.client_biz_reg_no || null,
-          },
-          { orderPlanName: order.plan_name },
-        );
-        if (campaignRows.length > 0) {
-          await supabase.from('campaigns').insert(campaignRows);
+            plan_name: p.plan_name,
+            plan_price: Number(p.plan_price) || 0,
+            content_count: p.content_count,
+            email: p.email,
+            name: p.name,
+            phone: p.phone,
+            company: p.company || '',
+            status: 'paid',
+            user_id: p.user_id,
+            client_address: p.client_address ?? null,
+            client_biz_reg_no: p.client_biz_reg_no ?? null,
+            order_items: p.order_items,
+          };
+          const { error: insErr } = await supabase.from('orders').insert([insertRow]);
+          if (!insErr) {
+            await supabase.from('checkout_drafts').delete().eq('oid', orderId);
+            order = insertRow;
+          } else {
+            console.error('[inicis payment-callback] orders insert from draft', insErr);
+          }
         }
       }
-      await supabase.from('orders').update({ status: 'paid' }).eq('order_number', orderId);
+
+      if (order?.user_id && Array.isArray(order.order_items) && order.order_items.length > 0) {
+        const { data: existingCamp } = await supabase.from('campaigns').select('id').eq('order_number', orderId).limit(1);
+        if (!existingCamp?.length) {
+          const campaignRows = buildCampaignRowsFromOrderItems(
+            order.order_items,
+            {
+              user_id: order.user_id,
+              order_number: orderId,
+              status: 'PAYMENT_PENDING',
+              brand_name: order.company || '',
+              customer_name: order.name || '',
+              customer_email: order.email || '',
+              customer_phone: order.phone || '',
+              client_address: order.client_address || null,
+              client_biz_reg_no: order.client_biz_reg_no || null,
+            },
+            { orderPlanName: order.plan_name },
+          );
+          if (campaignRows.length > 0) {
+            await supabase.from('campaigns').insert(campaignRows);
+          }
+        }
+      }
+
+      if (order?.user_id) {
+        await supabase.from('orders').update({ status: 'paid' }).eq('order_number', orderId);
+      }
     } catch (err) {
       console.error('[inicis payment-callback]', err);
     }

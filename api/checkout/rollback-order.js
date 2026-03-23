@@ -32,6 +32,7 @@ export default async function handler(req, res) {
   try {
     await supabase.from('campaigns').delete().eq('order_number', orderNumber);
     await supabase.from('orders').delete().eq('order_number', orderNumber);
+    await supabase.from('checkout_drafts').delete().eq('oid', orderNumber);
     return res.status(200).json({ ok: true });
   } catch (err) {
     console.error('[rollback-order]', err);

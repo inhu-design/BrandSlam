@@ -10,6 +10,12 @@ import Footer from '../components/layout/Footer';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
+/** `VITE_CARD_PAYMENT_ENABLED=true` 이면 안내 없이 결제창만. 미설정이면 심사용 안내(배너·alert) 후에도 결제창은 동일하게 열림 */
+const isCardPaymentEnabled = () => {
+  const v = String(import.meta.env.VITE_CARD_PAYMENT_ENABLED || '').toLowerCase();
+  return v === 'true' || v === '1' || v === 'yes';
+};
+
 const PLANS = {
   Starter: { id: 'Starter', name: 'Starter', price: '590,000', priceNum: 590000, count: 10, desc: '콘텐츠 10개 보장' },
   Growth: { id: 'Growth', name: 'Growth', price: '990,000', priceNum: 990000, count: 20, desc: '콘텐츠 20개 보장', isBest: true },
@@ -424,7 +430,8 @@ export default function Checkout() {
   const [orderNumber, setOrderNumber] = useState('');
   const [legalModal, setLegalModal] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('bank'); // 'bank' | 'card'
-  const [bankOrderNumber, setBankOrderNumber] = useState(null); // 계좌이체 시 주문 생성 후 표시
+  const [bankOrderNumber, setBankOrderNumber] = useState(null); // 계좌이체: 입금 안내용 주문번호 (DB 미생성)
+  const [bankOrderPayload, setBankOrderPayload] = useState(null); // 입금 확인 시 서버에 전달할 주문 본문
   const [verifyingPassword, setVerifyingPassword] = useState(false);
   const paymentInProgressRef = useRef(false);
   const invoicePreviewRef = useRef(null);
@@ -520,6 +527,28 @@ export default function Checkout() {
 
     // 1) 결제 파라미터 먼저 확인. 실패하면 주문/캠페인 생성 없이 종료
     let params;
+    const orderItems = lineItems.map((li) => ({
+      plan_name: li.plan.name,
+      qty: li.qty,
+      unit_price: li.unitPrice,
+      content_count: li.isVisit ? 1 : li.plan.count,
+      is_visit: !!li.isVisit,
+    }));
+    const orderDraft = {
+      order_number: orderNum,
+      plan_name: planSummary,
+      plan_price: totalPrice,
+      content_count: totalContentCount,
+      email: form.email,
+      name: form.name,
+      phone: form.phone,
+      company: clientForm.companyName || form.company,
+      user_id: user.id,
+      client_address: clientForm.address || null,
+      client_biz_reg_no: clientForm.bizRegNo || null,
+      order_items: orderItems,
+    };
+
     try {
       const res = await fetch(`${base}/api/inicis/payment-params`, {
         method: 'POST',
@@ -532,6 +561,7 @@ export default function Checkout() {
           buyertel: form.phone,
           buyeremail: form.email,
           method: inicisMethod,
+          order_draft: orderDraft,
         }),
       });
       params = await res.json();
@@ -553,38 +583,9 @@ export default function Checkout() {
       return;
     }
 
-    // 2) 결제창이 정상적으로 열릴 수 있을 때만 주문 생성 (캠페인은 결제 완료 후 생성)
-    const orderItems = lineItems.map((li) => ({
-      plan_name: li.plan.name,
-      qty: li.qty,
-      unit_price: li.unitPrice,
-      content_count: li.isVisit ? 1 : li.plan.count,
-      is_visit: !!li.isVisit,
-    }));
-    try {
-      await supabase.from('orders').insert([{
-        order_number: orderNum,
-        plan_name: planSummary,
-        plan_price: totalPrice,
-        content_count: totalContentCount,
-        email: form.email,
-        name: form.name,
-        phone: form.phone,
-        company: clientForm.companyName || form.company,
-        status: 'pending_payment',
-        user_id: user.id,
-        client_address: clientForm.address || null,
-        client_biz_reg_no: clientForm.bizRegNo || null,
-        order_items: orderItems,
-      }]);
-    } catch {
-      paymentInProgressRef.current = false;
-      setSubmitting(false);
-      alert('주문 저장에 실패했습니다. 다시 시도해 주세요.');
-      return;
-    }
+    // 2) orders 행은 결제 성공 후 서버 콜백에서만 생성. 초안은 payment-params가 checkout_drafts에 저장.
 
-    // 3) 결제창 오픈. 실패하면 방금 만든 주문 롤백
+    // 3) 결제창 오픈. 실패하면 임시 초안(draft) 롤백
     try {
       const formId = 'inicis-pay-form';
       let formEl = document.getElementById(formId);
@@ -640,7 +641,14 @@ export default function Checkout() {
     }
   };
 
-  const handleCardPayment = () => handleInicisPayment('card');
+  const handleCardPayment = () => {
+    if (!isCardPaymentEnabled()) {
+      window.alert(
+        '안내: 카드사 심사 진행 중입니다.\n\n「확인」 후 결제창이 열리며, 심사·테스트 목적으로 이용하실 수 있습니다.\n\n실제 서비스 결제는 실시간 계좌이체 이용을 권장합니다.',
+      );
+    }
+    handleInicisPayment('card');
+  };
 
   const handleBankPayment = async () => {
     if (paymentInProgressRef.current || !hasCartItems) return;
@@ -658,6 +666,20 @@ export default function Checkout() {
       content_count: li.isVisit ? 1 : li.plan.count,
       is_visit: !!li.isVisit,
     }));
+    const bankPayload = {
+      order_number: orderNum,
+      plan_name: planSummary,
+      plan_price: totalPrice,
+      content_count: totalContentCount,
+      email: form.email,
+      name: form.name,
+      phone: form.phone,
+      company: clientForm.companyName || form.company,
+      user_id: user.id,
+      client_address: clientForm.address || null,
+      client_biz_reg_no: clientForm.bizRegNo || null,
+      order_items: orderItems,
+    };
 
     try {
       if (isSettingPassword) {
@@ -667,26 +689,12 @@ export default function Checkout() {
       await supabase.auth.updateUser({
         data: { ...(user?.user_metadata || {}), name: form.name, phone: form.phone, company: form.company },
       });
-      await supabase.from('orders').insert([{
-        order_number: orderNum,
-        plan_name: planSummary,
-        plan_price: totalPrice,
-        content_count: totalContentCount,
-        email: form.email,
-        name: form.name,
-        phone: form.phone,
-        company: clientForm.companyName || form.company,
-        status: 'pending_payment',
-        user_id: user.id,
-        client_address: clientForm.address || null,
-        client_biz_reg_no: clientForm.bizRegNo || null,
-        order_items: orderItems,
-      }]);
       setOrderNumber(orderNum);
       setBankOrderNumber(orderNum);
+      setBankOrderPayload(bankPayload);
     } catch (e) {
       console.error(e);
-      alert('주문 생성에 실패했습니다. 다시 시도해 주세요.');
+      alert('처리에 실패했습니다. 다시 시도해 주세요.');
     } finally {
       paymentInProgressRef.current = false;
       setSubmitting(false);
@@ -694,7 +702,7 @@ export default function Checkout() {
   };
 
   const handleConfirmBankTransfer = async () => {
-    if (!bankOrderNumber || submitting) return;
+    if (!bankOrderNumber || !bankOrderPayload || submitting) return;
     setSubmitting(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -707,7 +715,7 @@ export default function Checkout() {
       const res = await fetch(`${window.location.origin}/api/checkout/confirm-bank-transfer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ order_number: bankOrderNumber }),
+        body: JSON.stringify({ order_number: bankOrderNumber, order_payload: bankOrderPayload }),
       });
       let data;
       try {
@@ -1308,6 +1316,17 @@ export default function Checkout() {
               </div>
 
               <h3 className="font-bold text-white mb-4">결제 수단</h3>
+              {!isCardPaymentEnabled() && (
+                <div className="mb-6 flex gap-3 p-4 rounded-2xl border border-amber-500/35 bg-amber-500/[0.12] text-amber-100/95">
+                  <AlertTriangle className="shrink-0 text-amber-400 mt-0.5" size={22} />
+                  <div className="text-sm leading-relaxed">
+                    <p className="font-bold text-amber-200 mb-1">신용카드 · 카드사 심사 안내</p>
+                    <p className="text-amber-100/85">
+                      심사를 위해 <strong className="text-white">신용카드 결제</strong> 버튼으로 결제창을 열 수 있습니다. 일반 고객 결제는 <strong className="text-white">실시간 계좌이체</strong>를 이용해 주세요.
+                    </p>
+                  </div>
+                </div>
+              )}
               <div className="flex gap-4 mb-6">
                 <button
                   type="button"
@@ -1322,7 +1341,7 @@ export default function Checkout() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setPaymentMethod('card'); setBankOrderNumber(null); }}
+                  onClick={() => { setPaymentMethod('card'); setBankOrderNumber(null); setBankOrderPayload(null); }}
                   className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl font-bold border-2 transition-all ${
                     paymentMethod === 'card'
                       ? 'bg-purple-500/20 border-purple-500 text-purple-300'
@@ -1353,8 +1372,24 @@ export default function Checkout() {
               )}
 
               {paymentMethod === 'card' && (
-                <div className="bg-white/[0.04] rounded-2xl p-5 mb-8 border border-white/10">
-                  <p className="text-sm text-slate-400">결제하기 버튼을 누르면 KG이니시스 결제창이 열립니다. 카드 정보를 입력해 결제를 완료해 주세요.</p>
+                <div className="space-y-4 mb-8">
+                  {!isCardPaymentEnabled() && (
+                    <div className="rounded-2xl p-5 border border-amber-500/25 bg-amber-500/[0.08]">
+                      <p className="text-sm text-amber-100/90 flex items-start gap-2">
+                        <AlertTriangle size={18} className="shrink-0 text-amber-400 mt-0.5" />
+                        <span>
+                          버튼을 누르면 안내 팝업 후 <strong className="text-white">KG이니시스 결제창</strong>이 열립니다. 심사·테스트용이며, 실제 결제는 <strong className="text-white">실시간 계좌이체</strong>를 권장합니다.
+                        </span>
+                      </p>
+                    </div>
+                  )}
+                  <div className="bg-white/[0.04] rounded-2xl p-5 border border-white/10">
+                    <p className="text-sm text-slate-400">
+                      {isCardPaymentEnabled()
+                        ? '결제하기 버튼을 누르면 KG이니시스 결제창이 열립니다. 카드 정보를 입력해 결제를 완료해 주세요.'
+                        : '위 안내를 확인한 뒤 결제하기를 누르시면 팝업 확인 후 결제창이 열립니다.'}
+                    </p>
+                  </div>
                 </div>
               )}
 

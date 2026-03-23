@@ -5,6 +5,7 @@
  * - SignKey는 서버에만 두고, signature/verification/mKey만 반환
  */
 import { createHash } from 'crypto';
+import { supabase } from '../lib/supabase-server.js';
 
 const INICIS_MID = process.env.INICIS_MID || '';
 const INICIS_SIGNKEY = process.env.INICIS_SIGNKEY || '';
@@ -33,11 +34,31 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Invalid JSON body' });
   }
 
-  const { oid, price, goodname, buyername, buyertel, buyeremail, method } = body;
+  const { oid, price, goodname, buyername, buyertel, buyeremail, method, order_draft: orderDraft } = body;
   if (!oid || price == null || !goodname || !buyername || !buyertel || !buyeremail) {
     return res.status(400).json({
       error: 'Missing required fields: oid, price, goodname, buyername, buyertel, buyeremail',
     });
+  }
+
+  if (orderDraft != null && typeof orderDraft === 'object') {
+    if (!supabase) {
+      return res.status(503).json({ error: 'Server cannot persist checkout (Supabase service role missing).' });
+    }
+    if (String(orderDraft.order_number || '') !== String(oid)) {
+      return res.status(400).json({ error: 'order_draft.order_number must match oid' });
+    }
+    if (!orderDraft.user_id || !orderDraft.email) {
+      return res.status(400).json({ error: 'order_draft must include user_id and email' });
+    }
+    const { error: draftErr } = await supabase.from('checkout_drafts').upsert(
+      { oid: String(oid), payload: orderDraft },
+      { onConflict: 'oid' },
+    );
+    if (draftErr) {
+      console.error('[payment-params] checkout_drafts upsert', draftErr);
+      return res.status(500).json({ error: 'Failed to save checkout draft' });
+    }
   }
   const payMethod = (method || 'card').toLowerCase();
   const isBank = payMethod === 'bank';
