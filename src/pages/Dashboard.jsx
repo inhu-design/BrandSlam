@@ -2375,9 +2375,9 @@ function buildVisitCalendarPaint(schedule) {
   addM(s.reannounce2Date, '재공지 2차', 'orange');
   addM(s.individualNoticeStart, '개별안내 시작', 'fuchsia');
   addM(s.individualNoticeEnd, '개별안내 종료', 'fuchsia');
-  addM(s.festivalStartDate, 'Festival', 'rose');
+  addM(s.festivalStartDate, '방문', 'rose');
   const fEnd = s.festivalEndDate || s.scheduleEndDate;
-  if (fEnd && fEnd !== s.festivalStartDate) addM(fEnd, 'Festival 종료', 'rose');
+  if (fEnd && fEnd !== s.festivalStartDate) addM(fEnd, '방문 종료', 'rose');
 
   const rangeBg = {};
   const paint = (a, b, key) => {
@@ -2482,7 +2482,7 @@ const VisitCampaignTimeline = ({ schedule }) => {
     { label: 'Guide & Comm', date: schedule.visitContentGuideCommDate },
     { label: 'Re-announce 1', date: schedule.reannounce1Date },
     { label: 'Re-announce 2', date: schedule.reannounce2Date },
-    { label: 'Festival', date: schedule.festivalStartDate, end: schedule.festivalEndDate },
+    { label: '방문', date: schedule.festivalStartDate, end: schedule.festivalEndDate },
   ];
 
   const ticks = [
@@ -2497,7 +2497,7 @@ const VisitCampaignTimeline = ({ schedule }) => {
     ...(schedule.individualNoticeEnd && schedule.individualNoticeEnd !== schedule.individualNoticeStart
       ? [{ date: schedule.individualNoticeEnd, label: '개별안내 끝' }]
       : []),
-    { date: schedule.festivalStartDate, label: 'Festival' },
+    { date: schedule.festivalStartDate, label: '방문' },
     { date: schedule.festivalEndDate || schedule.scheduleEndDate, label: '종료' },
   ].filter((t) => t.date);
 
@@ -2509,7 +2509,7 @@ const VisitCampaignTimeline = ({ schedule }) => {
         <strong className="text-slate-400 font-medium">달력</strong>에 마일스톤이 표시됩니다.{' '}
         <span className="text-slate-600">노랑 계열</span>=명단·교체 구간,{' '}
         <span className="text-fuchsia-400/80">보라 계열</span>=개별 안내,{' '}
-        <span className="text-rose-400/80">분홍</span>=Festival 구간입니다.
+        <span className="text-rose-400/80">분홍</span>=방문 구간입니다.
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -2614,7 +2614,7 @@ const VisitScheduleSummary = () => (
       <li>• 착수 후 단축 모집·확정 → 명단 납품 → 리스트 교체(3영업일)</li>
       <li>• 가이드 제작·소통 → 1·2차 재공지</li>
       <li>• 인플루언서 개별 일정 안내 구간</li>
-      <li>• Festival(현장 방문) 구간 — 행사 캘린더와 함께 확인해 주세요</li>
+      <li>• 방문(현장) 일정 구간 — 행사·촬영 일정은 별도 캘린더와 함께 확인해 주세요</li>
     </ul>
   </div>
 );
@@ -2790,8 +2790,8 @@ function AdminCampaignScheduleEditor({ campaign, onSaved, className = '' }) {
             {row('schedule_visit_reannounce_2_date', '인플루언서 재공지 2차')}
             {row('schedule_visit_notice_start_date', '개별 일정 안내 시작')}
             {row('schedule_visit_notice_end_date', '개별 일정 안내 종료')}
-            {row('schedule_visit_festival_start_date', 'Festival(방문) 시작')}
-            {row('schedule_visit_festival_end_date', 'Festival(방문) 종료')}
+            {row('schedule_visit_festival_start_date', '방문 시작')}
+            {row('schedule_visit_festival_end_date', '방문 종료')}
           </>
         ) : (
           <>
@@ -3064,7 +3064,7 @@ const KickoffView = ({ campaign, user, isAdminUser = false, onCampaignScheduleUp
             <h3 className="font-black text-white text-xl tracking-tight">캠페인 진행 일정</h3>
             <p className="text-slate-500 text-sm font-light">
               {isVisitPlan
-                ? 'Visit Content 플랜: 계약·세팅 기준으로 모집~명단까지 산출 후, 명단 납품일 기준 방문·행사 일정 템플릿이 적용됩니다. 관리자 저장 값이 있으면 해당 항목이 우선합니다.'
+                ? 'Visit Content 플랜: 계약·세팅 기준으로 모집~명단까지 산출 후, 명단 납품일 기준 방문·행사 일정 템플릿이 적용됩니다.'
                 : '기본은 계약/결제일·세팅 폼 기준 자동 산출입니다. 관리자가 저장한 날짜가 있으면 해당 항목은 수동 일정이 우선합니다.'}
             </p>
           </div>
@@ -3080,7 +3080,7 @@ const KickoffView = ({ campaign, user, isAdminUser = false, onCampaignScheduleUp
         {/* D-day 카드 */}
         {isVisitPlan ? (
           <div className="flex flex-wrap gap-4">
-            <DdayCard label="인플루언서 모집" dateStr={schedule?.recruitmentEnd} subLabel="~까지" />
+            <DdayCard label="인플루언서 모집" dateStr={schedule?.recruitmentEnd} subLabel="Recruitment" />
             <DdayCard label="명단 납품" dateStr={schedule?.listDeliveryDate} subLabel="List Delivery" />
             <DdayCard
               label="콘텐츠 가이드 제작·소통"
@@ -3090,7 +3090,7 @@ const KickoffView = ({ campaign, user, isAdminUser = false, onCampaignScheduleUp
             <DdayCard
               label="인플루언서 재공지"
               dateStr={schedule?.reannounce1Date}
-              subLabel={`2차 ${formatShort(schedule?.reannounce2Date)}`}
+              subLabel="Re-Announcement"
             />
             <DdayRangeCard
               label="개별 일정 안내"
@@ -3099,10 +3099,10 @@ const KickoffView = ({ campaign, user, isAdminUser = false, onCampaignScheduleUp
               subLabel="Influencer schedule notice"
             />
             <DdayRangeCard
-              label="Festival (방문)"
+              label="방문"
               startStr={schedule?.festivalStartDate}
               endStr={schedule?.festivalEndDate}
-              subLabel="현장 행사 구간"
+              subLabel="현장 방문 구간"
             />
           </div>
         ) : (
@@ -3123,7 +3123,7 @@ const KickoffView = ({ campaign, user, isAdminUser = false, onCampaignScheduleUp
           {isVisitPlan ? <VisitCampaignTimeline schedule={schedule} /> : <CampaignTimeline schedule={schedule} />}
           <p className="text-[10px] text-slate-500 mt-4 uppercase tracking-widest">
             {isVisitPlan
-              ? 'Recruitment → 소통·확정 → 명단·교체 → 가이드 제작·소통 → 재공지 → 개별 일정 안내 → Festival'
+              ? 'Recruitment → 소통·확정 → 명단·교체 → 가이드 제작·소통 → 재공지 → 개별 일정 안내 → 방문'
               : 'Recruitment → 소통·확정 → 명단 납품 → 리스트 교체(3영업일) → 배송 확정 → 업로드 기간 → 90일 트래킹'}
           </p>
         </div>
