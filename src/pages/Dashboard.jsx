@@ -2062,6 +2062,33 @@ function getCampaignSchedule(startDate, options = {}) {
   };
 }
 
+/** DB campaigns.id 형태의 UUID (가상 캠페인 행 제외) */
+const CAMPAIGN_ROW_UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * 템플릿 일정 위에 campaigns 테이블의 수동 일정 컬럼을 덮어씁니다.
+ */
+function mergeCampaignSchedule(computed, campaign) {
+  if (!computed) return computed;
+  const merged = { ...computed };
+  const o = campaign || {};
+  if (o.schedule_list_delivery_date) {
+    merged.listDeliveryDate = o.schedule_list_delivery_date;
+    merged.replacementWindowStart = o.schedule_list_delivery_date;
+    merged.replacementWindowEnd = addBizDays(o.schedule_list_delivery_date, 3);
+  }
+  if (o.schedule_shipping_date) merged.shippingDate = o.schedule_shipping_date;
+  if (o.schedule_upload_start_date) merged.uploadStartDate = o.schedule_upload_start_date;
+  if (o.schedule_upload_deadline_date) merged.uploadDeadlineDate = o.schedule_upload_deadline_date;
+  if (o.schedule_tracking_end_date) {
+    merged.trackingEndDate = o.schedule_tracking_end_date;
+  } else if (o.schedule_upload_start_date) {
+    merged.trackingEndDate = addDays(merged.uploadStartDate, 90);
+  }
+  return merged;
+}
+
 const KickoffSummaryRow = ({ label, value }) => (
   <div>
     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">{label}</p>
@@ -2244,7 +2271,240 @@ const ScheduleRulesCallout = ({ shippingType }) => (
   </div>
 );
 
-const KickoffView = ({ campaign, user }) => {
+function AdminCampaignScheduleEditor({ campaign, onSaved, className = '' }) {
+  const cid = campaign?.id;
+  const canEdit = cid && CAMPAIGN_ROW_UUID_RE.test(cid);
+  const [fields, setFields] = useState(() => ({
+    schedule_list_delivery_date: campaign?.schedule_list_delivery_date || '',
+    schedule_shipping_date: campaign?.schedule_shipping_date || '',
+    schedule_upload_start_date: campaign?.schedule_upload_start_date || '',
+    schedule_upload_deadline_date: campaign?.schedule_upload_deadline_date || '',
+    schedule_tracking_end_date: campaign?.schedule_tracking_end_date || '',
+  }));
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    setFields({
+      schedule_list_delivery_date: campaign?.schedule_list_delivery_date || '',
+      schedule_shipping_date: campaign?.schedule_shipping_date || '',
+      schedule_upload_start_date: campaign?.schedule_upload_start_date || '',
+      schedule_upload_deadline_date: campaign?.schedule_upload_deadline_date || '',
+      schedule_tracking_end_date: campaign?.schedule_tracking_end_date || '',
+    });
+    setMsg('');
+  }, [
+    cid,
+    campaign?.schedule_list_delivery_date,
+    campaign?.schedule_shipping_date,
+    campaign?.schedule_upload_start_date,
+    campaign?.schedule_upload_deadline_date,
+    campaign?.schedule_tracking_end_date,
+  ]);
+
+  if (!canEdit) return null;
+
+  const setField = (key) => (e) => {
+    setFields((f) => ({ ...f, [key]: e.target.value }));
+    setMsg('');
+  };
+
+  const trimOrNull = (v) => (v && String(v).trim() ? String(v).trim() : null);
+
+  const postSchedule = async (body) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) {
+      alert('로그인 세션이 없습니다.');
+      return;
+    }
+    setSaving(true);
+    setMsg('');
+    try {
+      const res = await fetch(`${window.location.origin}/api/admin/campaign-schedule`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `저장 실패 (${res.status})`);
+      onSaved?.(cid, data.schedule || {});
+      setMsg('저장되었습니다.');
+    } catch (e) {
+      setMsg(e?.message || String(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSave = () => {
+    const body = {
+      campaign_id: cid,
+      schedule_list_delivery_date: trimOrNull(fields.schedule_list_delivery_date),
+      schedule_shipping_date: trimOrNull(fields.schedule_shipping_date),
+      schedule_upload_start_date: trimOrNull(fields.schedule_upload_start_date),
+      schedule_upload_deadline_date: trimOrNull(fields.schedule_upload_deadline_date),
+      schedule_tracking_end_date: trimOrNull(fields.schedule_tracking_end_date),
+    };
+    postSchedule(body);
+  };
+
+  const handleClearAll = () => {
+    if (!window.confirm('저장된 수동 일정을 모두 지우고 템플릿 일정만 쓰시겠습니까?')) return;
+    postSchedule({
+      campaign_id: cid,
+      schedule_list_delivery_date: null,
+      schedule_shipping_date: null,
+      schedule_upload_start_date: null,
+      schedule_upload_deadline_date: null,
+      schedule_tracking_end_date: null,
+    });
+  };
+
+  const row = (key, label) => (
+    <label key={key} className="flex flex-col gap-1.5 text-sm">
+      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{label}</span>
+      <input
+        type="date"
+        value={fields[key]}
+        onChange={setField(key)}
+        className="px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white text-sm focus:outline-none focus:border-cyan-500/50"
+      />
+    </label>
+  );
+
+  return (
+    <div className={`rounded-2xl border border-amber-500/25 bg-amber-500/5 p-6 ${className}`}>
+      <h5 className="text-[10px] font-black text-amber-400/90 uppercase tracking-widest mb-4 flex items-center gap-2">
+        <Settings size={16} /> 관리자 · 착수 일정 수동 저장
+      </h5>
+      <p className="text-xs text-slate-500 mb-4 font-light">
+        비워 두면 해당 항목은 템플릿 자동 일정을 따릅니다. 저장은 관리자 계정(API·ADMIN_EMAILS)만 가능합니다.
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+        {row('schedule_list_delivery_date', '명단 납품')}
+        {row('schedule_shipping_date', '배송일')}
+        {row('schedule_upload_start_date', '업로드 시작')}
+        {row('schedule_upload_deadline_date', '업로드 마감')}
+        {row('schedule_tracking_end_date', '트래킹 종료 (미입력 시 업로드 시작+90일)')}
+      </div>
+      <div className="flex flex-wrap gap-3 items-center">
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+          className="px-5 py-2.5 rounded-xl font-bold text-sm bg-amber-500 text-slate-900 hover:bg-amber-400 disabled:opacity-50 transition-colors"
+        >
+          {saving ? '저장 중…' : '일정 저장'}
+        </button>
+        <button
+          type="button"
+          onClick={handleClearAll}
+          disabled={saving}
+          className="px-5 py-2.5 rounded-xl font-bold text-sm bg-white/10 border border-white/15 text-slate-200 hover:bg-white/15 disabled:opacity-50 transition-colors"
+        >
+          템플릿만 사용 (전체 초기화)
+        </button>
+        {msg && (
+          <span className={`text-xs ${msg.includes('저장되었') ? 'text-emerald-400' : 'text-red-400'}`}>{msg}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AdminCampaignScheduleByIdPanel() {
+  const [open, setOpen] = useState(false);
+  const [idInput, setIdInput] = useState('');
+  const [loaded, setLoaded] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+
+  const load = async () => {
+    const id = idInput.trim();
+    if (!CAMPAIGN_ROW_UUID_RE.test(id)) {
+      setErr('유효한 캠페인 UUID를 입력하세요.');
+      return;
+    }
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) {
+      setErr('로그인 세션이 없습니다.');
+      return;
+    }
+    setLoading(true);
+    setErr('');
+    try {
+      const res = await fetch(
+        `${window.location.origin}/api/admin/campaign-schedule?campaign_id=${encodeURIComponent(id)}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `조회 실패 (${res.status})`);
+      setLoaded(data.campaign);
+    } catch (e) {
+      setLoaded(null);
+      setErr(e?.message || String(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="mt-4 pt-4 border-t border-slate-600/30">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between text-left"
+      >
+        <span className="font-bold text-slate-300 flex items-center gap-2">
+          <Calendar size={18} className="text-amber-400" /> 캠페인 ID로 착수 일정 수정
+        </span>
+        <ChevronRight size={18} className={`text-slate-500 transition-transform ${open ? 'rotate-90' : ''}`} />
+      </button>
+      {open && (
+        <div className="mt-4 space-y-4">
+          <p className="text-slate-500 text-sm">
+            고객으로 가장한 화면이 아닌, 관리자 본인 계정으로 Supabase의 캠페인 UUID를 넣어 일정을 저장할 수 있습니다.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <input
+              type="text"
+              placeholder="캠페인 UUID (예: a1b2c3d4-...)"
+              value={idInput}
+              onChange={(e) => setIdInput(e.target.value)}
+              className="flex-1 min-w-[220px] px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/50 text-sm font-mono"
+            />
+            <button
+              type="button"
+              onClick={load}
+              disabled={loading}
+              className="px-5 py-2.5 bg-amber-600/80 hover:bg-amber-500 disabled:opacity-50 rounded-xl font-bold text-sm text-white transition-all"
+            >
+              {loading ? '불러오는 중…' : '불러오기'}
+            </button>
+          </div>
+          {err && <p className="text-red-400 text-sm">{err}</p>}
+          {loaded && (
+            <div className="space-y-3">
+              <p className="text-slate-400 text-sm">
+                <span className="text-white font-medium">{loaded.brand_name || '—'}</span>
+                {loaded.product_name ? ` · ${loaded.product_name}` : ''}
+                {loaded.order_number ? <span className="font-mono text-slate-500"> · {loaded.order_number}</span> : null}
+              </p>
+              <AdminCampaignScheduleEditor
+                campaign={loaded}
+                onSaved={(_, schedule) => setLoaded((prev) => (prev ? { ...prev, ...schedule } : prev))}
+              />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const KickoffView = ({ campaign, user, isAdminUser = false, onCampaignScheduleUpdated }) => {
   const navigate = useNavigate();
   const [submission, setSubmission] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -2275,11 +2535,12 @@ const KickoffView = ({ campaign, user }) => {
   // 일정 산출: 계약/결제일 = campaign.start_date 또는 제출일, 배송타입 = form 기반 추정
   const startDateForSchedule = campaign?.start_date || (submission?.created_at ? submission.created_at.split('T')[0] : null) || toYMD(new Date());
   const shippingType = fd.shippingRegion === 'domestic' ? 'domestic' : 'us';
-  const schedule = getCampaignSchedule(startDateForSchedule, {
+  const computedSchedule = getCampaignSchedule(startDateForSchedule, {
     shippingType,
     recruitmentWeeks: 3,
     requestedShippingDate: fd.requestedShippingDate || null,
   });
+  const schedule = mergeCampaignSchedule(computedSchedule, campaign);
   const guidelineStatus = fd.guidelineStatus || 'pending';
 
   return (
@@ -2383,9 +2644,18 @@ const KickoffView = ({ campaign, user }) => {
           </div>
           <div>
             <h3 className="font-black text-white text-xl tracking-tight">캠페인 진행 일정</h3>
-            <p className="text-slate-500 text-sm font-light">기준일(계약/결제일) 기준 자동 산출된 일정입니다. 담당자 확인 후 세부 조정될 수 있습니다.</p>
+            <p className="text-slate-500 text-sm font-light">
+              기본은 계약/결제일·세팅 폼 기준 자동 산출입니다. 관리자가 저장한 날짜가 있으면 해당 항목은 수동 일정이 우선합니다.
+            </p>
           </div>
         </div>
+
+        {isAdminUser && (
+          <AdminCampaignScheduleEditor
+            campaign={campaign}
+            onSaved={(campaignId, schedule) => onCampaignScheduleUpdated?.(campaignId, schedule)}
+          />
+        )}
 
         {/* D-day 카드 */}
         <div className="flex flex-wrap gap-4">
@@ -2482,7 +2752,7 @@ const KickoffView = ({ campaign, user }) => {
 };
 
 // --- Main Campaign Detail Container ---
-const CampaignDetail = ({ campaign, isDemoMode, user, isAdminUser = false }) => {
+const CampaignDetail = ({ campaign, isDemoMode, user, isAdminUser = false, onCampaignScheduleUpdated }) => {
   if (!campaign) return <div className="flex flex-col items-center justify-center py-40 text-slate-700 font-black uppercase tracking-[0.3em]"><Package size={48} className="mb-4 opacity-20"/> Select Campaign</div>;
 
   if (campaign.status === CampaignStatus.PAYMENT_PENDING) {
@@ -2491,7 +2761,14 @@ const CampaignDetail = ({ campaign, isDemoMode, user, isAdminUser = false }) => 
   }
 
   if (campaign.status === CampaignStatus.KICKOFF) {
-      return <KickoffView campaign={campaign} user={user} />;
+      return (
+        <KickoffView
+          campaign={campaign}
+          user={user}
+          isAdminUser={isAdminUser}
+          onCampaignScheduleUpdated={onCampaignScheduleUpdated}
+        />
+      );
   }
 
   if (campaign.status === CampaignStatus.CONTACTING) {
@@ -2568,6 +2845,11 @@ export default function Dashboard() {
   const [impersonateExpanded, setImpersonateExpanded] = useState(false);
 
   const adminEmails = useMemo(() => (import.meta.env.VITE_ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean), []);
+
+  const handleCampaignScheduleUpdated = (campaignId, schedule) => {
+    if (!campaignId || !schedule) return;
+    setCampaigns((prev) => prev.map((c) => (c.id === campaignId ? { ...c, ...schedule } : c)));
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -2796,6 +3078,7 @@ export default function Dashboard() {
                         </div>
                     </div>
                 )}
+                <AdminCampaignScheduleByIdPanel />
             </div>
         )}
 
@@ -2996,6 +3279,7 @@ export default function Dashboard() {
                                 isDemoMode={isDemoMode}
                                 user={user}
                                 isAdminUser={!!(user?.email && adminEmails.includes(user.email.toLowerCase()))}
+                                onCampaignScheduleUpdated={handleCampaignScheduleUpdated}
                             />
                         </div>
                     </div>
