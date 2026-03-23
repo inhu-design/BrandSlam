@@ -2330,50 +2330,151 @@ const CampaignTimeline = ({ schedule }) => {
   );
 };
 
-/** Visit 타임라인: 구간 길이 = 실제 캘린더 일수 비율, 재공지는 1차·2차 사이로 분리 */
-function buildVisitTimelineSegments(schedule) {
-  const s = schedule;
-  const add = (start, end, label, color) => {
-    if (!start || !end || start > end) return;
-    const daySpan = getDaysDiff(start, end);
-    if (daySpan < 1) return;
-    return { start, end, label, color, daySpan };
-  };
-  const segs = [];
-  const push = (o) => {
-    if (o) segs.push(o);
-  };
-  push(add(s.base, s.recruitmentEnd, '모집', 'bg-cyan-500'));
-  push(add(s.recruitmentEnd, s.listDeliveryDate, '소통·확정', 'bg-violet-500'));
-  push(add(s.listDeliveryDate, s.replacementWindowEnd, '명단·교체', 'bg-amber-500'));
-  push(add(s.replacementWindowEnd, s.visitContentGuideCommDate, '가이드 제작·소통', 'bg-teal-500'));
-  push(add(s.visitContentGuideCommDate, s.reannounce1Date, '1차 재공지 전', 'bg-orange-600'));
-  push(add(s.reannounce1Date, s.reannounce2Date, '1차→2차 재공지', 'bg-orange-500'));
-  push(add(s.reannounce2Date, s.individualNoticeStart, '개별 안내 전', 'bg-slate-600'));
-
-  const nS = s.individualNoticeStart;
-  const nE = s.individualNoticeEnd;
-  const fS = s.festivalStartDate;
-  const fE = s.festivalEndDate || s.scheduleEndDate;
-  if (nS && nE && fS && fE) {
-    if (nS < fS) push(add(nS, fS, '개별 일정 안내', 'bg-fuchsia-600'));
-    const festStart = nS >= fS ? nS : fS;
-    if (festStart <= fE) push(add(festStart, fE, 'Festival', 'bg-rose-500'));
-    if (fE < nE) push(add(fE, nE, '개별 안내(잔여)', 'bg-fuchsia-500/90'));
-  } else {
-    push(add(nS, nE, '개별 일정 안내', 'bg-fuchsia-500'));
-    push(add(fS, fE, 'Festival', 'bg-rose-500'));
+/** YYYY-MM-DD 포함, from~to 모든 날 */
+function enumerateDateStrings(fromStr, toStr) {
+  if (!fromStr || !toStr || fromStr > toStr) return [];
+  const out = [];
+  let cur = fromStr;
+  while (cur <= toStr) {
+    out.push(cur);
+    cur = addDays(cur, 1);
   }
-  return segs;
+  return out;
+}
+
+const VISIT_RANGE_BG = {
+  listExchange: 'bg-amber-500/[0.12] ring-1 ring-amber-500/20',
+  notice: 'bg-fuchsia-500/[0.10] ring-1 ring-fuchsia-500/15',
+  festival: 'bg-rose-500/[0.14] ring-1 ring-rose-500/25',
+};
+
+const VISIT_MARKER_TONE = {
+  slate: 'text-slate-200 border-l-2 border-slate-400 pl-1',
+  cyan: 'text-cyan-200 border-l-2 border-cyan-400 pl-1',
+  amber: 'text-amber-200 border-l-2 border-amber-400 pl-1',
+  teal: 'text-teal-200 border-l-2 border-teal-400 pl-1',
+  orange: 'text-orange-200 border-l-2 border-orange-400 pl-1',
+  fuchsia: 'text-fuchsia-200 border-l-2 border-fuchsia-400 pl-1',
+  rose: 'text-rose-200 border-l-2 border-rose-400 pl-1',
+};
+
+function buildVisitCalendarPaint(schedule) {
+  const markers = {};
+  const addM = (d, label, tone) => {
+    if (!d) return;
+    if (!markers[d]) markers[d] = [];
+    markers[d].push({ label, tone });
+  };
+  const s = schedule;
+  addM(s.base, '착수', 'slate');
+  addM(s.recruitmentEnd, '모집 마감', 'cyan');
+  addM(s.listDeliveryDate, '명단 납품', 'amber');
+  addM(s.replacementWindowEnd, '교체 마감', 'amber');
+  addM(s.visitContentGuideCommDate, '가이드', 'teal');
+  addM(s.reannounce1Date, '재공지 1차', 'orange');
+  addM(s.reannounce2Date, '재공지 2차', 'orange');
+  addM(s.individualNoticeStart, '개별안내 시작', 'fuchsia');
+  addM(s.individualNoticeEnd, '개별안내 종료', 'fuchsia');
+  addM(s.festivalStartDate, 'Festival', 'rose');
+  const fEnd = s.festivalEndDate || s.scheduleEndDate;
+  if (fEnd && fEnd !== s.festivalStartDate) addM(fEnd, 'Festival 종료', 'rose');
+
+  const rangeBg = {};
+  const paint = (a, b, key) => {
+    enumerateDateStrings(a, b).forEach((d) => {
+      rangeBg[d] = key;
+    });
+  };
+  paint(s.listDeliveryDate, s.replacementWindowEnd, 'listExchange');
+  paint(s.individualNoticeStart, s.individualNoticeEnd, 'notice');
+  paint(s.festivalStartDate, fEnd, 'festival');
+
+  const maxD = fEnd || s.base;
+  return { markers, rangeBg, minDate: s.base, maxDate: maxD };
+}
+
+function VisitScheduleMonthGrid({ year, monthIndex, markersByDate, rangeBgByDate }) {
+  const first = new Date(year, monthIndex, 1);
+  const last = new Date(year, monthIndex + 1, 0);
+  const startPad = first.getDay();
+  const daysInMonth = last.getDate();
+  const weekDays = ['일', '월', '화', '수', '목', '금', '토'];
+  const cells = [];
+  for (let i = 0; i < startPad; i++) cells.push({ key: `p-${i}`, empty: true });
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    cells.push({
+      key: dateStr,
+      dateStr,
+      day: d,
+      empty: false,
+      markers: markersByDate[dateStr] || [],
+      rangeKey: rangeBgByDate[dateStr],
+    });
+  }
+
+  return (
+    <div className="rounded-xl border border-white/10 bg-slate-900/50 p-3 sm:p-4">
+      <div className="text-center text-sm font-black text-white mb-3 tracking-tight">
+        {year}년 {monthIndex + 1}월
+      </div>
+      <div className="grid grid-cols-7 gap-1 text-center">
+        {weekDays.map((w) => (
+          <div key={w} className="text-[10px] font-bold text-slate-500 py-1">
+            {w}
+          </div>
+        ))}
+        {cells.map((cell) =>
+          cell.empty ? (
+            <div key={cell.key} className="min-h-[4.25rem]" />
+          ) : (
+            <div
+              key={cell.key}
+              className={`min-h-[4.25rem] rounded-lg p-1 flex flex-col items-stretch text-left border border-white/[0.06] ${
+                cell.rangeKey ? VISIT_RANGE_BG[cell.rangeKey] || '' : 'bg-white/[0.03]'
+              }`}
+              title={cell.markers.map((m) => m.label).join(', ') || cell.dateStr}
+            >
+              <span className="text-[11px] font-black text-white tabular-nums shrink-0">{cell.day}</span>
+              <div className="flex-1 flex flex-col gap-0.5 mt-0.5 min-w-0">
+                {cell.markers.map((m, i) => (
+                  <span
+                    key={`${m.label}-${i}`}
+                    className={`text-[8px] sm:text-[9px] font-bold leading-snug break-words ${VISIT_MARKER_TONE[m.tone] || VISIT_MARKER_TONE.slate}`}
+                  >
+                    {m.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ),
+        )}
+      </div>
+    </div>
+  );
 }
 
 const VisitCampaignTimeline = ({ schedule }) => {
   if (!schedule || schedule.kind !== 'visit') return null;
-  const segments = buildVisitTimelineSegments(schedule);
-  const totalSpan = segments.reduce((acc, g) => acc + g.daySpan, 0) || 1;
 
-  if (segments.length === 0) {
-    return <p className="text-slate-500 text-sm">일정 데이터가 부족해 타임라인을 그릴 수 없습니다.</p>;
+  const { markers, rangeBg, minDate, maxDate } = buildVisitCalendarPaint(schedule);
+  if (!minDate || !maxDate) {
+    return <p className="text-slate-500 text-sm">일정 데이터가 부족해 달력을 그릴 수 없습니다.</p>;
+  }
+
+  const [sy, sm] = minDate.split('-').map(Number);
+  const [ey, em] = maxDate.split('-').map(Number);
+  let y = sy;
+  let mi = sm - 1;
+  const endMi = em - 1;
+  const months = [];
+  while (y < ey || (y === ey && mi <= endMi)) {
+    months.push({ year: y, monthIndex: mi });
+    mi += 1;
+    if (mi > 11) {
+      mi = 0;
+      y += 1;
+    }
   }
 
   const milestones = [
@@ -2393,73 +2494,39 @@ const VisitCampaignTimeline = ({ schedule }) => {
     { date: schedule.reannounce1Date, label: '재공지1' },
     { date: schedule.reannounce2Date, label: '재공지2' },
     { date: schedule.individualNoticeStart, label: '개별안내' },
+    ...(schedule.individualNoticeEnd && schedule.individualNoticeEnd !== schedule.individualNoticeStart
+      ? [{ date: schedule.individualNoticeEnd, label: '개별안내 끝' }]
+      : []),
     { date: schedule.festivalStartDate, label: 'Festival' },
     { date: schedule.festivalEndDate || schedule.scheduleEndDate, label: '종료' },
   ].filter((t) => t.date);
 
+  const totalDays = Math.max(1, getDaysDiff(schedule.base, maxDate));
+
   return (
     <div className="space-y-4">
       <p className="text-[11px] text-slate-500 font-light">
-        막대 길이는 <strong className="text-slate-400 font-medium">실제 일수</strong> 비율입니다. 구간에 마우스를 올리면 기간(일)과 날짜가 표시됩니다.
+        <strong className="text-slate-400 font-medium">달력</strong>에 마일스톤이 표시됩니다.{' '}
+        <span className="text-slate-600">노랑 계열</span>=명단·교체 구간,{' '}
+        <span className="text-fuchsia-400/80">보라 계열</span>=개별 안내,{' '}
+        <span className="text-rose-400/80">분홍</span>=Festival 구간입니다.
       </p>
 
-      <div className="rounded-xl border border-white/10 bg-slate-900/40 overflow-hidden">
-        <div className="flex h-14 w-full min-h-[3.5rem]">
-          {segments.map((g, i) => (
-            <div
-              key={`${g.start}-${g.end}-${i}`}
-              style={{ flex: g.daySpan }}
-              className={`${g.color} min-w-0 border-r border-slate-950/40 last:border-r-0 flex items-end justify-center pb-1 px-0.5`}
-              title={`${g.label}\n${g.start} ~ ${g.end} (${g.daySpan}일)`}
-            >
-              <span className="text-[8px] font-bold text-white/90 drop-shadow-sm text-center leading-tight line-clamp-2 hidden md:block pointer-events-none">
-                {g.daySpan >= 4 ? g.label : ''}
-              </span>
-            </div>
-          ))}
-        </div>
-        <div className="flex w-full border-t border-white/5 bg-slate-950/30">
-          {segments.map((g, i) => (
-            <div
-              key={`tick-${g.start}-${i}`}
-              style={{ flex: g.daySpan }}
-              className="min-w-0 border-r border-white/5 last:border-r-0 px-0.5 pt-1 pb-2"
-            >
-              <div
-                className="text-[8px] sm:text-[9px] text-cyan-400/90 font-mono tabular-nums text-center font-bold leading-tight"
-                title={`${g.start} ~ ${g.end}`}
-              >
-                {g.daySpan <= 2 ? (
-                  formatShort(g.start)
-                ) : (
-                  <>
-                    <span className="text-slate-500">{formatShort(g.start)}</span>
-                    <span className="text-slate-600 mx-0.5">→</span>
-                    <span>{formatShort(g.end)}</span>
-                  </>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="px-2 py-1.5 text-[9px] text-slate-500 font-mono text-right border-t border-white/5">
-          전체 {totalSpan}일 · 종료 {schedule.festivalEndDate || schedule.scheduleEndDate}
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-x-4 gap-y-2 text-[10px] font-bold text-slate-400">
-        {segments.map((g, i) => (
-          <span key={`leg-${i}`} className="flex items-center gap-1.5 max-w-[200px]">
-            <span className={`w-2 h-2 rounded-sm shrink-0 ${g.color}`} />
-            <span className="leading-tight">
-              {g.label}{' '}
-              <span className="text-slate-600 font-normal font-mono">
-                ({g.daySpan}일)
-              </span>
-            </span>
-          </span>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {months.map((m) => (
+          <VisitScheduleMonthGrid
+            key={`${m.year}-${m.monthIndex}`}
+            year={m.year}
+            monthIndex={m.monthIndex}
+            markersByDate={markers}
+            rangeBgByDate={rangeBg}
+          />
         ))}
       </div>
+
+      <p className="text-[10px] text-slate-600 font-mono text-right">
+        전체 약 {totalDays}일 · 스케줄 종료 {maxDate}
+      </p>
 
       <div className="flex flex-wrap gap-x-6 gap-y-2 pt-2 border-t border-white/10">
         {milestones.map((m, i) => (
