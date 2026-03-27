@@ -75,3 +75,13 @@ npm run import:farmskin-phase2 -- "C:\Users\...\Desktop\팜스킨 2차 추가.xl
 대시보드는 `BS-US-FARMSKIN-VISIT` 을 주문번호·Visit 플랜으로 자동 연동합니다.
 
 검증만: `node scripts/farmskin-heather-phase2.js "경로.xlsx" --dry-run`
+
+**드랍이 DB에서 이미 지워진 경우** 제거할 11명 이름을 쉼표로:
+
+```powershell
+$env:FARMSKIN_NAMES_TO_REMOVE="이름1,이름2,..."; npm run import:farmskin-phase2 -- "...\팜스킨 2차 추가.xlsx"
+```
+
+엑셀 scale 시트에 **`드롭 인원` = true** 인 행을 두면, 그 행의 `name`도 제거 대상에 합쳐집니다. (교체 11명 행은 `false`/비움)
+
+**Visit에 50명이 보이던 이유:** `BS-US-FARMSKIN-VISIT` 행이 없을 때 예전 코드가 `test-influencers`(50명)로 채웠음 → 대시보드 수정됨. 스크립트로 visit 시트 1명 insert 필요.

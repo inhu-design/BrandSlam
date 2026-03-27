@@ -164,18 +164,29 @@ const LINKED_LIST_SLUG_FARMSKIN_VISIT = 'BS-US-FARMSKIN-VISIT';
 /** 웰코스 MX KWAILNARA Visit 납품 풀 */
 const LINKED_LIST_SLUG_WELCOS_MX = 'BS-MX-WELCOS';
 
+/** DB에 행이 없을 때 test-influencers(50명)로 채우면 안 되는 list_slug */
+const LINKED_DELIVERY_SLUGS_NO_TEST_FALLBACK = new Set([
+  LINKED_LIST_SLUG_FARMSKIN_VISIT,
+  LINKED_LIST_SLUG_WELCOS_MX,
+]);
+
 /** Farmskin Troubless GLASS GLOW+ PDRN COLLAGEN SUNSCREEN 캠페인만 (수동 예외·연동용) */
 const isTroublessPdrnSunscreenCampaign = (campaign) => {
   const hay = `${campaign?.product_name || ''} ${campaign?.brand_name || ''}`.toLowerCase();
   return hay.includes('troubless') && hay.includes('pdrn') && hay.includes('sunscreen');
 };
 
-/** 팜스킨 Visit 단독 주문 (엑셀 visit 시트 → admin_delivery_creators BS-US-FARMSKIN-VISIT) */
+const HEATHER_FARMSKIN_EMAIL = 'heather@fromom.net';
+const WELCOS_MKT_EMAIL = 'mkt01@welcos.com';
+
+/** 팜스킨 Visit → 소명단 BS-US-FARMSKIN-VISIT (Scale50 명단과 분리). 주문번호로도 매칭. */
 const isFarmskinVisitOrderCampaign = (campaign) => {
   if (!campaign?.id || campaign.id === 'admin-delivery-test') return false;
-  const on = String(campaign?.order_number || '').trim().toUpperCase();
   const plan = String(campaign?.plan || '').toLowerCase();
-  return on === 'BS-20260324-FC62D99F' && plan.includes('visit');
+  if (!plan.includes('visit')) return false;
+  const on = String(campaign?.order_number || '').trim().toUpperCase();
+  if (on === 'BS-20260324-FC62D99F') return true;
+  return false;
 };
 
 const TROUBLESS_PDRN_SUNSCREEN_NOTION_GUIDELINE_URL =
@@ -186,7 +197,9 @@ const isKwailnaraVisitLinkedCampaign = (campaign) => {
   if (!campaign?.id || campaign.id === 'admin-delivery-test') return false;
   const hay = `${campaign?.product_name || ''} ${campaign?.brand_name || ''}`.toLowerCase();
   const plan = String(campaign?.plan || '').toLowerCase();
-  return hay.includes('kwailnara') && plan.includes('visit');
+  if (!plan.includes('visit')) return false;
+  const customerEmail = String(campaign?.customer_email || '').toLowerCase().trim();
+  return hay.includes('kwailnara') || customerEmail === WELCOS_MKT_EMAIL;
 };
 
 const KWAILNARA_EUPHORIA_NOTION_GUIDELINE_URL =
@@ -206,10 +219,20 @@ const resolveLinkedDeliveryListSlug = (campaign, user) => {
   if (isKwailnaraVisitLinkedCampaign(campaign)) {
     return LINKED_LIST_SLUG_WELCOS_MX;
   }
+  // Visit 주문(FC62)은 JWT 이메일과 무관하게 소명단(가장 로그인 대응). 그 외 heather·Visit 플랜도 동일 slug.
   if (isFarmskinVisitOrderCampaign(campaign)) {
     return LINKED_LIST_SLUG_FARMSKIN_VISIT;
   }
-  if (authEmail === 'heather@fromom.net' && isTroublessPdrnSunscreenCampaign(campaign)) return LINKED_LIST_SLUG_FARMSKIN;
+  if (authEmail === HEATHER_FARMSKIN_EMAIL && String(campaign?.plan || '').toLowerCase().includes('visit')) {
+    return LINKED_LIST_SLUG_FARMSKIN_VISIT;
+  }
+  if (
+    authEmail === HEATHER_FARMSKIN_EMAIL &&
+    isTroublessPdrnSunscreenCampaign(campaign) &&
+    !String(campaign?.plan || '').toLowerCase().includes('visit')
+  ) {
+    return LINKED_LIST_SLUG_FARMSKIN;
+  }
   return null;
 };
 
@@ -3797,7 +3820,9 @@ export default function Dashboard() {
             creatorsBySlug[slug] =
               linkedCreators?.length > 0
                 ? linkedCreators.map((r, i) => toDisplayCreator(r, i))
-                : testInfluencers.map((c, i) => testInfluencerToDisplayCreator(c, i));
+                : LINKED_DELIVERY_SLUGS_NO_TEST_FALLBACK.has(slug)
+                  ? []
+                  : testInfluencers.map((c, i) => testInfluencerToDisplayCreator(c, i));
           }
           campaignList = campaignList.map((c) => {
             const slug = resolveLinkedDeliveryListSlug(c, user);
