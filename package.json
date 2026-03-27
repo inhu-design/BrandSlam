@@ -5,11 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:vercel": "vercel dev",
+    "dev:vercel": "vercel dev --listen 127.0.0.1:3000 --yes",
+    "dev:vercel:3001": "vercel dev --listen 127.0.0.1:3001 --yes",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "import:farmskin": "node scripts/import-farmskin-excel.js"
+    "import:farmskin": "node scripts/import-farmskin-excel.js",
+    "import:welcos": "node scripts/import-welcos-excel.js",
+    "import:farmskin-phase2": "node scripts/farmskin-heather-phase2.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.87.1",

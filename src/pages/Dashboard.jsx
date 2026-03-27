@@ -145,6 +145,7 @@ const mergeSocialFieldsFromRecord = (r) => {
     tiktok_follower,
     instagram_url,
     instagram_follower,
+    visit_date: trimOrNull(r.visit_date),
   };
 };
 
@@ -156,8 +157,12 @@ const normalizeDropIdentifier = (id) => {
   return s.split('|')[0].trim();
 };
 
-/** admin 납품 테스트 외, 특정 고객 캠페인에 동일 엑셀 풀(BS-US-FARMSKIN)을 연결할 때 사용 */
-const LINKED_DELIVERY_LIST_SLUG = 'BS-US-FARMSKIN';
+/** 팜스킨(Troubless) 납품 풀 */
+const LINKED_LIST_SLUG_FARMSKIN = 'BS-US-FARMSKIN';
+/** 팜스킨 Visit 주문 BS-20260324-FC62D99F 전용 소명단 */
+const LINKED_LIST_SLUG_FARMSKIN_VISIT = 'BS-US-FARMSKIN-VISIT';
+/** 웰코스 MX KWAILNARA Visit 납품 풀 */
+const LINKED_LIST_SLUG_WELCOS_MX = 'BS-MX-WELCOS';
 
 /** Farmskin Troubless GLASS GLOW+ PDRN COLLAGEN SUNSCREEN 캠페인만 (수동 예외·연동용) */
 const isTroublessPdrnSunscreenCampaign = (campaign) => {
@@ -165,20 +170,73 @@ const isTroublessPdrnSunscreenCampaign = (campaign) => {
   return hay.includes('troubless') && hay.includes('pdrn') && hay.includes('sunscreen');
 };
 
+/** 팜스킨 Visit 단독 주문 (엑셀 visit 시트 → admin_delivery_creators BS-US-FARMSKIN-VISIT) */
+const isFarmskinVisitOrderCampaign = (campaign) => {
+  if (!campaign?.id || campaign.id === 'admin-delivery-test') return false;
+  const on = String(campaign?.order_number || '').trim().toUpperCase();
+  const plan = String(campaign?.plan || '').toLowerCase();
+  return on === 'BS-20260324-FC62D99F' && plan.includes('visit');
+};
+
 const TROUBLESS_PDRN_SUNSCREEN_NOTION_GUIDELINE_URL =
   'https://spiral-playground-cff.notion.site/Troubless-Glass-Glow-PDRN-Collagen-Sunscreen-313259eb52488199b978e195eb1404b9';
 
-/**
- * 고객 대시보드에 납품 리스트·드랍 UI를 노출할 캠페인 판별.
- * 우선순위: VITE_LINKED_DELIVERY_CAMPAIGN_ID → 이메일 + 제품명 키워드
- */
-const campaignMatchesLinkedDeliveryList = (campaign, user) => {
+/** 웰코스 KWAILNARA · Visit 플랜 (캠페인 소유자에게만 노출 — DB user_id 기준) */
+const isKwailnaraVisitLinkedCampaign = (campaign) => {
   if (!campaign?.id || campaign.id === 'admin-delivery-test') return false;
+  const hay = `${campaign?.product_name || ''} ${campaign?.brand_name || ''}`.toLowerCase();
+  const plan = String(campaign?.plan || '').toLowerCase();
+  return hay.includes('kwailnara') && plan.includes('visit');
+};
+
+const KWAILNARA_EUPHORIA_NOTION_GUIDELINE_URL =
+  'https://spiral-playground-cff.notion.site/KWAILNARA-x-Euphoria-Fest-2026-330259eb524880c08554c4af31fcbaa0';
+
+/**
+ * 납품 리스트 Supabase list_slug (고객·캠페인별).
+ * 우선순위: VITE_LINKED_DELIVERY_CAMPAIGN_ID + VITE_LINKED_DELIVERY_LIST_SLUG → 이메일·캠페인 규칙
+ */
+const resolveLinkedDeliveryListSlug = (campaign, user) => {
+  if (!campaign?.id || campaign.id === 'admin-delivery-test') return null;
   const envId = (import.meta.env.VITE_LINKED_DELIVERY_CAMPAIGN_ID || '').trim();
-  if (envId && String(campaign.id) === envId) return true;
-  const email = (user?.email || '').toLowerCase().trim();
-  if (email !== 'heather@fromom.net') return false;
-  return isTroublessPdrnSunscreenCampaign(campaign);
+  const envSlug = (import.meta.env.VITE_LINKED_DELIVERY_LIST_SLUG || LINKED_LIST_SLUG_FARMSKIN).trim();
+  if (envId && String(campaign.id) === envId) return envSlug;
+  const authEmail = (user?.email || '').toLowerCase().trim();
+  // KWAILNARA·Visit: campaigns는 user_id로 본인 행만 올라오므로, 가장(impersonate) 시 JWT 이메일과 무관하게 동일 규칙 적용
+  if (isKwailnaraVisitLinkedCampaign(campaign)) {
+    return LINKED_LIST_SLUG_WELCOS_MX;
+  }
+  if (isFarmskinVisitOrderCampaign(campaign)) {
+    return LINKED_LIST_SLUG_FARMSKIN_VISIT;
+  }
+  if (authEmail === 'heather@fromom.net' && isTroublessPdrnSunscreenCampaign(campaign)) return LINKED_LIST_SLUG_FARMSKIN;
+  return null;
+};
+
+const campaignMatchesLinkedDeliveryList = (campaign, user) => resolveLinkedDeliveryListSlug(campaign, user) != null;
+
+/** 납품 테이블 컬럼 레이아웃: 웰코스 MX는 틱톡/인스타/visit date 분리 컬럼 */
+const linkedDeliveryTableLayout = (campaign, user) =>
+  resolveLinkedDeliveryListSlug(campaign, user) === LINKED_LIST_SLUG_WELCOS_MX ? 'visit_split' : 'stacked';
+
+const resolveKickoffNotionGuideline = (campaign) => {
+  if (isKwailnaraVisitLinkedCampaign(campaign)) {
+    return {
+      url: KWAILNARA_EUPHORIA_NOTION_GUIDELINE_URL,
+      title: '콘텐츠 가이드라인 (Notion)',
+      description:
+        'KWAILNARA x Euphoria Fest 2026 캠페인용 가이드를 Notion에서 확인해 주세요.',
+    };
+  }
+  if (isTroublessPdrnSunscreenCampaign(campaign)) {
+    return {
+      url: TROUBLESS_PDRN_SUNSCREEN_NOTION_GUIDELINE_URL,
+      title: '콘텐츠 가이드라인 (Notion)',
+      description:
+        'Troubless GLASS GLOW+ PDRN COLLAGEN SUNSCREEN 캠페인용 가이드를 Notion에서 확인해 주세요.',
+    };
+  }
+  return null;
 };
 
 /** creator_drops / delivery_list_sessions 에 저장할 참조 키 */
@@ -204,6 +262,7 @@ const toDisplayCreator = (r, idx) => {
     followers: primary?.followers || '0',
     status: 'Pending Review',
     contact: '-',
+    visit_date: m.visit_date || trimOrNull(r.visit_date) || null,
     _identifier: `${(m.name || r.name || '').trim()}`,
   };
 };
@@ -920,7 +979,7 @@ const InvoiceDetail = ({ campaign }) => {
                             onClick={handleCampaignSetup}
                             className="relative w-full py-7 bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-500 text-white rounded-3xl font-black text-xl md:text-2xl shadow-2xl hover:scale-[1.02] transition-all duration-300 flex items-center justify-center gap-4 tracking-tight"
                         >
-                            <Rocket size={28} className="animate-bounce" />
+                  
                             캠페인 세팅하기
                             <ArrowRight size={28} />
                         </button>
@@ -940,7 +999,7 @@ const DROP_DEADLINE_BUSINESS_DAYS = 3;
 const KR_PUBLIC_HOLIDAYS = new Set([
   '2025-01-01',
   '2025-01-28',
-  '2025-01-29',
+  '2025-01-29', 
   '2025-01-30',
   '2025-03-01',
   '2025-03-03',
@@ -1054,7 +1113,17 @@ const isMissingDeliverySessionsTableError = (err) => {
     );
 };
 
-const CandidateList = ({ candidates, targetCount, matchedCount, isDeliveryTest, campaign, user, existingDrops = [], allowAdminUnconfirm = false }) => {
+const CandidateList = ({
+    candidates,
+    targetCount,
+    matchedCount,
+    isDeliveryTest,
+    campaign,
+    user,
+    existingDrops = [],
+    allowAdminUnconfirm = false,
+    deliveryTableLayout = 'stacked',
+}) => {
     const { refType, refId } = campaign ? resolveDeliveryReference(campaign) : { refType: 'campaign', refId: '' };
     const progress = Math.min(Math.round((matchedCount / targetCount) * 100), 100);
     const listTotal = (candidates && candidates.length) || targetCount || 50;
@@ -1179,13 +1248,29 @@ const CandidateList = ({ candidates, targetCount, matchedCount, isDeliveryTest, 
     const handleDownloadCSV = () => {
         if (isDeliveryTest) {
             const filtered = (candidates || []).filter((c) => !droppedIds.has(normalizeDropIdentifier(c._identifier || c.name)));
-            const headers = ['name', 'shipping_country', 'instagram_url', 'instagram_followers', 'tiktok_url', 'tiktok_followers'];
+            const useSplit = deliveryTableLayout === 'visit_split';
+            const headers = useSplit
+                ? ['name', 'tiktok_url', 'tiktok_followers', 'instagram_url', 'instagram_followers', 'visit_date']
+                : ['name', 'shipping_country', 'instagram_url', 'instagram_followers', 'tiktok_url', 'tiktok_followers'];
             const csv = [
                 headers.join(','),
                 ...filtered.map((c) => {
                     const channels = c.sns_channels || [];
                     const ig = channels.find((ch) => ch.platform === 'Instagram') || {};
                     const tt = channels.find((ch) => ch.platform === 'TikTok') || {};
+                    if (useSplit) {
+                        const m = mergeSocialFieldsFromRecord(c);
+                        return [
+                            c.name,
+                            m.tiktok_url || '',
+                            m.tiktok_follower ?? '',
+                            m.instagram_url || '',
+                            m.instagram_follower ?? '',
+                            c.visit_date || m.visit_date || '',
+                        ]
+                            .map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`)
+                            .join(',');
+                    }
                     return [
                         c.name,
                         c.location,
@@ -1392,6 +1477,9 @@ const CandidateList = ({ candidates, targetCount, matchedCount, isDeliveryTest, 
 
     const allCandidates = useMemo(() => candidates || [], [candidates]);
     const isDeliveryTestView = isDeliveryTest;
+    const useVisitSplitLayout = isDeliveryTestView && deliveryTableLayout === 'visit_split';
+    const deliveryTestTableColSpan = useVisitSplitLayout ? 7 : 5;
+    const deliveryTestConfirmedColSpan = useVisitSplitLayout ? 6 : 4;
 
     // 정렬: 이름 ABC순 | 팔로워 수
     const [sortBy, setSortBy] = useState('name'); // 'name' | 'followers'
@@ -1452,57 +1540,95 @@ const CandidateList = ({ candidates, targetCount, matchedCount, isDeliveryTest, 
         setCurrentPage(1);
     }, [deliveryListTab, sortBy, sortOrder]);
 
-    const renderDeliveryDataCells = (creator) => (
-        <>
-            <td className="px-8 py-6">
-                <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-black text-sm shadow-lg">
-                        {creator.name?.charAt(0) || '-'}
-                    </div>
-                    <p className="font-bold text-white text-base tracking-tight">{creator.name}</p>
+    const renderDeliveryNameCell = (creator) => (
+        <td className="px-8 py-6">
+            <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-black text-sm shadow-lg">
+                    {creator.name?.charAt(0) || '-'}
                 </div>
-            </td>
-            <td className="px-8 py-6 text-slate-300">{creator.location || '-'}</td>
-            <td className="px-8 py-6">
-                <div className="flex flex-col gap-2">
-                    {(creator.sns_channels || [{ platform: creator.platform, url: creator.handle, followers: creator.followers }]).map((ch, chIdx) => (
-                        ch.url && ch.url !== '-' ? (
-                            <a
-                                key={`${ch.platform}-${chIdx}`}
-                                href={ensureAbsoluteUrl(ch.url)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-cyan-400 hover:text-cyan-300 text-sm flex items-center gap-1.5"
-                            >
-                                <ExternalLink size={12} className="shrink-0" />
-                                <span>{ch.platform}</span>
-                                <span className="text-slate-500 text-[10px]">({ch.followers})</span>
-                            </a>
-                        ) : (
-                            <span key={`${ch.platform}-${chIdx}`} className="text-slate-400 text-sm">
-                                {ch.platform}
-                                {ch.followers && String(ch.followers) !== '0' ? (
-                                    <span className="text-slate-500 text-[10px] ml-1.5">({ch.followers})</span>
-                                ) : null}
-                            </span>
-                        )
-                    ))}
-                    {(!creator.sns_channels || creator.sns_channels.length === 0) && !creator.handle && (
-                        <span className="text-slate-500">-</span>
-                    )}
-                </div>
-            </td>
-            <td className="px-8 py-6">
-                <div className="flex flex-col gap-1">
-                    {(creator.sns_channels || [{ platform: creator.platform, followers: creator.followers }]).map((ch, chIdx) => (
-                        <span key={`${ch.platform}-f-${chIdx}`} className="text-[10px] text-slate-400 font-black tracking-widest">
-                            {ch.platform}: {ch.followers}
-                        </span>
-                    ))}
-                </div>
-            </td>
-        </>
+                <p className="font-bold text-white text-base tracking-tight">{creator.name}</p>
+            </div>
+        </td>
     );
+
+    const renderDeliveryDataCells = (creator) => {
+        if (useVisitSplitLayout) {
+            const m = mergeSocialFieldsFromRecord(creator);
+            const ttU = m.tiktok_url;
+            const ttF = m.tiktok_follower != null && String(m.tiktok_follower).trim() !== '' ? m.tiktok_follower : '-';
+            const igU = m.instagram_url;
+            const igF = m.instagram_follower != null && String(m.instagram_follower).trim() !== '' ? m.instagram_follower : '-';
+            const visitLabel = creator.visit_date || m.visit_date || '-';
+            const linkCell = (url) =>
+                url ? (
+                    <a
+                        href={ensureAbsoluteUrl(url)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-cyan-400 hover:text-cyan-300 text-sm flex items-center gap-1.5 break-all max-w-xs"
+                    >
+                        <ExternalLink size={12} className="shrink-0" />
+                        <span className="line-clamp-2">{url}</span>
+                    </a>
+                ) : (
+                    <span className="text-slate-500">-</span>
+                );
+            return (
+                <>
+                    {renderDeliveryNameCell(creator)}
+                    <td className="px-8 py-6 align-top">{linkCell(ttU)}</td>
+                    <td className="px-8 py-6 text-slate-300 align-top">{ttF}</td>
+                    <td className="px-8 py-6 align-top">{linkCell(igU)}</td>
+                    <td className="px-8 py-6 text-slate-300 align-top">{igF}</td>
+                    <td className="px-8 py-6 text-slate-300 align-top whitespace-nowrap">{visitLabel}</td>
+                </>
+            );
+        }
+        return (
+            <>
+                {renderDeliveryNameCell(creator)}
+                <td className="px-8 py-6 text-slate-300">{creator.location || '-'}</td>
+                <td className="px-8 py-6">
+                    <div className="flex flex-col gap-2">
+                        {(creator.sns_channels || [{ platform: creator.platform, url: creator.handle, followers: creator.followers }]).map((ch, chIdx) => (
+                            ch.url && ch.url !== '-' ? (
+                                <a
+                                    key={`${ch.platform}-${chIdx}`}
+                                    href={ensureAbsoluteUrl(ch.url)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-cyan-400 hover:text-cyan-300 text-sm flex items-center gap-1.5"
+                                >
+                                    <ExternalLink size={12} className="shrink-0" />
+                                    <span>{ch.platform}</span>
+                                    <span className="text-slate-500 text-[10px]">({ch.followers})</span>
+                                </a>
+                            ) : (
+                                <span key={`${ch.platform}-${chIdx}`} className="text-slate-400 text-sm">
+                                    {ch.platform}
+                                    {ch.followers && String(ch.followers) !== '0' ? (
+                                        <span className="text-slate-500 text-[10px] ml-1.5">({ch.followers})</span>
+                                    ) : null}
+                                </span>
+                            )
+                        ))}
+                        {(!creator.sns_channels || creator.sns_channels.length === 0) && !creator.handle && (
+                            <span className="text-slate-500">-</span>
+                        )}
+                    </div>
+                </td>
+                <td className="px-8 py-6">
+                    <div className="flex flex-col gap-1">
+                        {(creator.sns_channels || [{ platform: creator.platform, followers: creator.followers }]).map((ch, chIdx) => (
+                            <span key={`${ch.platform}-f-${chIdx}`} className="text-[10px] text-slate-400 font-black tracking-widest">
+                                {ch.platform}: {ch.followers}
+                            </span>
+                        ))}
+                    </div>
+                </td>
+            </>
+        );
+    };
 
     return (
         <div className="space-y-10 animate-fade-in-up">
@@ -1631,15 +1757,27 @@ const CandidateList = ({ candidates, targetCount, matchedCount, isDeliveryTest, 
                                 <thead className="bg-white/5 text-slate-500 font-black uppercase tracking-widest text-[10px] border-b border-white/5 sticky top-0 z-10 backdrop-blur-md">
                                     <tr>
                                         <th className="px-8 py-5">이름</th>
-                                        <th className="px-8 py-5">국가</th>
-                                        <th className="px-8 py-5">SNS 주소</th>
-                                        <th className="px-8 py-5">팔로워 수</th>
+                                        {useVisitSplitLayout ? (
+                                            <>
+                                                <th className="px-8 py-5">TikTok 주소</th>
+                                                <th className="px-8 py-5">TikTok 팔로워</th>
+                                                <th className="px-8 py-5">Instagram 주소</th>
+                                                <th className="px-8 py-5">Instagram 팔로워</th>
+                                                <th className="px-8 py-5">Visit date</th>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <th className="px-8 py-5">국가</th>
+                                                <th className="px-8 py-5">SNS 주소</th>
+                                                <th className="px-8 py-5">팔로워 수</th>
+                                            </>
+                                        )}
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
                                     {confirmedList.length === 0 ? (
                                         <tr>
-                                            <td colSpan={4} className="px-8 py-16 text-center text-slate-500 text-sm font-medium">
+                                            <td colSpan={deliveryTestConfirmedColSpan} className="px-8 py-16 text-center text-slate-500 text-sm font-medium">
                                                 확정 리스트에 포함된 인원이 없습니다.
                                             </td>
                                         </tr>
@@ -1672,15 +1810,27 @@ const CandidateList = ({ candidates, targetCount, matchedCount, isDeliveryTest, 
                                 <thead className="bg-white/5 text-slate-500 font-black uppercase tracking-widest text-[10px] border-b border-white/5 sticky top-0 z-10 backdrop-blur-md">
                                     <tr>
                                         <th className="px-8 py-5">이름</th>
-                                        <th className="px-8 py-5">국가</th>
-                                        <th className="px-8 py-5">SNS 주소</th>
-                                        <th className="px-8 py-5">팔로워 수</th>
+                                        {useVisitSplitLayout ? (
+                                            <>
+                                                <th className="px-8 py-5">TikTok 주소</th>
+                                                <th className="px-8 py-5">TikTok 팔로워</th>
+                                                <th className="px-8 py-5">Instagram 주소</th>
+                                                <th className="px-8 py-5">Instagram 팔로워</th>
+                                                <th className="px-8 py-5">Visit date</th>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <th className="px-8 py-5">국가</th>
+                                                <th className="px-8 py-5">SNS 주소</th>
+                                                <th className="px-8 py-5">팔로워 수</th>
+                                            </>
+                                        )}
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
                                     {droppedList.length === 0 ? (
                                         <tr>
-                                            <td colSpan={4} className="px-8 py-12 text-center text-slate-500 text-sm font-medium">
+                                            <td colSpan={deliveryTestConfirmedColSpan} className="px-8 py-12 text-center text-slate-500 text-sm font-medium">
                                                 드랍한 인원이 없습니다.
                                             </td>
                                         </tr>
@@ -1821,17 +1971,30 @@ const CandidateList = ({ candidates, targetCount, matchedCount, isDeliveryTest, 
                         <thead className="bg-white/5 text-slate-500 font-black uppercase tracking-widest text-[10px] border-b border-white/5">
                             <tr>
                                 <th className="px-8 py-5">이름</th>
-                                <th className="px-8 py-5">국가</th>
-                                <th className="px-8 py-5">SNS 주소</th>
-                                <th className="px-8 py-5">팔로워 수</th>
-                                {isDeliveryTestView && (
-                                    <th className="px-8 py-5 min-w-[4rem] text-right whitespace-nowrap">드랍</th>
-                                )}
-                                {!isDeliveryTestView && (
+                                {isDeliveryTestView && useVisitSplitLayout ? (
                                     <>
-                                        <th className="px-8 py-5">상세정보(Masked)</th>
-                                        <th className="px-8 py-5">프로세스</th>
-                                        <th className="px-8 py-5 text-right">매니지먼트</th>
+                                        <th className="px-8 py-5">TikTok 주소</th>
+                                        <th className="px-8 py-5">TikTok 팔로워</th>
+                                        <th className="px-8 py-5">Instagram 주소</th>
+                                        <th className="px-8 py-5">Instagram 팔로워</th>
+                                        <th className="px-8 py-5">Visit date</th>
+                                        <th className="px-8 py-5 min-w-[4rem] text-right whitespace-nowrap">드랍</th>
+                                    </>
+                                ) : (
+                                    <>
+                                        <th className="px-8 py-5">국가</th>
+                                        <th className="px-8 py-5">SNS 주소</th>
+                                        <th className="px-8 py-5">팔로워 수</th>
+                                        {isDeliveryTestView && (
+                                            <th className="px-8 py-5 min-w-[4rem] text-right whitespace-nowrap">드랍</th>
+                                        )}
+                                        {!isDeliveryTestView && (
+                                            <>
+                                                <th className="px-8 py-5">상세정보(Masked)</th>
+                                                <th className="px-8 py-5">프로세스</th>
+                                                <th className="px-8 py-5 text-right">매니지먼트</th>
+                                            </>
+                                        )}
                                     </>
                                 )}
                             </tr>
@@ -1839,7 +2002,7 @@ const CandidateList = ({ candidates, targetCount, matchedCount, isDeliveryTest, 
                         <tbody className="divide-y divide-white/5">
                             {isDeliveryTestView && (
                                 <tr className="bg-amber-500/[0.06] border-b border-amber-500/15">
-                                    <td colSpan={5} className="px-8 py-3 text-[11px] text-slate-400 leading-relaxed">
+                                    <td colSpan={deliveryTestTableColSpan} className="px-8 py-3 text-[11px] text-slate-400 leading-relaxed">
                                         <span className="font-black text-amber-400/95 uppercase tracking-wider text-[10px] mr-2">안내</span>
                                         <span className="block">
                                             드랍은 납품일(한국 날짜) 다음 날부터 세는 영업일 {DROP_DEADLINE_BUSINESS_DAYS}일이 끝나는 날{' '}
@@ -1865,7 +2028,7 @@ const CandidateList = ({ candidates, targetCount, matchedCount, isDeliveryTest, 
                             )}
                             {displayCandidates.length === 0 && isDeliveryTestView ? (
                                 <tr>
-                                    <td colSpan={5} className="px-8 py-16 text-center text-slate-500 text-sm font-medium">
+                                    <td colSpan={deliveryTestTableColSpan} className="px-8 py-16 text-center text-slate-500 text-sm font-medium">
                                         {deliveryListTab === 'dropped' ? '드랍한 인플루언서가 없습니다.' : '표시할 인플루언서가 없습니다.'}
                                     </td>
                                 </tr>
@@ -2732,8 +2895,17 @@ const VisitCampaignTimeline = ({ schedule }) => {
 };
 
 // --- 가이드라인 세팅 블록 ---
-const GuidelineSettingBlock = ({ status = 'pending', notionGuidelineUrl = null }) => {
+const GuidelineSettingBlock = ({
+  status = 'pending',
+  notionGuidelineUrl = null,
+  notionGuidelineTitle = null,
+  notionGuidelineDescription = null,
+}) => {
   if (notionGuidelineUrl) {
+    const gTitle = notionGuidelineTitle || '콘텐츠 가이드라인 (Notion)';
+    const gDesc =
+      notionGuidelineDescription ||
+      'Troubless GLASS GLOW+ PDRN COLLAGEN SUNSCREEN 캠페인용 가이드를 Notion에서 확인해 주세요.';
     return (
       <div className="rounded-2xl border p-6 bg-emerald-500/10 border-emerald-500/20">
         <div className="flex items-start gap-4">
@@ -2741,10 +2913,8 @@ const GuidelineSettingBlock = ({ status = 'pending', notionGuidelineUrl = null }
             <FileText size={24} className="text-emerald-400" />
           </div>
           <div className="flex-1 min-w-0">
-            <h4 className="font-bold text-lg text-emerald-400">콘텐츠 가이드라인 (Notion)</h4>
-            <p className="text-slate-400 text-sm mt-1 font-light">
-              Troubless GLASS GLOW+ PDRN COLLAGEN SUNSCREEN 캠페인용 가이드를 Notion에서 확인해 주세요.
-            </p>
+            <h4 className="font-bold text-lg text-emerald-400">{gTitle}</h4>
+            <p className="text-slate-400 text-sm mt-1 font-light">{gDesc}</p>
             <a
               href={notionGuidelineUrl}
               target="_blank"
@@ -3166,6 +3336,7 @@ const KickoffView = ({ campaign, user, isAdminUser = false, onCampaignScheduleUp
     ? mergeVisitSchedule(computedSchedule, campaign)
     : mergeCampaignSchedule(computedSchedule, campaign);
   const guidelineStatus = fd.guidelineStatus || 'pending';
+  const kickoffNotionGuide = resolveKickoffNotionGuideline(campaign);
 
   return (
     <div className="space-y-10 animate-fade-in-up">
@@ -3219,38 +3390,86 @@ const KickoffView = ({ campaign, user, isAdminUser = false, onCampaignScheduleUp
           <div className="p-12 flex justify-center">
             <div className="w-10 h-10 border-2 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin" />
           </div>
-        ) : submission ? (
-          <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <KickoffSummaryRow label="회사명" value={fd.companyName} />
-              <KickoffSummaryRow label="담당자명 / 직함" value={[fd.contactName, fd.contactTitle].filter(Boolean).join(' · ')} />
-              <KickoffSummaryRow label="연락처" value={fd.contactPhone} />
-              <KickoffSummaryRow label="담당자 이메일" value={fd.contactEmail} />
-            </div>
-            <div className="space-y-4">
-              <KickoffSummaryRow label="캠페인 제품명" value={fd.productName} />
-              {isVisitPlan ? (
-                <>
-                  <KickoffSummaryRow label="타겟 오디언스 국가" value={fd.targetAudienceCountry} />
-                  <div>
-                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">행사일정</p>
-                    <EventScheduleCalendar dates={eventScheduleDates} />
-                  </div>
-                  <KickoffSummaryRow label="행사 장소" value={fd.eventVenue} />
-                  {fd.eventName && <KickoffSummaryRow label="행사명" value={fd.eventName} />}
-                  {fd.eventGift && <KickoffSummaryRow label="브랜드사 증정 선물" value={fd.eventGift} />}
-                </>
-              ) : (
-                <>
-                  <KickoffSummaryRow label="거주 국가 범위" value={COUNTRY_LABELS[fd.countryRange] || fd.countryRange} />
-                  <KickoffSummaryRow label="배송 예상 기간" value={fd.deliveryTime === 'other' ? (fd.deliveryOther || '기타') : (DELIVERY_LABELS[fd.deliveryTime] || fd.deliveryTime)} />
-                </>
-              )}
-              <KickoffSummaryRow label="제품 사진" value={Array.isArray(fd.productPhotoUrls) && fd.productPhotoUrls.length > 0 ? `${fd.productPhotoUrls.length}개 업로드됨` : '미첨부'} />
+        ) : (
+          <div className="p-8 space-y-6">
+            {!submission && (
+              <p className="text-sm text-amber-400/95 font-medium leading-relaxed rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3">
+                캠페인 세팅 폼 제출 내역이 없습니다. 아래는 <strong className="text-amber-200/95">결제·주문 시 저장된 캠페인 행</strong>과, 폼에 입력된 값이 있으면 그 값이 우선 표시됩니다.
+              </p>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <KickoffSummaryRow label="회사명" value={fd.companyName || campaign.brand_name} />
+                <KickoffSummaryRow
+                  label="담당자명 / 직함"
+                  value={
+                    [fd.contactName, fd.contactTitle].filter(Boolean).join(' · ') ||
+                    campaign.customer_name ||
+                    ''
+                  }
+                />
+                <KickoffSummaryRow label="연락처" value={fd.contactPhone || campaign.customer_phone} />
+                <KickoffSummaryRow label="담당자 이메일" value={fd.contactEmail || campaign.customer_email} />
+                {campaign.client_address ? (
+                  <KickoffSummaryRow label="사업자 주소" value={campaign.client_address} />
+                ) : null}
+                {campaign.client_biz_reg_no ? (
+                  <KickoffSummaryRow label="사업자등록번호" value={campaign.client_biz_reg_no} />
+                ) : null}
+              </div>
+              <div className="space-y-4">
+                <KickoffSummaryRow label="캠페인 제품명" value={fd.productName || campaign.product_name} />
+                {campaign.order_number ? (
+                  <KickoffSummaryRow label="주문번호" value={campaign.order_number} />
+                ) : null}
+                <KickoffSummaryRow label="요금제" value={campaign.plan || ''} />
+                <KickoffSummaryRow
+                  label="목표 인원"
+                  value={campaign.target_creators != null ? String(campaign.target_creators) : ''}
+                />
+                {campaign.plan_price != null ? (
+                  <KickoffSummaryRow
+                    label="플랜 금액"
+                    value={`${Number(campaign.plan_price).toLocaleString('ko-KR')}원`}
+                  />
+                ) : null}
+                {isVisitPlan ? (
+                  <>
+                    <KickoffSummaryRow label="타겟 오디언스 국가" value={fd.targetAudienceCountry} />
+                    {eventScheduleDates.length > 0 ? (
+                      <div>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">행사일정</p>
+                        <EventScheduleCalendar dates={eventScheduleDates} />
+                      </div>
+                    ) : null}
+                    <KickoffSummaryRow label="행사 장소" value={fd.eventVenue} />
+                    {fd.eventName ? <KickoffSummaryRow label="행사명" value={fd.eventName} /> : null}
+                    {fd.eventGift ? <KickoffSummaryRow label="브랜드사 증정 선물" value={fd.eventGift} /> : null}
+                  </>
+                ) : (
+                  <>
+                    <KickoffSummaryRow label="거주 국가 범위" value={COUNTRY_LABELS[fd.countryRange] || fd.countryRange} />
+                    <KickoffSummaryRow
+                      label="배송 예상 기간"
+                      value={
+                        fd.deliveryTime === 'other'
+                          ? (fd.deliveryOther || '기타')
+                          : (DELIVERY_LABELS[fd.deliveryTime] || fd.deliveryTime)
+                      }
+                    />
+                  </>
+                )}
+                <KickoffSummaryRow
+                  label="제품 사진"
+                  value={
+                    Array.isArray(fd.productPhotoUrls) && fd.productPhotoUrls.length > 0
+                      ? `${fd.productPhotoUrls.length}개 업로드됨`
+                      : '미첨부'
+                  }
+                />
+              </div>
             </div>
           </div>
-        ) : (
-          <div className="p-8 text-slate-500 text-sm">제출 정보를 불러오는 중이거나 아직 없습니다.</div>
         )}
         {fd.uspAndLinks && (
           <div className="px-8 pb-8">
@@ -3364,9 +3583,9 @@ const KickoffView = ({ campaign, user, isAdminUser = false, onCampaignScheduleUp
           </h4>
           <GuidelineSettingBlock
             status={guidelineStatus}
-            notionGuidelineUrl={
-              isTroublessPdrnSunscreenCampaign(campaign) ? TROUBLESS_PDRN_SUNSCREEN_NOTION_GUIDELINE_URL : null
-            }
+            notionGuidelineUrl={kickoffNotionGuide?.url ?? null}
+            notionGuidelineTitle={kickoffNotionGuide?.title}
+            notionGuidelineDescription={kickoffNotionGuide?.description}
           />
         </div>
       </div>
@@ -3409,6 +3628,7 @@ const KickoffView = ({ campaign, user, isAdminUser = false, onCampaignScheduleUp
                   campaign={campaign}
                   user={user}
                   allowAdminUnconfirm={false}
+                  deliveryTableLayout={linkedDeliveryTableLayout(campaign, user)}
                 />
               )}
             </div>
@@ -3471,6 +3691,7 @@ const CampaignDetail = ({ campaign, isDemoMode, user, isAdminUser = false, onCam
             user={user}
             existingDrops={[]}
             allowAdminUnconfirm={isAdminUser && campaign.id === 'admin-delivery-test'}
+            deliveryTableLayout={linkedDeliveryTableLayout(campaign, user)}
           />
       );
   }
@@ -3563,24 +3784,26 @@ export default function Dashboard() {
           campaignList = [deliveryTestCampaign, ...campaignList];
         }
 
-        const linkedIds = new Set(
-          campaignList.filter((c) => campaignMatchesLinkedDeliveryList(c, user)).map((c) => c.id),
-        );
-        if (linkedIds.size > 0) {
-          const { data: linkedCreators } = await supabase
-            .from('admin_delivery_creators')
-            .select('*')
-            .eq('list_slug', LINKED_DELIVERY_LIST_SLUG)
-            .order('created_at', { ascending: true });
-          let deliveryCandidates = testInfluencers;
-          if (linkedCreators?.length) {
-            deliveryCandidates = linkedCreators.map((r, i) => toDisplayCreator(r, i));
-          } else {
-            deliveryCandidates = testInfluencers.map((c, i) => testInfluencerToDisplayCreator(c, i));
+        const linkedCampaignRows = campaignList.filter((c) => campaignMatchesLinkedDeliveryList(c, user));
+        const linkedSlugs = [...new Set(linkedCampaignRows.map((c) => resolveLinkedDeliveryListSlug(c, user)).filter(Boolean))];
+        if (linkedSlugs.length > 0) {
+          const creatorsBySlug = {};
+          for (const slug of linkedSlugs) {
+            const { data: linkedCreators } = await supabase
+              .from('admin_delivery_creators')
+              .select('*')
+              .eq('list_slug', slug)
+              .order('created_at', { ascending: true });
+            creatorsBySlug[slug] =
+              linkedCreators?.length > 0
+                ? linkedCreators.map((r, i) => toDisplayCreator(r, i))
+                : testInfluencers.map((c, i) => testInfluencerToDisplayCreator(c, i));
           }
-          campaignList = campaignList.map((c) =>
-            linkedIds.has(c.id) ? { ...c, linked_delivery_candidates: deliveryCandidates } : c,
-          );
+          campaignList = campaignList.map((c) => {
+            const slug = resolveLinkedDeliveryListSlug(c, user);
+            if (!slug) return c;
+            return { ...c, linked_delivery_candidates: creatorsBySlug[slug] || [] };
+          });
         }
 
         const orderNumbers = [...new Set(campaignList.map((c) => c.order_number).filter(Boolean))];

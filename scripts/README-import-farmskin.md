@@ -42,3 +42,36 @@ $env:SUPABASE_SERVICE_ROLE_KEY="서비스롤-키"; npm run import:farmskin -- "C
 - `creator_drops`: 고객 드랍 내역 저장
 
 선택: BS-US-FARMSKIN 드랍 상한(15명)을 DB에서도 강제하려면 `supabase-migration-creator-drops-limit.sql` 을 실행하세요.
+
+---
+
+## BS-MX-WELCOS (웰코스 KWAILNARA Visit)
+
+1. Supabase에서 **`supabase-migration-admin-delivery-visit-date.sql`** 실행 (`visit_date` 컬럼).
+2. 서비스 롤 키 설정 후:
+
+```powershell
+$env:SUPABASE_SERVICE_ROLE_KEY="서비스롤-키"; npm run import:welcos -- "C:\Users\...\Downloads\BS-MX-웰코스.xlsx"
+```
+
+- `list_slug = BS-MX-WELCOS` 행만 삭제 후 다시 삽입합니다. (`test-influencers.json` 은 건드리지 않습니다.)
+
+---
+
+## 팜스킨 heather 2차 (드랍 11명 교체 + Visit 1명)
+
+엑셀 **`팜스킨 2차 추가.xlsx`**: 시트 `scale50(2026.03) Delivery`(11명), `visit(2026.03) `(1명).
+
+1. `SUPABASE_SERVICE_ROLE_KEY` 설정
+2. 실행:
+
+```powershell
+npm run import:farmskin-phase2 -- "C:\Users\...\Desktop\팜스킨 2차 추가.xlsx"
+```
+
+- 주문 **`BS-20260316-BEF0DBCE`**: 해당 캠페인 `creator_drops` 삭제 → 드랍됐던 이름과 일치하는 `BS-US-FARMSKIN` 행 삭제 → 시트 11명 insert → `delivery_list_sessions` 확정 되돌림  
+- 주문 **`BS-20260324-FC62D99F` (Visit)**: `BS-US-FARMSKIN-VISIT` 전체 삭제 후 visit 시트 1명 insert, 드랍·세션 정리  
+
+대시보드는 `BS-US-FARMSKIN-VISIT` 을 주문번호·Visit 플랜으로 자동 연동합니다.
+
+검증만: `node scripts/farmskin-heather-phase2.js "경로.xlsx" --dry-run`
