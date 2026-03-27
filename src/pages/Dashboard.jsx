@@ -181,7 +181,7 @@ const WELCOS_MKT_EMAIL = 'mkt01@welcos.com';
 
 /** 팜스킨 Visit → 소명단 BS-US-FARMSKIN-VISIT (Scale50 명단과 분리). 주문번호로도 매칭. */
 const isFarmskinVisitOrderCampaign = (campaign) => {
-  if (!campaign?.id || campaign.id === 'admin-delivery-test') return false;
+  if (!campaign?.id) return false;
   const plan = String(campaign?.plan || '').toLowerCase();
   if (!plan.includes('visit')) return false;
   const on = String(campaign?.order_number || '').trim().toUpperCase();
@@ -194,7 +194,7 @@ const TROUBLESS_PDRN_SUNSCREEN_NOTION_GUIDELINE_URL =
 
 /** 웰코스 KWAILNARA · Visit 플랜 (캠페인 소유자에게만 노출 — DB user_id 기준) */
 const isKwailnaraVisitLinkedCampaign = (campaign) => {
-  if (!campaign?.id || campaign.id === 'admin-delivery-test') return false;
+  if (!campaign?.id) return false;
   const hay = `${campaign?.product_name || ''} ${campaign?.brand_name || ''}`.toLowerCase();
   const plan = String(campaign?.plan || '').toLowerCase();
   if (!plan.includes('visit')) return false;
@@ -210,11 +210,13 @@ const KWAILNARA_EUPHORIA_NOTION_GUIDELINE_URL =
  * 우선순위: VITE_LINKED_DELIVERY_CAMPAIGN_ID + VITE_LINKED_DELIVERY_LIST_SLUG → 이메일·캠페인 규칙
  */
 const resolveLinkedDeliveryListSlug = (campaign, user) => {
-  if (!campaign?.id || campaign.id === 'admin-delivery-test') return null;
+  if (!campaign?.id) return null;
   const envId = (import.meta.env.VITE_LINKED_DELIVERY_CAMPAIGN_ID || '').trim();
   const envSlug = (import.meta.env.VITE_LINKED_DELIVERY_LIST_SLUG || LINKED_LIST_SLUG_FARMSKIN).trim();
   if (envId && String(campaign.id) === envId) return envSlug;
   const authEmail = (user?.email || '').toLowerCase().trim();
+  const campaignEmail = String(campaign?.customer_email || '').toLowerCase().trim();
+  const isHeatherOwner = authEmail === HEATHER_FARMSKIN_EMAIL || campaignEmail === HEATHER_FARMSKIN_EMAIL;
   // KWAILNARA·Visit: campaigns는 user_id로 본인 행만 올라오므로, 가장(impersonate) 시 JWT 이메일과 무관하게 동일 규칙 적용
   if (isKwailnaraVisitLinkedCampaign(campaign)) {
     return LINKED_LIST_SLUG_WELCOS_MX;
@@ -223,11 +225,11 @@ const resolveLinkedDeliveryListSlug = (campaign, user) => {
   if (isFarmskinVisitOrderCampaign(campaign)) {
     return LINKED_LIST_SLUG_FARMSKIN_VISIT;
   }
-  if (authEmail === HEATHER_FARMSKIN_EMAIL && String(campaign?.plan || '').toLowerCase().includes('visit')) {
+  if (isHeatherOwner && String(campaign?.plan || '').toLowerCase().includes('visit')) {
     return LINKED_LIST_SLUG_FARMSKIN_VISIT;
   }
   if (
-    authEmail === HEATHER_FARMSKIN_EMAIL &&
+    isHeatherOwner &&
     isTroublessPdrnSunscreenCampaign(campaign) &&
     !String(campaign?.plan || '').toLowerCase().includes('visit')
   ) {
@@ -272,9 +274,6 @@ const resolveKickoffNotionGuideline = (campaign) => {
 
 /** creator_drops / delivery_list_sessions 에 저장할 참조 키 */
 const resolveDeliveryReference = (campaign) => {
-  if (campaign?.id === 'admin-delivery-test') {
-    return { refType: 'admin_preview', refId: 'BS-US-FARMSKIN' };
-  }
   return { refType: 'campaign', refId: String(campaign.id) };
 };
 
@@ -1318,13 +1317,10 @@ const CandidateList = ({
             const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
-            const baseName =
-                campaign?.id === 'admin-delivery-test'
-                    ? 'BS-US-FARMSKIN'
-                    : String(campaign?.product_name || campaign?.order_number || '납품')
-                          .replace(/[\\/:*?"<>|]/g, '_')
-                          .trim()
-                          .slice(0, 80);
+            const baseName = String(campaign?.product_name || campaign?.order_number || '납품')
+                .replace(/[\\/:*?"<>|]/g, '_')
+                .trim()
+                .slice(0, 80);
             a.download = `${baseName}-납품리스트.csv`;
             a.click();
             URL.revokeObjectURL(a.href);
@@ -3741,12 +3737,9 @@ const CampaignDetail = ({ campaign, isDemoMode, user, isAdminUser = false, onCam
 
   if (campaign.status === CampaignStatus.CONTACTING) {
       const isLinkedDelivery = campaignMatchesLinkedDeliveryList(campaign, user);
-      const isDeliveryTest = campaign.id === 'admin-delivery-test' || isLinkedDelivery;
+      const isDeliveryTest = isLinkedDelivery;
       const candidates = isDeliveryTest
-        ? (campaign.id === 'admin-delivery-test'
-            ? (campaign.candidates || [])
-            : (campaign.linked_delivery_candidates || [])
-          ).map((c) => ({
+        ? (campaign.linked_delivery_candidates || []).map((c) => ({
             ...c,
             _identifier: c._identifier || normalizeDropIdentifier(`${c.name}|${c.platform}`),
           }))
@@ -3770,7 +3763,7 @@ const CampaignDetail = ({ campaign, isDemoMode, user, isAdminUser = false, onCam
             campaign={campaign}
             user={user}
             existingDrops={[]}
-            allowAdminUnconfirm={isAdminUser && campaign.id === 'admin-delivery-test'}
+            allowAdminUnconfirm={false}
             deliveryTableLayout={linkedDeliveryTableLayout(campaign, user)}
           />
       );
@@ -3826,43 +3819,16 @@ export default function Dashboard() {
       setUser(user);
 
       if (user) {
-        const { data } = await supabase
+        const isAdminUser = adminEmails.length > 0 && user?.email && adminEmails.includes(user.email.toLowerCase());
+        let campaignQuery = supabase
           .from('campaigns')
           .select(`*, creators (*), contents (*)`)
-          .eq('user_id', user.id)
           .order('created_at', { ascending: false });
-
-        let campaignList = data || [];
-        const isAdminUser = adminEmails.length > 0 && user?.email && adminEmails.includes(user.email.toLowerCase());
-        if (isAdminUser) {
-          let deliveryCandidates = testInfluencers;
-          const { data: adminCreators } = await supabase
-            .from('admin_delivery_creators')
-            .select('*')
-            .eq('list_slug', 'BS-US-FARMSKIN')
-            .order('created_at', { ascending: true });
-          if (adminCreators?.length) {
-            deliveryCandidates = adminCreators.map((r, i) => toDisplayCreator(r, i));
-          } else {
-            deliveryCandidates = deliveryCandidates.map((c, i) => testInfluencerToDisplayCreator(c, i));
-          }
-          const deliveryTestCampaign = {
-            id: 'admin-delivery-test',
-            order_number: 'BS-DELIVERY-TEST',
-            plan: 'Scale50',
-            status: CampaignStatus.CONTACTING,
-            brand_name: '납품 테스트 (관리자 전용)',
-            product_name: 'BS-US-FARMSKIN',
-            target_creators: deliveryCandidates.length,
-            matched_creators: deliveryCandidates.length,
-            candidates: deliveryCandidates,
-            plan_price: 2390000,
-            content_count: deliveryCandidates.length,
-            customer_name: '-',
-            customer_email: user.email,
-          };
-          campaignList = [deliveryTestCampaign, ...campaignList];
+        if (!isAdminUser) {
+          campaignQuery = campaignQuery.eq('user_id', user.id);
         }
+        const { data } = await campaignQuery;
+        let campaignList = data || [];
 
         const linkedCampaignRows = campaignList.filter((c) => campaignMatchesLinkedDeliveryList(c, user));
         const linkedSlugs = [...new Set(linkedCampaignRows.map((c) => resolveLinkedDeliveryListSlug(c, user)).filter(Boolean))];
@@ -3995,6 +3961,23 @@ export default function Dashboard() {
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#020617]"><div className="w-12 h-12 border-4 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin"></div></div>;
 
+  const isAdminUser = !!(user?.email && adminEmails.includes(user.email.toLowerCase()));
+  const adminLinkedCampaigns = isAdminUser
+    ? campaigns.filter((c) => campaignMatchesLinkedDeliveryList(c, user))
+    : [];
+  const adminOverviewBySlug = isAdminUser
+    ? Object.entries(
+        adminLinkedCampaigns.reduce((acc, c) => {
+          const slug = resolveLinkedDeliveryListSlug(c, user);
+          if (!slug) return acc;
+          if (!acc[slug]) acc[slug] = { campaigns: 0, creators: 0 };
+          acc[slug].campaigns += 1;
+          acc[slug].creators += (c.linked_delivery_candidates || []).length;
+          return acc;
+        }, {}),
+      ).map(([slug, stats]) => ({ slug, ...stats }))
+    : [];
+
   const selectedCampaign = campaigns.find(c => c.id === selectedCampaignId);
 
   return (
@@ -4010,14 +3993,42 @@ export default function Dashboard() {
             </div>
         )}
 
-        {user && adminEmails.includes(user.email?.toLowerCase()) && selectedCampaignId === 'admin-delivery-test' && (
-            <div className="mb-10 p-5 bg-amber-500/10 border border-amber-500/30 rounded-3xl flex items-center gap-4 text-amber-200 text-sm animate-fade-in-down">
-                <AlertCircle size={20} className="text-amber-400 shrink-0" />
-                <span className="font-light tracking-tight"><b className="font-black text-amber-400 uppercase tracking-widest">납품 테스트</b> — BS-US-FARMSKIN 엑셀에서 추출한 50명 인플루언서 데이터입니다. 고객 노출 전 관리자 전용 미리보기입니다.</span>
+        {isAdminUser && (
+            <div className="mb-10 p-5 bg-cyan-500/10 border border-cyan-500/30 rounded-3xl text-cyan-100 text-sm animate-fade-in-down">
+                <div className="flex items-center gap-3 mb-3">
+                    <UserCheck size={18} className="text-cyan-300 shrink-0" />
+                    <span className="font-black tracking-widest uppercase text-cyan-200">관리자 전용 납품 현황 대시보드</span>
+                </div>
+                <p className="font-light tracking-tight text-cyan-100/90">
+                    현재 로그인에서는 전체 캠페인을 조회합니다. 연결된 납품 리스트 데이터도 각 캠페인 상세에서 바로 확인할 수 있습니다.
+                </p>
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="rounded-2xl border border-cyan-400/20 bg-cyan-900/20 px-4 py-3">
+                        <p className="text-[10px] uppercase tracking-widest text-cyan-300/80 font-black">전체 캠페인</p>
+                        <p className="text-xl font-black text-white mt-1">{campaigns.length}</p>
+                    </div>
+                    <div className="rounded-2xl border border-cyan-400/20 bg-cyan-900/20 px-4 py-3">
+                        <p className="text-[10px] uppercase tracking-widest text-cyan-300/80 font-black">납품 연동 캠페인</p>
+                        <p className="text-xl font-black text-white mt-1">{adminLinkedCampaigns.length}</p>
+                    </div>
+                    <div className="rounded-2xl border border-cyan-400/20 bg-cyan-900/20 px-4 py-3">
+                        <p className="text-[10px] uppercase tracking-widest text-cyan-300/80 font-black">연동 인원 합계</p>
+                        <p className="text-xl font-black text-white mt-1">{adminLinkedCampaigns.reduce((sum, c) => sum + ((c.linked_delivery_candidates || []).length || 0), 0)}</p>
+                    </div>
+                </div>
+                {adminOverviewBySlug.length > 0 && (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                        {adminOverviewBySlug.map((item) => (
+                            <span key={item.slug} className="text-[10px] font-black tracking-wider uppercase px-3 py-1.5 rounded-full border border-cyan-400/25 bg-cyan-900/20 text-cyan-200">
+                                {item.slug} · 캠페인 {item.campaigns} · 인원 {item.creators}
+                            </span>
+                        ))}
+                    </div>
+                )}
             </div>
         )}
 
-        {user && adminEmails.includes(user.email?.toLowerCase()) && (
+        {isAdminUser && (
             <div className="mb-10 p-5 bg-slate-800/50 border border-slate-600/30 rounded-3xl animate-fade-in-down">
                 <button
                     onClick={() => setImpersonateExpanded(!impersonateExpanded)}
