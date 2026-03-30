@@ -1688,7 +1688,7 @@ const CandidateList = ({
                                 ? (dropConfirmed
                                     ? `리스트 확정 완료 · 확정 ${confirmedList.length}명 · 드랍 ${droppedList.length}명`
                                     : (isHeatherFarmskinView
-                                        ? '드랍 및 교체가 완료되어 최신 리스트로 업데이트되었습니다. 리스트 검토 후 확정을 진행해 주세요.'
+                                        ? '드랍 및 교체가 완료되었습니다. 최종 리스트를 확인하신 뒤 리스트 확정을 진행해 주세요.'
                                         : `인플루언서 리스트 · 드랍 ${droppedCount}/${maxDropCount}명 (전체 ${listTotal}명의 30%)${sentAt && dropDeadlineLabelKr ? ` · 마감 ${dropDeadlineLabelKr}${daysRemaining != null && !dropWindowExpired ? ` · 약 ${Math.max(0, Math.ceil(daysRemaining))}일 남음` : ''}` : ''}`))
                                 : '목표 인원 달성 시 자동으로 제품 배송 단계로 전환됩니다.'}
                         </p>
@@ -1744,7 +1744,7 @@ const CandidateList = ({
                                     </p>
                                     <ul className="text-slate-500 text-xs space-y-1 mt-3">
                                         <li>· 현재 리스트를 검토하신 뒤 하단의 <strong className="text-amber-400/90">「리스트 확정」</strong> 버튼을 눌러 최종 확정해 주세요.</li>
-                                        <li>· 추가 드랍 요청 또는 문의사항이 있으시면 <strong className="text-amber-400/90">별도 문의</strong> 부탁드립니다.</li>
+                                        <li>· 본 캠페인은 드랍 단계가 종료되어 <strong className="text-amber-400/90">추가 드랍은 불가</strong>합니다.</li>
                                     </ul>
                                 </>
                             ) : (
@@ -2064,7 +2064,7 @@ const CandidateList = ({
                                         {isHeatherFarmskinView ? (
                                             <span className="block">
                                                 드랍 및 교체가 완료된 최신 리스트입니다. 검토 후 <strong className="text-amber-200/90">리스트 확정</strong>을 진행해 주세요.
-                                                추가 드랍 요청/문의는 별도 문의 부탁드립니다.
+                                                본 캠페인은 추가 드랍이 종료된 상태입니다.
                                             </span>
                                         ) : (
                                             <>
@@ -2118,7 +2118,7 @@ const CandidateList = ({
                                                                 ? (dropConfirmed
                                                                     ? '리스트가 확정되어 드랍을 변경할 수 없습니다.'
                                                                     : (isHeatherFarmskinView
-                                                                        ? '추가 드랍 요청 또는 문의사항은 별도 문의 부탁드립니다.'
+                                                                        ? '본 캠페인은 드랍 단계가 종료되어 추가 드랍이 불가능합니다. 최종 리스트 확정을 진행해 주세요.'
                                                                         : '영업일 기준 드랍 마감 시각이 지났습니다.'))
                                                                 : (!isDropped && !canDropMore
                                                                     ? `드랍은 최대 ${maxDropCount}명(전체 ${listTotal}명의 30%)까지 가능합니다. 다른 인원의 드랍을 해제한 뒤 저장하면 다시 선택할 수 있습니다.`
@@ -2191,7 +2191,7 @@ const CandidateList = ({
                             </p>
                             {isHeatherFarmskinView ? (
                                 <p>
-                                    드랍 및 교체는 이미 반영된 상태입니다. 추가 드랍 요청 또는 문의사항은 <strong className="text-amber-400/90">별도 문의</strong> 부탁드립니다.
+                                    드랍 및 교체는 이미 반영 완료되었습니다. 이제 <strong className="text-amber-400/90">리스트 확정</strong>만 진행해 주세요.
                                 </p>
                             ) : (
                                 <p>
@@ -3514,6 +3514,9 @@ const KickoffView = ({ campaign, user, isAdminUser = false, onCampaignScheduleUp
   }, [campaign?.id]);
 
   const fd = submission?.form_data || {};
+  const productPhotoUrls = Array.isArray(fd.productPhotoUrls)
+    ? fd.productPhotoUrls.filter((u) => typeof u === 'string' && u.trim() !== '')
+    : [];
   const isVisitPlan = campaign?.plan?.toLowerCase().includes('visit');
 
   const eventScheduleDates = Array.isArray(fd.eventSchedule)
@@ -3660,11 +3663,34 @@ const KickoffView = ({ campaign, user, isAdminUser = false, onCampaignScheduleUp
                 <KickoffSummaryRow
                   label="제품 사진"
                   value={
-                    Array.isArray(fd.productPhotoUrls) && fd.productPhotoUrls.length > 0
-                      ? `${fd.productPhotoUrls.length}개 업로드됨`
+                    productPhotoUrls.length > 0
+                      ? `${productPhotoUrls.length}개 업로드됨`
                       : '미첨부'
                   }
                 />
+                {productPhotoUrls.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">첨부 이미지 미리보기</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {productPhotoUrls.slice(0, 6).map((url, idx) => (
+                        <a
+                          key={`${url}-${idx}`}
+                          href={ensureAbsoluteUrl(url)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block rounded-xl overflow-hidden border border-white/10 bg-white/5 hover:border-cyan-400/40 transition-colors"
+                        >
+                          <img
+                            src={ensureAbsoluteUrl(url)}
+                            alt={`product-photo-${idx + 1}`}
+                            className="w-full h-24 object-cover"
+                            loading="lazy"
+                          />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -3798,7 +3824,7 @@ const KickoffView = ({ campaign, user, isAdminUser = false, onCampaignScheduleUp
               </h4>
               <p className="text-slate-500 text-sm font-light mt-1">
                 {isHeatherFarmskinScale50Campaign(campaign, user)
-                  ? '드랍 및 교체 반영이 완료된 최신 리스트입니다. 검토 후 리스트 확정을 진행해 주세요. 추가 요청은 별도 문의 부탁드립니다.'
+                  ? '드랍 및 교체 반영이 완료된 최종 리스트입니다. 추가 드랍은 종료되었으며, 리스트 확정만 진행해 주세요.'
                   : '명단 확인·드랍(최대 30%, 영업일 기준 마감)·리스트 확정은 아래에서 진행할 수 있습니다.'}
               </p>
             </div>
@@ -4288,6 +4314,7 @@ export default function Dashboard() {
         target_country: c.setup_submission_summary?.target_country || '-',
         event_name: c.setup_submission_summary?.event_name || '-',
         guideline_status: c.setup_submission_summary?.guideline_status || '-',
+        product_photo_urls: c.setup_submission_summary?.product_photo_urls || [],
         setup_created_at: c.setup_submission_summary?.created_at || null,
       }))
       .sort((a, b) => String(b.setup_created_at || '').localeCompare(String(a.setup_created_at || '')));
@@ -4470,6 +4497,17 @@ export default function Dashboard() {
                                             <p>제품명: <span className="text-slate-100">{row.product_name_input}</span></p>
                                             <p>타겟국가: <span className="text-slate-100">{row.target_country}</span></p>
                                             <p>행사명: <span className="text-slate-100">{row.event_name}</span> · 가이드라인: <span className="text-slate-100">{row.guideline_status}</span></p>
+                                            {Array.isArray(row.product_photo_urls) && row.product_photo_urls.length > 0 && (
+                                              <div className="mt-2 flex items-center gap-2">
+                                                <img
+                                                  src={ensureAbsoluteUrl(row.product_photo_urls[0])}
+                                                  alt="setup-photo-preview"
+                                                  className="w-10 h-10 rounded-md object-cover border border-white/15"
+                                                  loading="lazy"
+                                                />
+                                                <span className="text-slate-400 text-[11px]">사진 {row.product_photo_urls.length}개 첨부</span>
+                                              </div>
+                                            )}
                                         </td>
                                         <td className="px-4 py-3 align-top text-right text-slate-400">{row.setup_created_at ? new Date(row.setup_created_at).toLocaleString('ko-KR') : '-'}</td>
                                     </tr>
@@ -4651,26 +4689,26 @@ export default function Dashboard() {
                                 className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder-slate-500"
                             />
                             <div className="grid grid-cols-1 gap-2">
-                                <select value={adminFilterCustomer} onChange={(e) => setAdminFilterCustomer(e.target.value)} className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-200">
-                                    <option value="all">고객사 전체</option>
-                                    {adminCustomerOptions.map((v) => <option key={v} value={v}>{v}</option>)}
+                                <select value={adminFilterCustomer} onChange={(e) => setAdminFilterCustomer(e.target.value)} className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white">
+                                    <option value="all" className="bg-white text-slate-900">고객사 전체</option>
+                                    {adminCustomerOptions.map((v) => <option key={v} value={v} className="bg-white text-slate-900">{v}</option>)}
                                 </select>
-                                <select value={adminFilterBrand} onChange={(e) => setAdminFilterBrand(e.target.value)} className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-200">
-                                    <option value="all">브랜드 전체</option>
-                                    {adminBrandOptions.map((v) => <option key={v} value={v}>{v}</option>)}
+                                <select value={adminFilterBrand} onChange={(e) => setAdminFilterBrand(e.target.value)} className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white">
+                                    <option value="all" className="bg-white text-slate-900">브랜드 전체</option>
+                                    {adminBrandOptions.map((v) => <option key={v} value={v} className="bg-white text-slate-900">{v}</option>)}
                                 </select>
-                                <select value={adminFilterPlan} onChange={(e) => setAdminFilterPlan(e.target.value)} className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-200">
-                                    <option value="all">플랜 전체</option>
-                                    {adminPlanOptions.map((v) => <option key={v} value={v}>{v}</option>)}
+                                <select value={adminFilterPlan} onChange={(e) => setAdminFilterPlan(e.target.value)} className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white">
+                                    <option value="all" className="bg-white text-slate-900">플랜 전체</option>
+                                    {adminPlanOptions.map((v) => <option key={v} value={v} className="bg-white text-slate-900">{v}</option>)}
                                 </select>
-                                <select value={adminFilterStatus} onChange={(e) => setAdminFilterStatus(e.target.value)} className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-200">
-                                    <option value="all">상태 전체</option>
-                                    {adminStatusOptions.map((v) => <option key={v} value={v}>{v}</option>)}
+                                <select value={adminFilterStatus} onChange={(e) => setAdminFilterStatus(e.target.value)} className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white">
+                                    <option value="all" className="bg-white text-slate-900">상태 전체</option>
+                                    {adminStatusOptions.map((v) => <option key={v} value={v} className="bg-white text-slate-900">{v}</option>)}
                                 </select>
-                                <select value={adminFilterDelivery} onChange={(e) => setAdminFilterDelivery(e.target.value)} className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-200">
-                                    <option value="all">납품 연동 조건 전체</option>
-                                    <option value="linked">납품 연동 캠페인만</option>
-                                    <option value="with_creators">연동 + 인원 보유만</option>
+                                <select value={adminFilterDelivery} onChange={(e) => setAdminFilterDelivery(e.target.value)} className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white">
+                                    <option value="all" className="bg-white text-slate-900">납품 연동 조건 전체</option>
+                                    <option value="linked" className="bg-white text-slate-900">납품 연동 캠페인만</option>
+                                    <option value="with_creators" className="bg-white text-slate-900">연동 + 인원 보유만</option>
                                 </select>
                             </div>
                             <button

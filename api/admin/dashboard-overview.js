@@ -63,6 +63,9 @@ const resolveLinkedDeliveryListSlug = (campaign) => {
 
 const pickSetupSummary = (row) => {
   const fd = row?.form_data || {};
+  const photos = Array.isArray(fd.productPhotoUrls)
+    ? fd.productPhotoUrls.filter((u) => typeof u === 'string' && u.trim() !== '')
+    : [];
   return {
     created_at: row?.created_at || null,
     company_name: fd.companyName || null,
@@ -78,6 +81,7 @@ const pickSetupSummary = (row) => {
       : (fd.eventSchedule || null),
     requested_shipping_date: fd.requestedShippingDate || null,
     guideline_status: fd.guidelineStatus || null,
+    product_photo_urls: photos,
   };
 };
 
