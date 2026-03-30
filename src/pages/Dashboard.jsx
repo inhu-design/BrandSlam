@@ -3368,6 +3368,130 @@ function AdminCampaignScheduleByIdPanel() {
   );
 }
 
+const AdminCampaignQuickEditor = ({ campaign, onSaved }) => {
+  const [fields, setFields] = useState({
+    brand_name: '',
+    product_name: '',
+    plan: '',
+    status: CampaignStatus.KICKOFF,
+    customer_name: '',
+    customer_email: '',
+    customer_phone: '',
+    start_date: '',
+    target_creators: '',
+    matched_creators: '',
+    plan_price: '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    if (!campaign?.id) return;
+    setFields({
+      brand_name: campaign.brand_name || '',
+      product_name: campaign.product_name || '',
+      plan: campaign.plan || '',
+      status: campaign.status || CampaignStatus.KICKOFF,
+      customer_name: campaign.customer_name || '',
+      customer_email: campaign.customer_email || '',
+      customer_phone: campaign.customer_phone || '',
+      start_date: campaign.start_date || '',
+      target_creators: campaign.target_creators ?? '',
+      matched_creators: campaign.matched_creators ?? '',
+      plan_price: campaign.plan_price ?? '',
+    });
+    setMsg('');
+  }, [campaign]);
+
+  if (!campaign?.id) return null;
+
+  const setField = (k, v) => setFields((prev) => ({ ...prev, [k]: v }));
+
+  const handleSave = async () => {
+    setSaving(true);
+    setMsg('');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) {
+        setMsg('로그인 세션이 없어 저장할 수 없습니다.');
+        return;
+      }
+      const payload = {
+        campaign_id: campaign.id,
+        brand_name: fields.brand_name,
+        product_name: fields.product_name,
+        plan: fields.plan,
+        status: fields.status,
+        customer_name: fields.customer_name,
+        customer_email: fields.customer_email,
+        customer_phone: fields.customer_phone,
+        start_date: fields.start_date || null,
+        target_creators: fields.target_creators,
+        matched_creators: fields.matched_creators,
+        plan_price: fields.plan_price,
+      };
+
+      const res = await fetch(`${window.location.origin}/api/admin/campaign-update`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMsg(data?.error || '캠페인 저장에 실패했습니다.');
+        return;
+      }
+      onSaved?.(campaign.id, data.campaign || payload);
+      setMsg('저장 완료: Supabase와 동기화되었습니다.');
+    } catch (e) {
+      setMsg(`저장 실패: ${e?.message || e}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="mb-10 p-6 bg-white/[0.03] border border-cyan-500/20 rounded-2xl">
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <h3 className="text-sm font-black tracking-widest uppercase text-cyan-300">관리자 전용 · 캠페인 편집</h3>
+        <span className="text-[10px] text-slate-500 font-mono">{campaign.order_number || campaign.id}</span>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <input value={fields.brand_name} onChange={(e) => setField('brand_name', e.target.value)} placeholder="브랜드명" className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white" />
+        <input value={fields.product_name} onChange={(e) => setField('product_name', e.target.value)} placeholder="제품명" className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white" />
+        <input value={fields.plan} onChange={(e) => setField('plan', e.target.value)} placeholder="플랜명" className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white" />
+        <select value={fields.status} onChange={(e) => setField('status', e.target.value)} className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white">
+          {Object.values(CampaignStatus).map((s) => (
+            <option key={s} value={s} className="bg-slate-900">{s}</option>
+          ))}
+        </select>
+        <input value={fields.customer_name} onChange={(e) => setField('customer_name', e.target.value)} placeholder="고객 담당자명" className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white" />
+        <input value={fields.customer_email} onChange={(e) => setField('customer_email', e.target.value)} placeholder="고객 이메일" className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white" />
+        <input value={fields.customer_phone} onChange={(e) => setField('customer_phone', e.target.value)} placeholder="고객 연락처" className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white" />
+        <input value={fields.start_date || ''} onChange={(e) => setField('start_date', e.target.value)} placeholder="시작일 YYYY-MM-DD" className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white" />
+        <input value={fields.target_creators} onChange={(e) => setField('target_creators', e.target.value)} placeholder="목표 인원" className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white" />
+        <input value={fields.matched_creators} onChange={(e) => setField('matched_creators', e.target.value)} placeholder="매칭 인원" className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white" />
+        <input value={fields.plan_price} onChange={(e) => setField('plan_price', e.target.value)} placeholder="플랜 금액" className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white md:col-span-2" />
+      </div>
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <p className={`text-xs ${msg.includes('실패') ? 'text-red-400' : 'text-slate-400'}`}>{msg || '캠페인 기본정보를 수정하면 즉시 DB에 반영됩니다.'}</p>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+          className="px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest bg-cyan-600 hover:bg-cyan-500 border border-cyan-400/40 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {saving ? '저장 중...' : '캠페인 저장'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const KickoffView = ({ campaign, user, isAdminUser = false, onCampaignScheduleUpdated }) => {
   const navigate = useNavigate();
   const [submission, setSubmission] = useState(null);
@@ -3805,6 +3929,12 @@ export default function Dashboard() {
   const [impersonateEmail, setImpersonateEmail] = useState('');
   const [impersonateLoading, setImpersonateLoading] = useState(false);
   const [impersonateExpanded, setImpersonateExpanded] = useState(false);
+  const [adminFilterCustomer, setAdminFilterCustomer] = useState('all');
+  const [adminFilterBrand, setAdminFilterBrand] = useState('all');
+  const [adminFilterPlan, setAdminFilterPlan] = useState('all');
+  const [adminFilterStatus, setAdminFilterStatus] = useState('all');
+  const [adminFilterDelivery, setAdminFilterDelivery] = useState('all');
+  const [adminSearch, setAdminSearch] = useState('');
 
   const adminEmails = useMemo(() => (import.meta.env.VITE_ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean), []);
 
@@ -3820,26 +3950,64 @@ export default function Dashboard() {
 
       if (user) {
         const isAdminUser = adminEmails.length > 0 && user?.email && adminEmails.includes(user.email.toLowerCase());
-        let campaignQuery = supabase
-          .from('campaigns')
-          .select(`*, creators (*), contents (*)`)
-          .order('created_at', { ascending: false });
-        if (!isAdminUser) {
-          campaignQuery = campaignQuery.eq('user_id', user.id);
+        let campaignList = [];
+        let linkedCreatorsRawBySlug = {};
+        let orderSummaryByNumber = {};
+        let setupByCampaignId = {};
+        let loadedFromAdminApi = false;
+
+        if (isAdminUser) {
+          try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const token = session?.access_token;
+            if (token) {
+              const res = await fetch(`${window.location.origin}/api/admin/dashboard-overview`, {
+                method: 'GET',
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              if (res.ok) {
+                const adminData = await res.json();
+                campaignList = adminData?.campaigns || [];
+                linkedCreatorsRawBySlug = adminData?.creators_by_slug || {};
+                orderSummaryByNumber = adminData?.order_summary_by_number || {};
+                setupByCampaignId = adminData?.setup_by_campaign_id || {};
+                loadedFromAdminApi = true;
+              } else {
+                const errText = await res.text();
+                console.warn('[admin/dashboard-overview] failed:', res.status, errText);
+              }
+            }
+          } catch (err) {
+            console.warn('[admin/dashboard-overview] error:', err);
+          }
         }
-        const { data } = await campaignQuery;
-        let campaignList = data || [];
+
+        if (!loadedFromAdminApi) {
+          let campaignQuery = supabase
+            .from('campaigns')
+            .select(`*, creators (*), contents (*)`)
+            .order('created_at', { ascending: false });
+          if (!isAdminUser) {
+            campaignQuery = campaignQuery.eq('user_id', user.id);
+          }
+          const { data } = await campaignQuery;
+          campaignList = data || [];
+        }
 
         const linkedCampaignRows = campaignList.filter((c) => campaignMatchesLinkedDeliveryList(c, user));
         const linkedSlugs = [...new Set(linkedCampaignRows.map((c) => resolveLinkedDeliveryListSlug(c, user)).filter(Boolean))];
         if (linkedSlugs.length > 0) {
           const creatorsBySlug = {};
           for (const slug of linkedSlugs) {
-            const { data: linkedCreators } = await supabase
-              .from('admin_delivery_creators')
-              .select('*')
-              .eq('list_slug', slug)
-              .order('created_at', { ascending: true });
+            let linkedCreators = linkedCreatorsRawBySlug?.[slug] || [];
+            if (!loadedFromAdminApi) {
+              const { data: queryRows } = await supabase
+                .from('admin_delivery_creators')
+                .select('*')
+                .eq('list_slug', slug)
+                .order('created_at', { ascending: true });
+              linkedCreators = queryRows || [];
+            }
             creatorsBySlug[slug] =
               linkedCreators?.length > 0
                 ? linkedCreators.map((r, i) => toDisplayCreator(r, i))
@@ -3855,18 +4023,18 @@ export default function Dashboard() {
         }
 
         const orderNumbers = [...new Set(campaignList.map((c) => c.order_number).filter(Boolean))];
-        if (orderNumbers.length > 0) {
+        if (orderNumbers.length > 0 && !loadedFromAdminApi) {
           const { data: orderRows } = await supabase
             .from('orders')
             .select('order_number, plan_name, plan_price, order_items, content_count')
             .in('order_number', orderNumbers);
-          const orderByNum = Object.fromEntries((orderRows || []).map((o) => [o.order_number, o]));
-          campaignList = campaignList.map((c) =>
-            c.order_number && orderByNum[c.order_number]
-              ? { ...c, order_summary: orderByNum[c.order_number] }
-              : c,
-          );
+          orderSummaryByNumber = Object.fromEntries((orderRows || []).map((o) => [o.order_number, o]));
         }
+        campaignList = campaignList.map((c) =>
+          c.order_number && orderSummaryByNumber[c.order_number]
+            ? { ...c, order_summary: orderSummaryByNumber[c.order_number], setup_submission_summary: setupByCampaignId[c.id] || null }
+            : { ...c, setup_submission_summary: setupByCampaignId[c.id] || null },
+        );
 
         if (campaignList.length > 0) {
           setCampaigns(campaignList);
@@ -3897,6 +4065,106 @@ export default function Dashboard() {
 
     fetchData();
   }, [navigate, adminEmails]);
+  const isAdminUser = !!(user?.email && adminEmails.includes(user.email.toLowerCase()));
+
+  const handleAdminCampaignUpdated = (campaignId, patch) => {
+    if (!campaignId || !patch) return;
+    setCampaigns((prev) =>
+      prev.map((c) => (c.id === campaignId ? { ...c, ...patch } : c)),
+    );
+  };
+
+  const adminCustomerOptions = useMemo(
+    () => [...new Set(campaigns.map((c) => String(c.customer_email || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    [campaigns],
+  );
+  const adminBrandOptions = useMemo(
+    () => [...new Set(campaigns.map((c) => String(c.brand_name || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    [campaigns],
+  );
+  const adminPlanOptions = useMemo(
+    () => [...new Set(campaigns.map((c) => String(c.plan || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    [campaigns],
+  );
+  const adminStatusOptions = useMemo(
+    () => [...new Set(campaigns.map((c) => String(c.status || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    [campaigns],
+  );
+
+  const filteredCampaigns = useMemo(() => {
+    if (!isAdminUser) return campaigns;
+    let rows = [...campaigns];
+    if (adminFilterCustomer !== 'all') rows = rows.filter((c) => String(c.customer_email || '').trim() === adminFilterCustomer);
+    if (adminFilterBrand !== 'all') rows = rows.filter((c) => String(c.brand_name || '').trim() === adminFilterBrand);
+    if (adminFilterPlan !== 'all') rows = rows.filter((c) => String(c.plan || '').trim() === adminFilterPlan);
+    if (adminFilterStatus !== 'all') rows = rows.filter((c) => String(c.status || '').trim() === adminFilterStatus);
+    if (adminFilterDelivery !== 'all') {
+      rows = rows.filter((c) => {
+        const linked = !!resolveLinkedDeliveryListSlug(c, user);
+        if (!linked) return false;
+        if (adminFilterDelivery === 'with_creators') return (c.linked_delivery_candidates || []).length > 0;
+        return true;
+      });
+    }
+    const q = adminSearch.trim().toLowerCase();
+    if (q) {
+      rows = rows.filter((c) =>
+        `${c.order_number || ''} ${c.brand_name || ''} ${c.product_name || ''} ${c.customer_email || ''} ${c.plan || ''}`
+          .toLowerCase()
+          .includes(q),
+      );
+    }
+    return rows;
+  }, [isAdminUser, campaigns, adminFilterCustomer, adminFilterBrand, adminFilterPlan, adminFilterStatus, adminFilterDelivery, adminSearch, user]);
+
+  const handleAdminDrilldownCustomer = (customerEmail) => {
+    if (!isAdminUser) return;
+    const next = adminFilterCustomer === customerEmail ? 'all' : customerEmail;
+    setAdminFilterCustomer(next);
+    setAdminFilterBrand('all');
+    setAdminFilterPlan('all');
+    setAdminFilterStatus('all');
+    setAdminFilterDelivery('all');
+    setAdminSearch(next === 'all' ? '' : customerEmail);
+  };
+
+  const handleAdminDrilldownMetric = (customerEmail, metric) => {
+    if (!isAdminUser) return;
+    setAdminFilterCustomer(customerEmail || 'all');
+    setAdminFilterBrand('all');
+    setAdminFilterPlan('all');
+    setAdminFilterStatus('all');
+    if (metric === 'linked_count') setAdminFilterDelivery('linked');
+    else if (metric === 'linked_creators') setAdminFilterDelivery('with_creators');
+    else setAdminFilterDelivery('all');
+    setAdminSearch(customerEmail || '');
+  };
+
+  const handleAdminDrilldownCampaign = (campaignId) => {
+    if (!campaignId) return;
+    setSelectedCampaignId(campaignId);
+    const target = campaigns.find((c) => c.id === campaignId);
+    if (!target) return;
+    if (isAdminUser) {
+      setAdminFilterCustomer(String(target.customer_email || '').trim() || 'all');
+      setAdminFilterBrand(String(target.brand_name || '').trim() || 'all');
+      setAdminFilterPlan(String(target.plan || '').trim() || 'all');
+      setAdminFilterStatus('all');
+      setAdminFilterDelivery(resolveLinkedDeliveryListSlug(target, user) ? 'linked' : 'all');
+      setAdminSearch(String(target.order_number || '').trim());
+    }
+  };
+
+  useEffect(() => {
+    if (!filteredCampaigns.length) {
+      setSelectedCampaignId(null);
+      return;
+    }
+    if (!filteredCampaigns.some((c) => c.id === selectedCampaignId)) {
+      setSelectedCampaignId(filteredCampaigns[0].id);
+    }
+  }, [filteredCampaigns, selectedCampaignId]);
+
   const handlePasswordUpdate = async () => {
     if (newPassword.length < 8) return alert("비밀번호는 8자 이상이어야 합니다.");
     if (newPassword !== newPasswordConfirm) return alert("비밀번호가 일치하지 않습니다.");
@@ -3959,9 +4227,6 @@ export default function Dashboard() {
     }
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#020617]"><div className="w-12 h-12 border-4 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin"></div></div>;
-
-  const isAdminUser = !!(user?.email && adminEmails.includes(user.email.toLowerCase()));
   const adminLinkedCampaigns = isAdminUser
     ? campaigns.filter((c) => campaignMatchesLinkedDeliveryList(c, user))
     : [];
@@ -3978,7 +4243,59 @@ export default function Dashboard() {
       ).map(([slug, stats]) => ({ slug, ...stats }))
     : [];
 
-  const selectedCampaign = campaigns.find(c => c.id === selectedCampaignId);
+  const adminCustomerOverviewRows = useMemo(() => {
+    if (!isAdminUser) return [];
+    const rowsByCustomer = {};
+    for (const c of campaigns) {
+      const customer = String(c.customer_email || '미지정').trim() || '미지정';
+      if (!rowsByCustomer[customer]) {
+        rowsByCustomer[customer] = {
+          customer,
+          campaign_count: 0,
+          linked_count: 0,
+          linked_creators: 0,
+          latest_at: null,
+        };
+      }
+      const row = rowsByCustomer[customer];
+      row.campaign_count += 1;
+      const slug = resolveLinkedDeliveryListSlug(c, user);
+      if (slug) {
+        row.linked_count += 1;
+        row.linked_creators += (c.linked_delivery_candidates || []).length;
+      }
+      const ts = c.updated_at || c.created_at || c.setup_submission_summary?.created_at || null;
+      if (ts && (!row.latest_at || String(ts) > String(row.latest_at))) {
+        row.latest_at = ts;
+      }
+    }
+    return Object.values(rowsByCustomer).sort((a, b) => b.campaign_count - a.campaign_count);
+  }, [isAdminUser, campaigns, user]);
+
+  const adminSetupOverviewRows = useMemo(() => {
+    if (!isAdminUser) return [];
+    return campaigns
+      .map((c) => ({
+        id: c.id,
+        order_number: c.order_number || '-',
+        customer_email: c.customer_email || '-',
+        brand_name: c.brand_name || '-',
+        plan: c.plan || '-',
+        company_name: c.setup_submission_summary?.company_name || '-',
+        contact_name: c.setup_submission_summary?.contact_name || '-',
+        contact_email: c.setup_submission_summary?.contact_email || '-',
+        product_name_input: c.setup_submission_summary?.product_name || '-',
+        target_country: c.setup_submission_summary?.target_country || '-',
+        event_name: c.setup_submission_summary?.event_name || '-',
+        guideline_status: c.setup_submission_summary?.guideline_status || '-',
+        setup_created_at: c.setup_submission_summary?.created_at || null,
+      }))
+      .sort((a, b) => String(b.setup_created_at || '').localeCompare(String(a.setup_created_at || '')));
+  }, [isAdminUser, campaigns]);
+
+  const selectedCampaign = filteredCampaigns.find(c => c.id === selectedCampaignId) || null;
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#020617]"><div className="w-12 h-12 border-4 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin"></div></div>;
 
   return (
     <div className="min-h-screen bg-[#020617] text-white flex flex-col selection:bg-cyan-500/30">
@@ -4000,8 +4317,16 @@ export default function Dashboard() {
                     <span className="font-black tracking-widest uppercase text-cyan-200">관리자 전용 납품 현황 대시보드</span>
                 </div>
                 <p className="font-light tracking-tight text-cyan-100/90">
-                    현재 로그인에서는 전체 캠페인을 조회합니다. 연결된 납품 리스트 데이터도 각 캠페인 상세에서 바로 확인할 수 있습니다.
+                    현재 로그인에서는 전체 캠페인을 조회합니다. 모든 고객 캠페인의 상태 확인, 필터링, 세팅 검토, 캠페인 수정까지 이 화면에서 관리할 수 있습니다.
                 </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                    {adminFilterCustomer !== 'all' && <span className="text-[10px] px-2 py-1 rounded-lg bg-cyan-900/40 border border-cyan-400/30">고객: {adminFilterCustomer}</span>}
+                    {adminFilterBrand !== 'all' && <span className="text-[10px] px-2 py-1 rounded-lg bg-cyan-900/40 border border-cyan-400/30">브랜드: {adminFilterBrand}</span>}
+                    {adminFilterPlan !== 'all' && <span className="text-[10px] px-2 py-1 rounded-lg bg-cyan-900/40 border border-cyan-400/30">플랜: {adminFilterPlan}</span>}
+                    {adminFilterStatus !== 'all' && <span className="text-[10px] px-2 py-1 rounded-lg bg-cyan-900/40 border border-cyan-400/30">상태: {adminFilterStatus}</span>}
+                    {adminFilterDelivery !== 'all' && <span className="text-[10px] px-2 py-1 rounded-lg bg-cyan-900/40 border border-cyan-400/30">{adminFilterDelivery === 'linked' ? '납품 연동만' : '연동+인원 보유'}</span>}
+                    {adminSearch.trim() && <span className="text-[10px] px-2 py-1 rounded-lg bg-cyan-900/40 border border-cyan-400/30">검색: {adminSearch.trim()}</span>}
+                </div>
                 <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="rounded-2xl border border-cyan-400/20 bg-cyan-900/20 px-4 py-3">
                         <p className="text-[10px] uppercase tracking-widest text-cyan-300/80 font-black">전체 캠페인</p>
@@ -4025,6 +4350,137 @@ export default function Dashboard() {
                         ))}
                     </div>
                 )}
+            </div>
+        )}
+
+        {isAdminUser && (
+            <div className="mb-10 grid grid-cols-1 xl:grid-cols-2 gap-6">
+                <div className="bg-white/[0.03] border border-cyan-500/20 rounded-2xl overflow-hidden">
+                    <div className="px-5 py-4 border-b border-white/10 bg-cyan-500/[0.08]">
+                        <h3 className="text-sm font-black tracking-widest uppercase text-cyan-200">고객사별 집계</h3>
+                        <p className="text-xs text-slate-400 mt-1">캠페인 수 / 납품 연동 수 / 연동 인원 / 최근 업데이트</p>
+                    </div>
+                    <div className="max-h-[360px] overflow-auto">
+                        <table className="w-full text-xs">
+                            <thead className="sticky top-0 bg-[#0b1327] text-slate-400 border-b border-white/10">
+                                <tr>
+                                    <th className="text-left px-4 py-3">고객사</th>
+                                    <th className="text-right px-4 py-3">캠페인</th>
+                                    <th className="text-right px-4 py-3">연동</th>
+                                    <th className="text-right px-4 py-3">인원</th>
+                                    <th className="text-right px-4 py-3">최근 업데이트</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5">
+                                {adminCustomerOverviewRows.map((row) => (
+                                    <tr
+                                        key={row.customer}
+                                        onClick={() => handleAdminDrilldownCustomer(row.customer)}
+                                        className={`cursor-pointer transition-colors ${
+                                          adminFilterCustomer === row.customer ? 'bg-cyan-500/15' : 'hover:bg-white/[0.03]'
+                                        }`}
+                                        title={adminFilterCustomer === row.customer ? '클릭하면 고객 필터 해제' : `${row.customer} 고객 캠페인만 보기`}
+                                    >
+                                        <td className="px-4 py-3 text-slate-200">{row.customer}</td>
+                                        <td className="px-4 py-3 text-right">
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleAdminDrilldownMetric(row.customer, 'campaign_count');
+                                              }}
+                                              className="text-white font-bold underline decoration-dotted underline-offset-4 hover:text-cyan-200"
+                                              title="이 고객의 전체 캠페인만 보기"
+                                            >
+                                              {row.campaign_count}
+                                            </button>
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleAdminDrilldownMetric(row.customer, 'linked_count');
+                                              }}
+                                              className="text-cyan-300 font-bold underline decoration-dotted underline-offset-4 hover:text-cyan-200"
+                                              title="이 고객의 납품 연동 캠페인만 보기"
+                                            >
+                                              {row.linked_count}
+                                            </button>
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleAdminDrilldownMetric(row.customer, 'linked_creators');
+                                              }}
+                                              className="text-cyan-200 underline decoration-dotted underline-offset-4 hover:text-cyan-100"
+                                              title="이 고객의 연동+인원 보유 캠페인만 보기"
+                                            >
+                                              {row.linked_creators}
+                                            </button>
+                                        </td>
+                                        <td className="px-4 py-3 text-right text-slate-400">{row.latest_at ? new Date(row.latest_at).toLocaleString('ko-KR') : '-'}</td>
+                                    </tr>
+                                ))}
+                                {adminCustomerOverviewRows.length === 0 && (
+                                    <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-500">표시할 고객 집계가 없습니다.</td></tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div className="bg-white/[0.03] border border-cyan-500/20 rounded-2xl overflow-hidden">
+                    <div className="px-5 py-4 border-b border-white/10 bg-cyan-500/[0.08]">
+                        <h3 className="text-sm font-black tracking-widest uppercase text-cyan-200">고객 입력 세팅 요약</h3>
+                        <p className="text-xs text-slate-400 mt-1">캠페인 세팅 폼 최신 제출값 기준</p>
+                    </div>
+                    <div className="max-h-[360px] overflow-auto">
+                        <table className="w-full text-xs">
+                            <thead className="sticky top-0 bg-[#0b1327] text-slate-400 border-b border-white/10">
+                                <tr>
+                                    <th className="text-left px-4 py-3">주문/고객</th>
+                                    <th className="text-left px-4 py-3">브랜드/플랜</th>
+                                    <th className="text-left px-4 py-3">세팅 입력 요약</th>
+                                    <th className="text-right px-4 py-3">제출시각</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5">
+                                {adminSetupOverviewRows.map((row) => (
+                                    <tr
+                                        key={row.id}
+                                        onClick={() => handleAdminDrilldownCampaign(row.id)}
+                                        className={`cursor-pointer transition-colors ${
+                                          selectedCampaignId === row.id ? 'bg-cyan-500/15' : 'hover:bg-white/[0.03]'
+                                        }`}
+                                        title="클릭하면 해당 캠페인으로 이동 및 필터 적용"
+                                    >
+                                        <td className="px-4 py-3 align-top">
+                                            <p className="text-slate-200 font-mono">{row.order_number}</p>
+                                            <p className="text-slate-500 mt-1">{row.customer_email}</p>
+                                        </td>
+                                        <td className="px-4 py-3 align-top">
+                                            <p className="text-white font-semibold">{row.brand_name}</p>
+                                            <p className="text-slate-500 mt-1">{row.plan}</p>
+                                        </td>
+                                        <td className="px-4 py-3 align-top text-slate-300 leading-relaxed">
+                                            <p>회사명: <span className="text-slate-100">{row.company_name}</span></p>
+                                            <p>담당자: <span className="text-slate-100">{row.contact_name}</span> / {row.contact_email}</p>
+                                            <p>제품명: <span className="text-slate-100">{row.product_name_input}</span></p>
+                                            <p>타겟국가: <span className="text-slate-100">{row.target_country}</span></p>
+                                            <p>행사명: <span className="text-slate-100">{row.event_name}</span> · 가이드라인: <span className="text-slate-100">{row.guideline_status}</span></p>
+                                        </td>
+                                        <td className="px-4 py-3 align-top text-right text-slate-400">{row.setup_created_at ? new Date(row.setup_created_at).toLocaleString('ko-KR') : '-'}</td>
+                                    </tr>
+                                ))}
+                                {adminSetupOverviewRows.length === 0 && (
+                                    <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-500">캠페인 세팅 입력 데이터가 없습니다.</td></tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         )}
 
@@ -4168,16 +4624,73 @@ export default function Dashboard() {
             </div>
         )}
 
+        {isAdminUser && (
+            <AdminCampaignQuickEditor
+                campaign={selectedCampaign}
+                onSaved={handleAdminCampaignUpdated}
+            />
+        )}
+
         <div className="flex flex-col lg:flex-row gap-10 items-start">
             {/* Left Sidebar */}
             <div className="w-full lg:w-1/4 space-y-10 sticky top-40">
                 <div className="space-y-6">
                     <div className="flex items-center justify-between px-2">
                         <h2 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em]">Campaign Library</h2>
-                        <span className="text-[10px] font-black bg-white/5 text-slate-400 px-3 py-1 rounded-full border border-white/5">{campaigns.length}</span>
+                        <span className="text-[10px] font-black bg-white/5 text-slate-400 px-3 py-1 rounded-full border border-white/5">
+                          {isAdminUser ? `${filteredCampaigns.length}/${campaigns.length}` : campaigns.length}
+                        </span>
                     </div>
+                    {isAdminUser && (
+                        <div className="p-4 rounded-2xl border border-cyan-500/20 bg-cyan-500/[0.04] space-y-3">
+                            <p className="text-[10px] font-black tracking-widest uppercase text-cyan-300">관리자 필터</p>
+                            <input
+                                value={adminSearch}
+                                onChange={(e) => setAdminSearch(e.target.value)}
+                                placeholder="주문번호/브랜드/이메일 검색"
+                                className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder-slate-500"
+                            />
+                            <div className="grid grid-cols-1 gap-2">
+                                <select value={adminFilterCustomer} onChange={(e) => setAdminFilterCustomer(e.target.value)} className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-200">
+                                    <option value="all">고객사 전체</option>
+                                    {adminCustomerOptions.map((v) => <option key={v} value={v}>{v}</option>)}
+                                </select>
+                                <select value={adminFilterBrand} onChange={(e) => setAdminFilterBrand(e.target.value)} className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-200">
+                                    <option value="all">브랜드 전체</option>
+                                    {adminBrandOptions.map((v) => <option key={v} value={v}>{v}</option>)}
+                                </select>
+                                <select value={adminFilterPlan} onChange={(e) => setAdminFilterPlan(e.target.value)} className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-200">
+                                    <option value="all">플랜 전체</option>
+                                    {adminPlanOptions.map((v) => <option key={v} value={v}>{v}</option>)}
+                                </select>
+                                <select value={adminFilterStatus} onChange={(e) => setAdminFilterStatus(e.target.value)} className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-200">
+                                    <option value="all">상태 전체</option>
+                                    {adminStatusOptions.map((v) => <option key={v} value={v}>{v}</option>)}
+                                </select>
+                                <select value={adminFilterDelivery} onChange={(e) => setAdminFilterDelivery(e.target.value)} className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-200">
+                                    <option value="all">납품 연동 조건 전체</option>
+                                    <option value="linked">납품 연동 캠페인만</option>
+                                    <option value="with_creators">연동 + 인원 보유만</option>
+                                </select>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setAdminFilterCustomer('all');
+                                    setAdminFilterBrand('all');
+                                    setAdminFilterPlan('all');
+                                    setAdminFilterStatus('all');
+                                    setAdminFilterDelivery('all');
+                                    setAdminSearch('');
+                                }}
+                                className="w-full px-3 py-2 rounded-xl text-[10px] font-black tracking-widest uppercase bg-white/10 border border-white/15 text-slate-300 hover:bg-white/15 transition-all"
+                            >
+                                필터 초기화
+                            </button>
+                        </div>
+                    )}
                     <div className="space-y-4">
-                        {campaigns.map(campaign => (
+                        {filteredCampaigns.map(campaign => (
                             <CampaignCard 
                                 key={campaign.id} 
                                 campaign={campaign} 
@@ -4220,7 +4733,7 @@ export default function Dashboard() {
 
             {/* Main Content Area */}
             <div className="w-full lg:w-3/4">
-                {campaigns.length === 0 && !isDemoMode ? (
+                {filteredCampaigns.length === 0 && !isDemoMode ? (
                     // [신규] 구매 유도 빈 화면 (Empty State CTA)
                     <div className="bg-white/5 backdrop-blur-2xl p-8 md:p-12 rounded-[4rem] border border-white/10 shadow-[0_0_100px_rgba(0,0,0,0.5)] min-h-[700px] flex flex-col items-center justify-center relative overflow-hidden text-center animate-fade-in-up">
                         <div className="w-32 h-32 bg-gradient-to-br from-purple-500/10 to-blue-500/10 rounded-full flex items-center justify-center mb-8 border border-white/10 shadow-[0_0_50px_rgba(168,85,247,0.1)]">
