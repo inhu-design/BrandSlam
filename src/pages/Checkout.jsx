@@ -10,12 +10,6 @@ import Footer from '../components/layout/Footer';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
-/** `VITE_CARD_PAYMENT_ENABLED=true` 이면 안내 없이 결제창만. 미설정이면 심사용 안내(배너·alert) 후에도 결제창은 동일하게 열림 */
-const isCardPaymentEnabled = () => {
-  const v = String(import.meta.env.VITE_CARD_PAYMENT_ENABLED || '').toLowerCase();
-  return v === 'true' || v === '1' || v === 'yes';
-};
-
 const PLANS = {
   Starter: { id: 'Starter', name: 'Starter', price: '590,000', priceNum: 590000, count: 10, desc: '콘텐츠 10개 보장' },
   Growth: { id: 'Growth', name: 'Growth', price: '990,000', priceNum: 990000, count: 20, desc: '콘텐츠 20개 보장', isBest: true },
@@ -436,6 +430,11 @@ export default function Checkout() {
   const paymentInProgressRef = useRef(false);
   const invoicePreviewRef = useRef(null);
 
+  const restorePageScroll = () => {
+    document.body.style.overflow = '';
+    document.documentElement.style.overflow = '';
+  };
+
   useEffect(() => {
     if (!authLoading && !user) {
       navigate('/login', {
@@ -451,12 +450,33 @@ export default function Checkout() {
   useEffect(() => {
     const onMessage = (e) => {
       if (e.data?.type === 'INICIS_PAYMENT_SUCCESS' && e.data?.order_number) {
+        restorePageScroll();
         setOrderNumber(e.data.order_number);
         setCurrentStep(5);
       }
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      restorePageScroll();
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleFocusBack = () => {
+      if (!paymentInProgressRef.current) {
+        restorePageScroll();
+      }
+    };
+    window.addEventListener('focus', handleFocusBack);
+    document.addEventListener('visibilitychange', handleFocusBack);
+    return () => {
+      window.removeEventListener('focus', handleFocusBack);
+      document.removeEventListener('visibilitychange', handleFocusBack);
+    };
   }, []);
 
   if (authLoading || !user) {
@@ -637,16 +657,12 @@ export default function Checkout() {
       await rollbackOrder(orderNum);
       paymentInProgressRef.current = false;
       setSubmitting(false);
+      restorePageScroll();
       alert('결제창을 여는 도중 문제가 발생했습니다. 다른 결제 수단을 이용해 주시거나 잠시 후 다시 시도해 주세요.');
     }
   };
 
   const handleCardPayment = () => {
-    if (!isCardPaymentEnabled()) {
-      window.alert(
-        '안내: 카드사 심사 진행 중입니다.\n\n「확인」 후 결제창이 열리며, 심사·테스트 목적으로 이용하실 수 있습니다.\n\n실제 서비스 결제는 실시간 계좌이체 이용을 권장합니다.',
-      );
-    }
     handleInicisPayment('card');
   };
 
@@ -1316,17 +1332,6 @@ export default function Checkout() {
               </div>
 
               <h3 className="font-bold text-white mb-4">결제 수단</h3>
-              {!isCardPaymentEnabled() && (
-                <div className="mb-6 flex gap-3 p-4 rounded-2xl border border-amber-500/35 bg-amber-500/[0.12] text-amber-100/95">
-                  <AlertTriangle className="shrink-0 text-amber-400 mt-0.5" size={22} />
-                  <div className="text-sm leading-relaxed">
-                    <p className="font-bold text-amber-200 mb-1">신용카드 · 카드사 심사 안내</p>
-                    <p className="text-amber-100/85">
-                      심사를 위해 <strong className="text-white">신용카드 결제</strong> 버튼으로 결제창을 열 수 있습니다. 일반 고객 결제는 <strong className="text-white">실시간 계좌이체</strong>를 이용해 주세요.
-                    </p>
-                  </div>
-                </div>
-              )}
               <div className="flex gap-4 mb-6">
                 <button
                   type="button"
@@ -1373,21 +1378,9 @@ export default function Checkout() {
 
               {paymentMethod === 'card' && (
                 <div className="space-y-4 mb-8">
-                  {!isCardPaymentEnabled() && (
-                    <div className="rounded-2xl p-5 border border-amber-500/25 bg-amber-500/[0.08]">
-                      <p className="text-sm text-amber-100/90 flex items-start gap-2">
-                        <AlertTriangle size={18} className="shrink-0 text-amber-400 mt-0.5" />
-                        <span>
-                          버튼을 누르면 안내 팝업 후 <strong className="text-white">KG이니시스 결제창</strong>이 열립니다. 심사·테스트용이며, 실제 결제는 <strong className="text-white">실시간 계좌이체</strong>를 권장합니다.
-                        </span>
-                      </p>
-                    </div>
-                  )}
                   <div className="bg-white/[0.04] rounded-2xl p-5 border border-white/10">
                     <p className="text-sm text-slate-400">
-                      {isCardPaymentEnabled()
-                        ? '결제하기 버튼을 누르면 KG이니시스 결제창이 열립니다. 카드 정보를 입력해 결제를 완료해 주세요.'
-                        : '위 안내를 확인한 뒤 결제하기를 누르시면 팝업 확인 후 결제창이 열립니다.'}
+                      결제하기 버튼을 누르면 KG이니시스 결제창이 열립니다. 카드 정보를 입력해 결제를 완료해 주세요.
                     </p>
                   </div>
                 </div>
