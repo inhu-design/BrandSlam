@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, ArrowRight, Check, UserPlus, FileText,
@@ -9,12 +9,37 @@ import Navbar from '../components/layout/Navbar';
 import Footer from '../components/layout/Footer';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import {
+  CUSTOM_OFFER_FRAMELESS_ID,
+  CUSTOM_OFFER_FRAMELESS_EMAIL,
+  getFramelessOfferCart,
+  getFramelessOrderItemsForDraft,
+  isFramelessOfferForUser,
+} from '../lib/customOffers';
 
 const PLANS = {
   Starter: { id: 'Starter', name: 'Starter', price: '590,000', priceNum: 590000, count: 10, desc: '콘텐츠 10개 보장' },
   Growth: { id: 'Growth', name: 'Growth', price: '990,000', priceNum: 990000, count: 20, desc: '콘텐츠 20개 보장', isBest: true },
   Scale50: { id: 'Scale50', name: 'Scale50', price: '2,390,000', priceNum: 2390000, count: 50, desc: '콘텐츠 50개 보장' },
   Visit: { id: 'Visit', name: 'Visit Content', pricePerPerson: 300000, isVisit: true, desc: '방문형 콘텐츠 · 인당 300,000원' },
+  /** 개인 맞춤 결제 (The Frameless) — 요금제 선택 UI에 숨김 */
+  CustomSeedingFrameless: {
+    id: 'CustomSeedingFrameless',
+    name: '시딩(건당)',
+    price: '35,000',
+    priceNum: 35000,
+    count: 1,
+    desc: '시딩 건당 단가 (부가세 별도)',
+    hiddenFromPicker: true,
+  },
+  CustomVisitSeedingFrameless: {
+    id: 'CustomVisitSeedingFrameless',
+    name: '방문형 시딩(건당)',
+    pricePerPerson: 240000,
+    isVisit: true,
+    desc: '방문형 시딩 건당 단가 (부가세 별도)',
+    hiddenFromPicker: true,
+  },
 };
 
 const LEGAL_CONTENTS = {
@@ -358,8 +383,16 @@ export default function Checkout() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
 
+  /** 로그인 복귀 시 { checkoutState: { customOfferId } } 형태로 올 수 있음 */
+  const effectiveCheckoutState = useMemo(() => {
+    const s = location.state;
+    if (s?.customOfferId) return s;
+    if (s?.checkoutState?.customOfferId) return s.checkoutState;
+    return s || {};
+  }, [location.state]);
+
   const queryPlan = new URLSearchParams(location.search).get('plan');
-  const initialPlanId = location.state?.plan?.id || location.state?.plan || queryPlan || null;
+  const initialPlanId = effectiveCheckoutState?.plan?.id || effectiveCheckoutState?.plan || queryPlan || null;
   // cart: [{ planId, qty }, ...] - 복합/다중 구매 지원
   const [cart, setCart] = useState(() => {
     if (initialPlanId && PLANS[initialPlanId]) {
@@ -407,6 +440,23 @@ export default function Checkout() {
 
   const [currentStep, setCurrentStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+
+  const isCustomOfferActive = useMemo(
+    () => isFramelessOfferForUser(effectiveCheckoutState, user?.email),
+    [effectiveCheckoutState, user?.email],
+  );
+
+  useLayoutEffect(() => {
+    if (authLoading) return;
+    if (!user) return;
+    if (effectiveCheckoutState?.customOfferId !== CUSTOM_OFFER_FRAMELESS_ID) return;
+    if (user.email?.toLowerCase().trim() !== CUSTOM_OFFER_FRAMELESS_EMAIL) {
+      navigate('/dashboard', { replace: true });
+      return;
+    }
+    setCart(getFramelessOfferCart());
+    setCurrentStep(1);
+  }, [authLoading, user, effectiveCheckoutState?.customOfferId, navigate]);
 
   const hasExistingPassword = user?.user_metadata?.password_set === true;
   const [isSettingPassword, setIsSettingPassword] = useState(!hasExistingPassword);
@@ -547,18 +597,20 @@ export default function Checkout() {
 
     // 1) 결제 파라미터 먼저 확인. 실패하면 주문/캠페인 생성 없이 종료
     let params;
-    const orderItems = lineItems.map((li) => ({
-      plan_name: li.plan.name,
-      qty: li.qty,
-      unit_price: li.unitPrice,
-      content_count: li.isVisit ? 1 : li.plan.count,
-      is_visit: !!li.isVisit,
-    }));
+    const orderItems = isCustomOfferActive
+      ? getFramelessOrderItemsForDraft()
+      : lineItems.map((li) => ({
+          plan_name: li.plan.name,
+          qty: li.qty,
+          unit_price: li.unitPrice,
+          content_count: li.isVisit ? 1 : li.plan.count,
+          is_visit: !!li.isVisit,
+        }));
     const orderDraft = {
       order_number: orderNum,
       plan_name: planSummary,
       plan_price: totalPrice,
-      content_count: totalContentCount,
+      content_count: isCustomOfferActive ? 210 : totalContentCount,
       email: form.email,
       name: form.name,
       phone: form.phone,
@@ -567,6 +619,7 @@ export default function Checkout() {
       client_address: clientForm.address || null,
       client_biz_reg_no: clientForm.bizRegNo || null,
       order_items: orderItems,
+      ...(isCustomOfferActive ? { custom_offer_id: CUSTOM_OFFER_FRAMELESS_ID } : {}),
     };
 
     try {
@@ -675,18 +728,20 @@ export default function Checkout() {
     const orderNum = `BS-${datePart}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
     const planSummary = lineItems.map((li) => `${li.plan.name} x ${li.qty}`).join(', ');
     const totalContentCount = lineItems.reduce((s, li) => s + li.count, 0);
-    const orderItems = lineItems.map((li) => ({
-      plan_name: li.plan.name,
-      qty: li.qty,
-      unit_price: li.unitPrice,
-      content_count: li.isVisit ? 1 : li.plan.count,
-      is_visit: !!li.isVisit,
-    }));
+    const orderItems = isCustomOfferActive
+      ? getFramelessOrderItemsForDraft()
+      : lineItems.map((li) => ({
+          plan_name: li.plan.name,
+          qty: li.qty,
+          unit_price: li.unitPrice,
+          content_count: li.isVisit ? 1 : li.plan.count,
+          is_visit: !!li.isVisit,
+        }));
     const bankPayload = {
       order_number: orderNum,
       plan_name: planSummary,
       plan_price: totalPrice,
-      content_count: totalContentCount,
+      content_count: isCustomOfferActive ? 210 : totalContentCount,
       email: form.email,
       name: form.name,
       phone: form.phone,
@@ -695,6 +750,7 @@ export default function Checkout() {
       client_address: clientForm.address || null,
       client_biz_reg_no: clientForm.bizRegNo || null,
       order_items: orderItems,
+      ...(isCustomOfferActive ? { custom_offer_id: CUSTOM_OFFER_FRAMELESS_ID } : {}),
     };
 
     try {
@@ -844,7 +900,11 @@ export default function Checkout() {
     goNext();
   };
 
-  const goPrev = () => setCurrentStep(s => s - 1);
+  const goPrev = () => setCurrentStep((s) => {
+    const next = Math.max(0, s - 1);
+    if (isCustomOfferActive && next === 0) return 1;
+    return next;
+  });
 
   const setCartQty = (planId, delta) => {
     setCart((prev) => {
@@ -896,9 +956,13 @@ export default function Checkout() {
                 <Sparkles size={14} className="animate-pulse" /> Quick Purchase
               </div>
             </div>
-            <h1 className="text-3xl md:text-5xl font-black tracking-tight mb-4">빠른 구매</h1>
+            <h1 className="text-3xl md:text-5xl font-black tracking-tight mb-4">
+              {isCustomOfferActive ? '맞춤 견적 결제' : '빠른 구매'}
+            </h1>
             <p className="text-lg text-slate-300 leading-relaxed max-w-xl mx-auto">
-              원하는 플랜을 선택하고, 간편하게 시작하세요
+              {isCustomOfferActive
+                ? 'The Frameless 맞춤 견적(시딩·방문형 시딩)에 대한 결제입니다. 공급가에 부가세가 합산됩니다.'
+                : '원하는 플랜을 선택하고, 간편하게 시작하세요'}
             </p>
           </div>
 
@@ -912,7 +976,7 @@ export default function Checkout() {
 
               {/* Main plans with quantity */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                {Object.values(PLANS).filter(p => !p.isVisit).map(p => {
+                {Object.values(PLANS).filter((p) => !p.isVisit && !p.hiddenFromPicker).map((p) => {
                   const qty = getCartQty(p.id);
                   return (
                     <div key={p.id} className={`relative text-left w-full p-8 rounded-2xl border-2 transition-all ${
@@ -948,6 +1012,7 @@ export default function Checkout() {
               </div>
 
               {/* Visit plan with quantity */}
+              {!isCustomOfferActive && (
               <div className={`relative w-full p-8 rounded-2xl border-2 transition-all ${
                 getCartQty('Visit') > 0 ? 'border-orange-500/50 bg-orange-500/5' : 'border-white/10 bg-white/[0.03] hover:border-white/20'
               }`}>
@@ -979,6 +1044,7 @@ export default function Checkout() {
                   </div>
                 </div>
               </div>
+              )}
 
               {/* Cart summary & next - replaces old Visit-only selector */}
               {hasCartItems && (

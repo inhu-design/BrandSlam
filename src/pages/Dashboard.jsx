@@ -12,6 +12,11 @@ import Navbar from '../components/layout/Navbar';
 import Footer from '../components/layout/Footer';
 import sealImg from '../assets/seal.jpg';
 import testInfluencers from '../data/test-influencers.json';
+import {
+  CUSTOM_OFFER_FRAMELESS_EMAIL,
+  CUSTOM_OFFER_FRAMELESS_ID,
+  getFramelessOfferTotals,
+} from '../lib/customOffers';
 
 /** 팔로워 수 파싱 (11.5K → 11500) */
 const parseFollower = (val) => {
@@ -4335,6 +4340,33 @@ export default function Dashboard() {
                 <AlertCircle size={20} className="text-purple-400 shrink-0" />
                 <span className="font-light tracking-tight">현재 시스템 체험을 위한 <b className="font-black text-white uppercase tracking-widest underline decoration-purple-500 underline-offset-4">Demo Mode</b>가 활성화되어 있습니다. 실제 캠페인 계약 시 실시간 데이터 피드가 전송됩니다.</span>
             </div>
+        )}
+
+        {!isAdminUser && user?.email?.toLowerCase().trim() === CUSTOM_OFFER_FRAMELESS_EMAIL && (
+          <div className="mb-10 p-6 md:p-8 rounded-[2rem] border border-emerald-500/35 bg-gradient-to-br from-emerald-950/50 to-slate-900/80 shadow-[0_0_40px_rgba(16,185,129,0.12)]">
+            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
+              <div>
+                <p className="text-[10px] font-black tracking-[0.25em] uppercase text-emerald-400/90 mb-2">개인 맞춤 결제</p>
+                <h2 className="text-xl md:text-2xl font-black text-white mb-2">The Frameless 맞춤 견적</h2>
+                <p className="text-sm text-slate-400 leading-relaxed max-w-xl">
+                  시딩 35,000원 × 200건 · 방문형 시딩 240,000원 × 10건 (공급가, 부가세 별도). 아래 금액은 부가세 포함 총액입니다.
+                </p>
+                <ul className="mt-4 space-y-2 text-sm text-slate-300">
+                  <li className="flex justify-between gap-4 max-w-md"><span>시딩(건당) × 200건 · 공급가</span><span className="font-mono text-white">{(35000 * 200).toLocaleString()}원</span></li>
+                  <li className="flex justify-between gap-4 max-w-md"><span>방문형 시딩(건당) × 10건 · 공급가</span><span className="font-mono text-white">{(240000 * 10).toLocaleString()}원</span></li>
+                  <li className="flex justify-between gap-4 max-w-md border-t border-white/10 pt-2 mt-2"><span className="text-emerald-200/90">부가세(10%)</span><span className="font-mono text-emerald-200">{getFramelessOfferTotals().vat.toLocaleString()}원</span></li>
+                  <li className="flex justify-between gap-4 max-w-md text-lg font-black text-white"><span>결제 예정(VAT 포함)</span><span className="text-emerald-400">{getFramelessOfferTotals().total.toLocaleString()}원</span></li>
+                </ul>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate('/checkout', { state: { customOfferId: CUSTOM_OFFER_FRAMELESS_ID } })}
+                className="shrink-0 inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-black text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-500 hover:from-emerald-300 hover:to-teal-400 transition-all shadow-lg shadow-emerald-500/20"
+              >
+                맞춤 견적 결제하기 <ArrowRight size={18} />
+              </button>
+            </div>
+          </div>
         )}
 
         {isAdminUser && (

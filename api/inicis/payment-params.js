@@ -6,6 +6,7 @@
  */
 import { createHash } from 'crypto';
 import { supabase } from '../lib/supabase-server.js';
+import { assertFramelessOfferPrice } from '../lib/custom-offers.js';
 
 const INICIS_MID = process.env.INICIS_MID || '';
 const INICIS_SIGNKEY = process.env.INICIS_SIGNKEY || '';
@@ -42,6 +43,10 @@ export default async function handler(req, res) {
   }
 
   if (orderDraft != null && typeof orderDraft === 'object') {
+    const framelessCheck = assertFramelessOfferPrice(orderDraft, price);
+    if (!framelessCheck.ok) {
+      return res.status(framelessCheck.status || 400).json({ error: framelessCheck.error });
+    }
     if (!supabase) {
       return res.status(503).json({ error: 'Server cannot persist checkout (Supabase service role missing).' });
     }

@@ -7,6 +7,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { supabase as supabaseAdmin } from '../lib/supabase-server.js';
 import { buildCampaignRowsFromOrderItems } from '../lib/build-campaign-rows-from-order-items.js';
+import { assertFramelessBankPayload } from '../lib/custom-offers.js';
 
 const supabaseUrl = process.env.SUPABASE_URL || 'https://grlayjybcxrcaufnwysb.supabase.co';
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdybGF5anliY3hyY2F1Zm53eXNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUzNDM4NzksImV4cCI6MjA4MDkxOTg3OX0.Voj60xKccEl2_r8EzLVO-fot5WiEiUHb6UTfya2ql8Q';
@@ -74,6 +75,10 @@ export default async function handler(req, res) {
     }
     if (orderPayload.user_id && orderPayload.user_id !== user.id) {
       return res.status(403).json({ error: '본인 주문만 결제 완료 처리할 수 있습니다.' });
+    }
+    const bankCheck = assertFramelessBankPayload(orderPayload);
+    if (!bankCheck.ok) {
+      return res.status(bankCheck.status || 400).json({ error: bankCheck.error });
     }
     const items = Array.isArray(orderPayload.order_items) ? orderPayload.order_items : [];
     if (items.length === 0) {
