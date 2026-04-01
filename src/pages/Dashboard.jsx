@@ -197,6 +197,27 @@ const isFarmskinVisitOrderCampaign = (campaign) => {
 const TROUBLESS_PDRN_SUNSCREEN_NOTION_GUIDELINE_URL =
   'https://spiral-playground-cff.notion.site/Troubless-Glass-Glow-PDRN-Collagen-Sunscreen-313259eb52488199b978e195eb1404b9';
 
+/** heather@fromom.net · Visit — Farmskin SUPER GLOW COLLAGEN WRAPPING MASK (TJ Maxx Store Visit) */
+const FARMSKIN_SUPER_GLOW_WRAPPING_MASK_VISIT_NOTION_URL =
+  'https://spiral-playground-cff.notion.site/Farmskin-Super-Glow-Collagen-Wrapping-Mask-TJ-Maxx-Store-Visit-334259eb524880cb8560daece76e147e';
+
+/** 팜스킨 Visit · Super Glow Wrapping Mask 캠페인 (heather 전용 가이드라인) */
+const isFarmskinSuperGlowWrappingMaskVisitCampaign = (campaign, user) => {
+  const plan = String(campaign?.plan || '').toLowerCase();
+  if (!plan.includes('visit')) return false;
+  const campaignEmail = String(campaign?.customer_email || '').toLowerCase().trim();
+  const authEmail = String(user?.email || '').toLowerCase().trim();
+  const isHeatherContext =
+    campaignEmail === HEATHER_FARMSKIN_EMAIL || authEmail === HEATHER_FARMSKIN_EMAIL;
+  if (!isHeatherContext) return false;
+  const hay = `${campaign?.product_name || ''} ${campaign?.brand_name || ''}`.toLowerCase();
+  return (
+    (hay.includes('super') && hay.includes('glow') && hay.includes('wrapping')) ||
+    hay.includes('wrapping mask') ||
+    hay.includes('tj maxx')
+  );
+};
+
 /** 웰코스 KWAILNARA · Visit 플랜 (캠페인 소유자에게만 노출 — DB user_id 기준) */
 const isKwailnaraVisitLinkedCampaign = (campaign) => {
   if (!campaign?.id) return false;
@@ -257,13 +278,21 @@ const isHeatherFarmskinScale50Campaign = (campaign, user) => {
 const linkedDeliveryTableLayout = (campaign, user) =>
   resolveLinkedDeliveryListSlug(campaign, user) === LINKED_LIST_SLUG_WELCOS_MX ? 'visit_split' : 'stacked';
 
-const resolveKickoffNotionGuideline = (campaign) => {
+const resolveKickoffNotionGuideline = (campaign, user) => {
   if (isKwailnaraVisitLinkedCampaign(campaign)) {
     return {
       url: KWAILNARA_EUPHORIA_NOTION_GUIDELINE_URL,
       title: '콘텐츠 가이드라인 (Notion)',
       description:
         'KWAILNARA x Euphoria Fest 2026 캠페인용 가이드를 Notion에서 확인해 주세요.',
+    };
+  }
+  if (isFarmskinSuperGlowWrappingMaskVisitCampaign(campaign, user)) {
+    return {
+      url: FARMSKIN_SUPER_GLOW_WRAPPING_MASK_VISIT_NOTION_URL,
+      title: '콘텐츠 가이드라인 (Notion)',
+      description:
+        'Farmskin SUPER GLOW COLLAGEN WRAPPING MASK (Visit) 캠페인용 가이드를 Notion에서 확인해 주세요.',
     };
   }
   if (isTroublessPdrnSunscreenCampaign(campaign)) {
@@ -3542,7 +3571,7 @@ const KickoffView = ({ campaign, user, isAdminUser = false, onCampaignScheduleUp
     ? mergeVisitSchedule(computedSchedule, campaign)
     : mergeCampaignSchedule(computedSchedule, campaign);
   const guidelineStatus = fd.guidelineStatus || 'pending';
-  const kickoffNotionGuide = resolveKickoffNotionGuideline(campaign);
+  const kickoffNotionGuide = resolveKickoffNotionGuideline(campaign, user);
 
   return (
     <div className="space-y-10 animate-fade-in-up">
