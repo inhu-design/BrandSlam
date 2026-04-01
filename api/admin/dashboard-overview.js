@@ -42,8 +42,11 @@ const isKwailnaraVisitLinkedCampaign = (campaign) => {
   return hay.includes('kwailnara') || customerEmail === WELCOS_MKT_EMAIL;
 };
 
-const resolveLinkedDeliveryListSlug = (campaign) => {
+const resolveLinkedDeliveryListSlug = (campaign, settingsByCampaignId = null) => {
   if (!campaign?.id) return null;
+  const runtime = settingsByCampaignId?.[campaign.id];
+  const runtimeSlug = String(runtime?.linked_list_slug || '').trim();
+  if (runtimeSlug) return runtimeSlug;
   const campaignEmail = String(campaign?.customer_email || '').toLowerCase().trim();
   const isHeatherOwner = campaignEmail === HEATHER_FARMSKIN_EMAIL;
   if (isKwailnaraVisitLinkedCampaign(campaign)) return LINKED_LIST_SLUG_WELCOS_MX;
@@ -85,6 +88,15 @@ const pickSetupSummary = (row) => {
   };
 };
 
+const pickRuntimeSettings = (row) => ({
+  linked_list_slug: row?.linked_list_slug || null,
+  notion_guideline_url: row?.notion_guideline_url || null,
+  notion_guideline_title: row?.notion_guideline_title || null,
+  notion_guideline_description: row?.notion_guideline_description || null,
+  force_drop_complete_message: !!row?.force_drop_complete_message,
+  updated_at: row?.updated_at || null,
+});
+
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
@@ -113,7 +125,30 @@ export default async function handler(req, res) {
       .order('created_at', { ascending: false });
     if (campaignsError) return res.status(500).json({ error: campaignsError.message || 'Failed to load campaigns' });
 
-    const linkedSlugs = [...new Set((campaigns || []).map((c) => resolveLinkedDeliveryListSlug(c)).filter(Boolean))];
+    const campaignIds = (campaigns || []).map((c) => c.id).filter(Boolean);
+    const settingsByCampaignId = {};
+    if (campaignIds.length > 0) {
+      const { data: runtimeRows, error: runtimeError } = await supabaseAdmin
+        .from('campaign_admin_settings')
+        .select(
+          'campaign_id, linked_list_slug, notion_guideline_url, notion_guideline_title, notion_guideline_description, force_drop_complete_message, updated_at',
+        )
+        .in('campaign_id', campaignIds);
+      if (runtimeError) {
+        const msg = String(runtimeError.message || '').toLowerCase();
+        const tableMissing = msg.includes('campaign_admin_settings') && (msg.includes('does not exist') || msg.includes('relation'));
+        if (!tableMissing) {
+          return res.status(500).json({ error: runtimeError.message || 'Failed to load campaign runtime settings' });
+        }
+      } else {
+        for (const row of runtimeRows || []) {
+          if (!row?.campaign_id) continue;
+          settingsByCampaignId[row.campaign_id] = pickRuntimeSettings(row);
+        }
+      }
+    }
+
+    const linkedSlugs = [...new Set((campaigns || []).map((c) => resolveLinkedDeliveryListSlug(c, settingsByCampaignId)).filter(Boolean))];
     const creatorsBySlug = {};
     if (linkedSlugs.length > 0) {
       const { data: creators, error: creatorsError } = await supabaseAdmin
@@ -144,7 +179,6 @@ export default async function handler(req, res) {
       }
     }
 
-    const campaignIds = (campaigns || []).map((c) => c.id).filter(Boolean);
     const setupByCampaignId = {};
     if (campaignIds.length > 0) {
       const { data: setupRows, error: setupError } = await supabaseAdmin
@@ -168,6 +202,7 @@ export default async function handler(req, res) {
       creators_by_slug: creatorsBySlug,
       order_summary_by_number: orderSummaryByNumber,
       setup_by_campaign_id: setupByCampaignId,
+      settings_by_campaign_id: settingsByCampaignId,
     });
   } catch (err) {
     console.error('[dashboard-overview]', err);

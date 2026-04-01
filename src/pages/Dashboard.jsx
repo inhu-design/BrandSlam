@@ -231,12 +231,17 @@ const isKwailnaraVisitLinkedCampaign = (campaign) => {
 const KWAILNARA_EUPHORIA_NOTION_GUIDELINE_URL =
   'https://spiral-playground-cff.notion.site/KWAILNARA-x-Euphoria-Fest-2026-330259eb524880c08554c4af31fcbaa0';
 
+const getCampaignRuntimeSettings = (campaign) => campaign?.admin_runtime_settings || null;
+
 /**
  * 납품 리스트 Supabase list_slug (고객·캠페인별).
  * 우선순위: VITE_LINKED_DELIVERY_CAMPAIGN_ID + VITE_LINKED_DELIVERY_LIST_SLUG → 이메일·캠페인 규칙
  */
 const resolveLinkedDeliveryListSlug = (campaign, user) => {
   if (!campaign?.id) return null;
+  const runtime = getCampaignRuntimeSettings(campaign);
+  const runtimeSlug = String(runtime?.linked_list_slug || '').trim();
+  if (runtimeSlug) return runtimeSlug;
   const envId = (import.meta.env.VITE_LINKED_DELIVERY_CAMPAIGN_ID || '').trim();
   const envSlug = (import.meta.env.VITE_LINKED_DELIVERY_LIST_SLUG || LINKED_LIST_SLUG_FARMSKIN).trim();
   if (envId && String(campaign.id) === envId) return envSlug;
@@ -266,6 +271,8 @@ const resolveLinkedDeliveryListSlug = (campaign, user) => {
 
 const campaignMatchesLinkedDeliveryList = (campaign, user) => resolveLinkedDeliveryListSlug(campaign, user) != null;
 const isHeatherFarmskinScale50Campaign = (campaign, user) => {
+  const runtime = getCampaignRuntimeSettings(campaign);
+  if (runtime?.force_drop_complete_message) return true;
   const authEmail = (user?.email || '').toLowerCase().trim();
   if (authEmail !== HEATHER_FARMSKIN_EMAIL) return false;
   const slug = resolveLinkedDeliveryListSlug(campaign, user);
@@ -279,6 +286,17 @@ const linkedDeliveryTableLayout = (campaign, user) =>
   resolveLinkedDeliveryListSlug(campaign, user) === LINKED_LIST_SLUG_WELCOS_MX ? 'visit_split' : 'stacked';
 
 const resolveKickoffNotionGuideline = (campaign, user) => {
+  const runtime = getCampaignRuntimeSettings(campaign);
+  const runtimeUrl = String(runtime?.notion_guideline_url || '').trim();
+  if (runtimeUrl) {
+    return {
+      url: runtimeUrl,
+      title: runtime?.notion_guideline_title || '콘텐츠 가이드라인 (Notion)',
+      description:
+        runtime?.notion_guideline_description ||
+        '관리자 설정에서 연결한 캠페인별 가이드라인입니다.',
+    };
+  }
   if (isKwailnaraVisitLinkedCampaign(campaign)) {
     return {
       url: KWAILNARA_EUPHORIA_NOTION_GUIDELINE_URL,
@@ -3526,6 +3544,134 @@ const AdminCampaignQuickEditor = ({ campaign, onSaved }) => {
   );
 };
 
+const AdminCampaignRuntimeSettingsEditor = ({ campaign, onSaved }) => {
+  const [fields, setFields] = useState({
+    linked_list_slug: '',
+    notion_guideline_url: '',
+    notion_guideline_title: '',
+    notion_guideline_description: '',
+    force_drop_complete_message: false,
+  });
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    if (!campaign?.id) return;
+    const runtime = campaign.admin_runtime_settings || {};
+    setFields({
+      linked_list_slug: runtime.linked_list_slug || '',
+      notion_guideline_url: runtime.notion_guideline_url || '',
+      notion_guideline_title: runtime.notion_guideline_title || '',
+      notion_guideline_description: runtime.notion_guideline_description || '',
+      force_drop_complete_message: !!runtime.force_drop_complete_message,
+    });
+    setMsg('');
+  }, [campaign]);
+
+  if (!campaign?.id) return null;
+  const setField = (k, v) => setFields((prev) => ({ ...prev, [k]: v }));
+
+  const handleSave = async () => {
+    setSaving(true);
+    setMsg('');
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) {
+        setMsg('로그인 세션이 없어 저장할 수 없습니다.');
+        return;
+      }
+      const payload = {
+        campaign_id: campaign.id,
+        linked_list_slug: fields.linked_list_slug || null,
+        notion_guideline_url: fields.notion_guideline_url || null,
+        notion_guideline_title: fields.notion_guideline_title || null,
+        notion_guideline_description: fields.notion_guideline_description || null,
+        force_drop_complete_message: !!fields.force_drop_complete_message,
+      };
+      const res = await fetch(`${window.location.origin}/api/admin/campaign-runtime-settings`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMsg(data?.error || '런타임 설정 저장에 실패했습니다.');
+        return;
+      }
+      onSaved?.(campaign.id, data.settings || null);
+      setMsg('저장 완료: 즉시 대시보드에 반영됩니다.');
+    } catch (e) {
+      setMsg(`저장 실패: ${e?.message || e}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="mb-10 p-6 bg-white/[0.03] border border-emerald-500/20 rounded-2xl">
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <h3 className="text-sm font-black tracking-widest uppercase text-emerald-300">관리자 전용 · 런타임 설정</h3>
+        <span className="text-[10px] text-slate-500 font-mono">{campaign.order_number || campaign.id}</span>
+      </div>
+      <div className="grid grid-cols-1 gap-3">
+        <input
+          value={fields.linked_list_slug}
+          onChange={(e) => setField('linked_list_slug', e.target.value)}
+          placeholder="납품 list_slug (예: BS-US-FARMSKIN)"
+          className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white"
+        />
+        <input
+          value={fields.notion_guideline_url}
+          onChange={(e) => setField('notion_guideline_url', e.target.value)}
+          placeholder="콘텐츠 가이드라인 URL (https://...)"
+          className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white"
+        />
+        <input
+          value={fields.notion_guideline_title}
+          onChange={(e) => setField('notion_guideline_title', e.target.value)}
+          placeholder="가이드라인 제목 (선택)"
+          className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white"
+        />
+        <textarea
+          value={fields.notion_guideline_description}
+          onChange={(e) => setField('notion_guideline_description', e.target.value)}
+          placeholder="가이드라인 설명 (선택)"
+          rows={3}
+          className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white"
+        />
+        <label className="flex items-center gap-3 text-sm text-slate-300">
+          <input
+            type="checkbox"
+            checked={fields.force_drop_complete_message}
+            onChange={(e) => setField('force_drop_complete_message', e.target.checked)}
+            className="w-4 h-4 rounded border-white/10 bg-white/5 text-emerald-500"
+          />
+          이 캠페인을 "드랍 완료 · 최종 리스트 확정" 상태로 고정
+        </label>
+      </div>
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <p className={`text-xs ${msg.includes('실패') ? 'text-red-400' : 'text-slate-400'}`}>
+          {msg || '코드를 재배포하지 않고 캠페인별 동작/링크를 즉시 바꿀 수 있습니다.'}
+        </p>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+          className="px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest bg-emerald-600 hover:bg-emerald-500 border border-emerald-400/40 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {saving ? '저장 중...' : '런타임 설정 저장'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const KickoffView = ({ campaign, user, isAdminUser = false, onCampaignScheduleUpdated }) => {
   const navigate = useNavigate();
   const [submission, setSubmission] = useState(null);
@@ -4014,6 +4160,7 @@ export default function Dashboard() {
         let linkedCreatorsRawBySlug = {};
         let orderSummaryByNumber = {};
         let setupByCampaignId = {};
+        let settingsByCampaignId = {};
         let loadedFromAdminApi = false;
 
         if (isAdminUser) {
@@ -4031,6 +4178,7 @@ export default function Dashboard() {
                 linkedCreatorsRawBySlug = adminData?.creators_by_slug || {};
                 orderSummaryByNumber = adminData?.order_summary_by_number || {};
                 setupByCampaignId = adminData?.setup_by_campaign_id || {};
+                settingsByCampaignId = adminData?.settings_by_campaign_id || {};
                 loadedFromAdminApi = true;
               } else {
                 const errText = await res.text();
@@ -4052,7 +4200,33 @@ export default function Dashboard() {
           }
           const { data } = await campaignQuery;
           campaignList = data || [];
+          const campaignIds = campaignList.map((c) => c.id).filter(Boolean);
+          if (campaignIds.length > 0) {
+            const { data: runtimeRows } = await supabase
+              .from('campaign_admin_settings')
+              .select(
+                'campaign_id, linked_list_slug, notion_guideline_url, notion_guideline_title, notion_guideline_description, force_drop_complete_message, updated_at',
+              )
+              .in('campaign_id', campaignIds);
+            settingsByCampaignId = Object.fromEntries(
+              (runtimeRows || [])
+                .filter((r) => r?.campaign_id)
+                .map((r) => [
+                  r.campaign_id,
+                  {
+                    linked_list_slug: r.linked_list_slug || null,
+                    notion_guideline_url: r.notion_guideline_url || null,
+                    notion_guideline_title: r.notion_guideline_title || null,
+                    notion_guideline_description: r.notion_guideline_description || null,
+                    force_drop_complete_message: !!r.force_drop_complete_message,
+                    updated_at: r.updated_at || null,
+                  },
+                ]),
+            );
+          }
         }
+
+        campaignList = campaignList.map((c) => ({ ...c, admin_runtime_settings: settingsByCampaignId[c.id] || null }));
 
         const linkedCampaignRows = campaignList.filter((c) => campaignMatchesLinkedDeliveryList(c, user));
         const linkedSlugs = [...new Set(linkedCampaignRows.map((c) => resolveLinkedDeliveryListSlug(c, user)).filter(Boolean))];
@@ -4131,6 +4305,12 @@ export default function Dashboard() {
     if (!campaignId || !patch) return;
     setCampaigns((prev) =>
       prev.map((c) => (c.id === campaignId ? { ...c, ...patch } : c)),
+    );
+  };
+  const handleAdminRuntimeSettingsUpdated = (campaignId, settings) => {
+    if (!campaignId) return;
+    setCampaigns((prev) =>
+      prev.map((c) => (c.id === campaignId ? { ...c, admin_runtime_settings: settings || null } : c)),
     );
   };
 
@@ -4727,6 +4907,12 @@ export default function Dashboard() {
             <AdminCampaignQuickEditor
                 campaign={selectedCampaign}
                 onSaved={handleAdminCampaignUpdated}
+            />
+        )}
+        {isAdminUser && (
+            <AdminCampaignRuntimeSettingsEditor
+                campaign={selectedCampaign}
+                onSaved={handleAdminRuntimeSettingsUpdated}
             />
         )}
 
