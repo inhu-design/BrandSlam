@@ -549,9 +549,10 @@ export default function Checkout() {
 
   const allAgreed = agree.terms && agree.refund && agree.privacy;
 
+  const isSameAsLoggedInEmail = String(user?.email || '').toLowerCase().trim() === String(form.email || '').toLowerCase().trim();
   const passwordValid = isSettingPassword
     ? form.password.length >= 8 && form.password === form.passwordConfirm
-    : form.password.length >= 8;
+    : (isSameAsLoggedInEmail ? true : form.password.length >= 8);
 
   const step1Valid = form.email && passwordValid && form.name && form.phone && form.company;
 
@@ -884,6 +885,11 @@ export default function Checkout() {
   const handleStep1Next = async () => {
     if (!step1Valid) return;
     if (isSettingPassword) {
+      goNext();
+      return;
+    }
+    if (isSameAsLoggedInEmail) {
+      // 이미 로그인된 동일 계정이면 재로그인 검증을 생략한다.
       goNext();
       return;
     }
