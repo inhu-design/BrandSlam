@@ -1,6 +1,6 @@
 /**
  * 개인 맞춤 결제 오퍼 (The Frameless / suyoungkim@theframeless.co)
- * — Checkout·Dashboard에서 공통 사용. 금액 변경 시 서버(api/lib/custom-offers.js)와 반드시 동기화.
+ * — Checkout·Dashboard에서 공통 사용. 금액 변경 시 서버(server/lib/custom-offers.js)와 반드시 동기화.
  */
 export const CUSTOM_OFFER_FRAMELESS_ID = 'frameless-suyoungkim';
 export const CUSTOM_OFFER_FRAMELESS_EMAIL = 'suyoungkim@theframeless.co';

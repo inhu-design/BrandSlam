@@ -529,6 +529,33 @@ export default function Checkout() {
     };
   }, []);
 
+  /** 세션 복구 전 첫 렌더에서 user가 없으면 form 초기 이메일이 ''로 고정되는 문제 보정 */
+  useEffect(() => {
+    if (!user?.email) return;
+    setForm((prev) => {
+      const meta = user.user_metadata || {};
+      const updates = {};
+      if (!String(prev.email || '').trim()) updates.email = user.email;
+      if (!String(prev.name || '').trim() && meta.name) updates.name = meta.name;
+      if (!String(prev.phone || '').trim() && meta.phone) updates.phone = meta.phone;
+      if (!String(prev.company || '').trim() && meta.company) updates.company = meta.company;
+      if (Object.keys(updates).length === 0) return prev;
+      return { ...prev, ...updates };
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- user_metadata 객체 대신 name/phone/company만 추적
+  }, [
+    user?.id,
+    user?.email,
+    user?.user_metadata?.name,
+    user?.user_metadata?.phone,
+    user?.user_metadata?.company,
+  ]);
+
+  /** user가 늦게 채워질 때 password_set 반영 (초기 isSettingPassword 오판 방지) */
+  useEffect(() => {
+    if (user?.user_metadata?.password_set === true) setIsSettingPassword(false);
+  }, [user?.user_metadata?.password_set]);
+
   if (authLoading || !user) {
     return (
       <div className="font-sans antialiased text-white bg-[#020617] min-h-screen flex items-center justify-center">
@@ -894,16 +921,22 @@ export default function Checkout() {
       return;
     }
     setVerifyingPassword(true);
-    const { error } = await supabase.auth.signInWithPassword({
-      email: form.email.trim(),
-      password: form.password,
-    });
-    setVerifyingPassword(false);
-    if (error) {
-      alert('비밀번호가 일치하지 않습니다. 다시 입력해 주세요.');
-      return;
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: form.email.trim(),
+        password: form.password,
+      });
+      if (error) {
+        alert('비밀번호가 일치하지 않습니다. 다시 입력해 주세요.');
+        return;
+      }
+      goNext();
+    } catch (e) {
+      console.error(e);
+      alert('비밀번호 확인 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setVerifyingPassword(false);
     }
-    goNext();
   };
 
   const goPrev = () => setCurrentStep((s) => {
@@ -1141,6 +1174,7 @@ export default function Checkout() {
                 <Input label="회사명" required placeholder="주식회사 브랜드슬램" value={form.company} onChange={set('company')} />
 
                 <button
+                  type="button"
                   onClick={handleStep1Next}
                   disabled={!step1Valid || verifyingPassword}
                   className={`w-full py-4 rounded-2xl font-bold text-lg transition-all mt-4 flex items-center justify-center gap-2 ${

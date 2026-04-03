@@ -5,9 +5,9 @@
  * - 주문 이메일과 로그인 사용자 이메일 일치 시 orders만 paid로 갱신 (campaigns는 PAYMENT_PENDING 유지 → 송장·캠페인 세팅 후 착수)
  */
 import { createClient } from '@supabase/supabase-js';
-import { supabase as supabaseAdmin } from '../lib/supabase-server.js';
-import { buildCampaignRowsFromOrderItems } from '../lib/build-campaign-rows-from-order-items.js';
-import { assertFramelessBankPayload } from '../lib/custom-offers.js';
+import { supabase as supabaseAdmin } from '../../server/lib/supabase-server.js';
+import { buildCampaignRowsFromOrderItems } from '../../server/lib/build-campaign-rows-from-order-items.js';
+import { assertFramelessBankPayload } from '../../server/lib/custom-offers.js';
 
 const supabaseUrl = process.env.SUPABASE_URL || 'https://grlayjybcxrcaufnwysb.supabase.co';
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdybGF5anliY3hyY2F1Zm53eXNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUzNDM4NzksImV4cCI6MjA4MDkxOTg3OX0.Voj60xKccEl2_r8EzLVO-fot5WiEiUHb6UTfya2ql8Q';

@@ -6,7 +6,7 @@
  * - ADMIN_EMAILS 환경변수에 등록된 이메일만 호출 가능
  */
 import { createClient } from '@supabase/supabase-js';
-import { supabase as supabaseAdmin } from '../lib/supabase-server.js';
+import { supabase as supabaseAdmin } from '../../server/lib/supabase-server.js';
 
 const supabaseUrl = process.env.SUPABASE_URL || 'https://grlayjybcxrcaufnwysb.supabase.co';
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;

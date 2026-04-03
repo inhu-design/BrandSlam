@@ -1,5 +1,5 @@
 /**
- * order_items → campaigns INSERT용 행 배열
+ * order_items -> campaigns INSERT용 행 배열
  * - Visit(is_visit): 동일 주문 안의 모든 Visit 라인을 수량·금액 합산해 캠페인 1행
  * - 그 외 플랜: 기존처럼 qty만큼 캠페인 행 분할
  */
