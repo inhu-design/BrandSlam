@@ -15,6 +15,7 @@ import testInfluencers from '../data/test-influencers.json';
 import {
   CUSTOM_OFFER_FRAMELESS_EMAIL,
   CUSTOM_OFFER_FRAMELESS_ID,
+  FRAMELESS_OFFER_PRICING,
   getFramelessOfferTotals,
 } from '../lib/customOffers';
 
@@ -270,7 +271,7 @@ const resolveLinkedDeliveryListSlug = (campaign, user) => {
 };
 
 const campaignMatchesLinkedDeliveryList = (campaign, user) => resolveLinkedDeliveryListSlug(campaign, user) != null;
-const isHeatherFarmskinScale50Campaign = (campaign, user) => {
+const isHeatherFarmskinScale50Campaign = (campaign) => {
   const runtime = getCampaignRuntimeSettings(campaign);
   // 드랍 강제 종료 여부는 캠페인별 런타임 설정으로만 제어합니다.
   return !!runtime?.force_drop_complete_message;
@@ -4553,11 +4554,11 @@ export default function Dashboard() {
                 <p className="text-[10px] font-black tracking-[0.25em] uppercase text-emerald-400/90 mb-2">개인 맞춤 결제</p>
                 <h2 className="text-xl md:text-2xl font-black text-white mb-2">The Frameless 맞춤 견적</h2>
                 <p className="text-sm text-slate-400 leading-relaxed max-w-xl">
-                  시딩 35,000원 × 200건 · 방문형 시딩 240,000원 × 10건 (공급가, 부가세 별도). 아래 금액은 부가세 포함 총액입니다.
+                  시딩 35,000원 × {FRAMELESS_OFFER_PRICING.seedingQty}건 · 방문형 시딩 240,000원 × {FRAMELESS_OFFER_PRICING.visitQty}건 (공급가, 부가세 별도). 아래 금액은 부가세 포함 총액입니다.
                 </p>
                 <ul className="mt-4 space-y-2 text-sm text-slate-300">
-                  <li className="flex justify-between gap-4 max-w-md"><span>시딩(건당) × 200건 · 공급가</span><span className="font-mono text-white">{(35000 * 200).toLocaleString()}원</span></li>
-                  <li className="flex justify-between gap-4 max-w-md"><span>방문형 시딩(건당) × 10건 · 공급가</span><span className="font-mono text-white">{(240000 * 10).toLocaleString()}원</span></li>
+                  <li className="flex justify-between gap-4 max-w-md"><span>시딩(건당) × {FRAMELESS_OFFER_PRICING.seedingQty}건 · 공급가</span><span className="font-mono text-white">{(FRAMELESS_OFFER_PRICING.seedingUnitPrice * FRAMELESS_OFFER_PRICING.seedingQty).toLocaleString()}원</span></li>
+                  <li className="flex justify-between gap-4 max-w-md"><span>방문형 시딩(건당) × {FRAMELESS_OFFER_PRICING.visitQty}건 · 공급가</span><span className="font-mono text-white">{(FRAMELESS_OFFER_PRICING.visitUnitPrice * FRAMELESS_OFFER_PRICING.visitQty).toLocaleString()}원</span></li>
                   <li className="flex justify-between gap-4 max-w-md border-t border-white/10 pt-2 mt-2"><span className="text-emerald-200/90">부가세(10%)</span><span className="font-mono text-emerald-200">{getFramelessOfferTotals().vat.toLocaleString()}원</span></li>
                   <li className="flex justify-between gap-4 max-w-md text-lg font-black text-white"><span>결제 예정(VAT 포함)</span><span className="text-emerald-400">{getFramelessOfferTotals().total.toLocaleString()}원</span></li>
                 </ul>

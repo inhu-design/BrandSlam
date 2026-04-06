@@ -5,9 +5,19 @@
 export const CUSTOM_OFFER_FRAMELESS_ID = 'frameless-suyoungkim';
 export const CUSTOM_OFFER_FRAMELESS_EMAIL = 'suyoungkim@theframeless.co';
 
+const FRAMELESS_OFFER_PRICING = {
+  seedingUnitPrice: 35000,
+  seedingQty: 300,
+  visitUnitPrice: 240000,
+  visitQty: 10,
+  vatRate: 0.1,
+};
+
 export function getFramelessOfferExpectedTotal() {
-  const supply = 35000 * 200 + 240000 * 10;
-  const vat = Math.round(supply * 0.1);
+  const supply =
+    FRAMELESS_OFFER_PRICING.seedingUnitPrice * FRAMELESS_OFFER_PRICING.seedingQty
+    + FRAMELESS_OFFER_PRICING.visitUnitPrice * FRAMELESS_OFFER_PRICING.visitQty;
+  const vat = Math.round(supply * FRAMELESS_OFFER_PRICING.vatRate);
   return supply + vat;
 }
 

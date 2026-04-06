@@ -13,6 +13,7 @@ import {
   CUSTOM_OFFER_FRAMELESS_ID,
   CUSTOM_OFFER_FRAMELESS_EMAIL,
   getFramelessOfferCart,
+  getFramelessOfferContentCount,
   getFramelessOrderItemsForDraft,
   isFramelessOfferForUser,
 } from '../lib/customOffers';
@@ -727,7 +728,6 @@ export default function Checkout() {
       order_number: orderNum,
       plan_name: planSummary,
       plan_price: totalPrice,
-      content_count: isCustomOfferActive ? 210 : totalContentCount,
       email: form.email,
       name: form.name,
       phone: form.phone,
@@ -736,6 +736,7 @@ export default function Checkout() {
       client_address: clientForm.address || null,
       client_biz_reg_no: clientForm.bizRegNo || null,
       order_items: orderItems,
+      content_count: isCustomOfferActive ? getFramelessOfferContentCount() : totalContentCount,
       ...(isCustomOfferActive ? { custom_offer_id: CUSTOM_OFFER_FRAMELESS_ID } : {}),
     };
 
@@ -880,7 +881,6 @@ export default function Checkout() {
       order_number: orderNum,
       plan_name: planSummary,
       plan_price: totalPrice,
-      content_count: isCustomOfferActive ? 210 : totalContentCount,
       email: form.email,
       name: form.name,
       phone: form.phone,
@@ -889,6 +889,7 @@ export default function Checkout() {
       client_address: clientForm.address || null,
       client_biz_reg_no: clientForm.bizRegNo || null,
       order_items: orderItems,
+      content_count: isCustomOfferActive ? getFramelessOfferContentCount() : totalContentCount,
       ...(isCustomOfferActive ? { custom_offer_id: CUSTOM_OFFER_FRAMELESS_ID } : {}),
     };
 
