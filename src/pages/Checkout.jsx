@@ -17,6 +17,39 @@ import {
   isFramelessOfferForUser,
 } from '../lib/customOffers';
 
+const CHECKOUT_RESUME_KEY = 'checkout_resume_state_v1';
+
+const readCheckoutResume = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.sessionStorage.getItem(CHECKOUT_RESUME_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const writeCheckoutResume = (data) => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.setItem(CHECKOUT_RESUME_KEY, JSON.stringify(data));
+  } catch {
+    // ignore session storage failures
+  }
+};
+
+const clearCheckoutResume = () => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.removeItem(CHECKOUT_RESUME_KEY);
+  } catch {
+    // ignore session storage failures
+  }
+};
+
 const PLANS = {
   Starter: { id: 'Starter', name: 'Starter', price: '590,000', priceNum: 590000, count: 10, desc: '콘텐츠 10개 보장' },
   Growth: { id: 'Growth', name: 'Growth', price: '990,000', priceNum: 990000, count: 20, desc: '콘텐츠 20개 보장', isBest: true },
@@ -382,6 +415,7 @@ export default function Checkout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+  const initialResume = useMemo(() => readCheckoutResume(), []);
 
   /** 로그인 복귀 시 { checkoutState: { customOfferId } } 형태로 올 수 있음 */
   const effectiveCheckoutState = useMemo(() => {
@@ -397,6 +431,9 @@ export default function Checkout() {
   const [cart, setCart] = useState(() => {
     if (initialPlanId && PLANS[initialPlanId]) {
       return [{ planId: initialPlanId, qty: 1 }];
+    }
+    if (Array.isArray(initialResume?.cart) && initialResume.cart.length > 0) {
+      return initialResume.cart;
     }
     return [];
   });
@@ -438,12 +475,23 @@ export default function Checkout() {
       ? { name: lineItems.map((li) => `${li.plan.name} x ${li.qty}`).join(', '), count: lineItems.reduce((s, li) => s + li.count, 0), priceNum: supplyPrice, price: supplyPrice.toLocaleString(), isMulti: true }
       : null;
 
-  const [currentStep, setCurrentStep] = useState(0);
+  const [currentStep, setCurrentStep] = useState(() => {
+    const step = Number(initialResume?.currentStep);
+    if (Number.isInteger(step) && step >= 0 && step <= 5) return step;
+    return 0;
+  });
   const [submitting, setSubmitting] = useState(false);
+  const resumedCustomOfferId = initialResume?.customOfferId;
 
   const isCustomOfferActive = useMemo(
-    () => isFramelessOfferForUser(effectiveCheckoutState, user?.email),
-    [effectiveCheckoutState, user?.email],
+    () => (
+      isFramelessOfferForUser(effectiveCheckoutState, user?.email)
+      || (
+        resumedCustomOfferId === CUSTOM_OFFER_FRAMELESS_ID
+        && String(user?.email || '').toLowerCase().trim() === CUSTOM_OFFER_FRAMELESS_EMAIL
+      )
+    ),
+    [effectiveCheckoutState, user?.email, resumedCustomOfferId],
   );
 
   useLayoutEffect(() => {
@@ -462,23 +510,33 @@ export default function Checkout() {
   const [isSettingPassword, setIsSettingPassword] = useState(!hasExistingPassword);
 
   const [form, setForm] = useState({
-    email: user?.email || '', password: '', passwordConfirm: '',
-    name: '', phone: '', company: '',
+    email: initialResume?.form?.email || user?.email || '', password: '', passwordConfirm: '',
+    name: initialResume?.form?.name || '',
+    phone: initialResume?.form?.phone || '',
+    company: initialResume?.form?.company || '',
   });
   // 인보이스용 공급받는 자 정보 (결제 전 인보이스 확인 단계에서 입력)
   const [clientForm, setClientForm] = useState({
-    companyName: '', address: '', bizRegNo: '',
+    companyName: initialResume?.clientForm?.companyName || '',
+    address: initialResume?.clientForm?.address || '',
+    bizRegNo: initialResume?.clientForm?.bizRegNo || '',
   });
 
-  const [agree, setAgree] = useState({ terms: false, refund: false, privacy: false });
+  const [agree, setAgree] = useState({
+    terms: !!initialResume?.agree?.terms,
+    refund: !!initialResume?.agree?.refund,
+    privacy: !!initialResume?.agree?.privacy,
+  });
   const [orderNumber, setOrderNumber] = useState('');
   const [legalModal, setLegalModal] = useState(null);
-  const [paymentMethod, setPaymentMethod] = useState('bank'); // 'bank' | 'card'
+  const [paymentMethod, setPaymentMethod] = useState(initialResume?.paymentMethod === 'card' ? 'card' : 'bank'); // 'bank' | 'card'
   const [bankOrderNumber, setBankOrderNumber] = useState(null); // 계좌이체: 입금 안내용 주문번호 (DB 미생성)
   const [bankOrderPayload, setBankOrderPayload] = useState(null); // 입금 확인 시 서버에 전달할 주문 본문
   const [verifyingPassword, setVerifyingPassword] = useState(false);
   const paymentInProgressRef = useRef(false);
   const invoicePreviewRef = useRef(null);
+  const payWindowRef = useRef(null);
+  const payWindowMonitorRef = useRef(null);
 
   const restorePageScroll = () => {
     document.body.style.overflow = '';
@@ -498,9 +556,36 @@ export default function Checkout() {
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'smooth' }); }, [currentStep]);
 
   useEffect(() => {
+    if (!user?.email) return;
+    writeCheckoutResume({
+      ownerEmail: String(user.email).toLowerCase().trim(),
+      currentStep,
+      paymentMethod,
+      customOfferId: isCustomOfferActive ? CUSTOM_OFFER_FRAMELESS_ID : null,
+      cart,
+      form: {
+        email: form.email,
+        name: form.name,
+        phone: form.phone,
+        company: form.company,
+      },
+      clientForm,
+      agree,
+    });
+  }, [user?.email, currentStep, paymentMethod, isCustomOfferActive, cart, form.email, form.name, form.phone, form.company, clientForm, agree]);
+
+  useEffect(() => {
     const onMessage = (e) => {
       if (e.data?.type === 'INICIS_PAYMENT_SUCCESS' && e.data?.order_number) {
+        paymentInProgressRef.current = false;
+        setSubmitting(false);
         restorePageScroll();
+        if (payWindowMonitorRef.current) {
+          window.clearInterval(payWindowMonitorRef.current);
+          payWindowMonitorRef.current = null;
+        }
+        payWindowRef.current = null;
+        clearCheckoutResume();
         setOrderNumber(e.data.order_number);
         setCurrentStep(5);
       }
@@ -511,6 +596,10 @@ export default function Checkout() {
 
   useEffect(() => {
     return () => {
+      if (payWindowMonitorRef.current) {
+        window.clearInterval(payWindowMonitorRef.current);
+        payWindowMonitorRef.current = null;
+      }
       restorePageScroll();
     };
   }, []);
@@ -719,8 +808,30 @@ export default function Checkout() {
 
       const openInicisPay = () => {
         window.INIStdPay.pay(formId);
-        paymentInProgressRef.current = false;
+        payWindowRef.current = payWindow;
+        if (payWindowMonitorRef.current) {
+          window.clearInterval(payWindowMonitorRef.current);
+        }
+        payWindowMonitorRef.current = window.setInterval(() => {
+          const w = payWindowRef.current;
+          if (!w) return;
+          if (w.closed) {
+            window.clearInterval(payWindowMonitorRef.current);
+            payWindowMonitorRef.current = null;
+            payWindowRef.current = null;
+            paymentInProgressRef.current = false;
+            setSubmitting(false);
+            restorePageScroll();
+            setCurrentStep((s) => (s === 5 ? 5 : Math.max(s, 4)));
+          }
+        }, 400);
         setSubmitting(false);
+        window.setTimeout(() => {
+          if (!payWindowRef.current) {
+            paymentInProgressRef.current = false;
+            restorePageScroll();
+          }
+        }, 1200);
         setTimeout(() => { window.open = originalOpen; }, 5000);
       };
 

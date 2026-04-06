@@ -272,13 +272,8 @@ const resolveLinkedDeliveryListSlug = (campaign, user) => {
 const campaignMatchesLinkedDeliveryList = (campaign, user) => resolveLinkedDeliveryListSlug(campaign, user) != null;
 const isHeatherFarmskinScale50Campaign = (campaign, user) => {
   const runtime = getCampaignRuntimeSettings(campaign);
-  if (runtime?.force_drop_complete_message) return true;
-  const authEmail = (user?.email || '').toLowerCase().trim();
-  if (authEmail !== HEATHER_FARMSKIN_EMAIL) return false;
-  const slug = resolveLinkedDeliveryListSlug(campaign, user);
-  if (slug !== LINKED_LIST_SLUG_FARMSKIN) return false;
-  const plan = String(campaign?.plan || '').toLowerCase();
-  return plan.includes('scale');
+  // 드랍 강제 종료 여부는 캠페인별 런타임 설정으로만 제어합니다.
+  return !!runtime?.force_drop_complete_message;
 };
 
 /** 납품 테이블 컬럼 레이아웃: 웰코스 MX는 틱톡/인스타/visit date 분리 컬럼 */
