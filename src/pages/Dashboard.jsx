@@ -325,6 +325,49 @@ const resolveDeliveryReference = (campaign) => {
   return { refType: 'campaign', refId: String(campaign.id) };
 };
 
+/** 납품 명단 이름 정규화 (공백·대소문자) */
+const normDeliveryListPersonName = (s) => {
+  if (s == null || s === '') return '';
+  return String(s).trim().replace(/\s+/g, ' ').toLowerCase();
+};
+
+/**
+ * Troubless GLASS GLOW+ PDRN COLLAGEN SUNSCREEN (BS-US-FARMSKIN) 최종 50명:
+ * 브랜드 드랍 3명 제거 후 교체 3명 반영. DB/JSON에 아직 옛 인원이 있어도 화면·CSV는 동일하게 맞춤.
+ */
+const TROUBLESS_PDRN_REMOVED_FROM_FINAL_DELIVERY = new Set([
+  'gabrielle diane comeau',
+  'holly curtis',
+  'stephanie padilla',
+]);
+
+const TROUBLESS_PDRN_REPLACEMENT_SPEC_RAW = [
+  {
+    name: 'Svitlana Zakharkiv',
+    shipping_country: 'US',
+    tiktok_url: 'https://www.tiktok.com/@svitlana_ugc?_r=1&_t=ZT-959mCApCEgP',
+    tiktok_follower: '3550',
+    instagram_url: 'https://www.instagram.com/svitlana_ugc?igsh=Y2xqMTlidXU1dHFq&utm_source=qr',
+    instagram_follower: '6484',
+  },
+  {
+    name: 'Aleksandra Martynova',
+    shipping_country: 'US',
+    tiktok_url: 'https://www.tiktok.com/@sasha_probuyer?_r=1&_t=ZP-959JcsZTIsw',
+    tiktok_follower: '1059',
+    instagram_url: 'https://www.instagram.com/sasha_probuyer?igsh=b2RlaXVmbTN2bGxx&utm_source=qr',
+    instagram_follower: '1333',
+  },
+  {
+    name: 'Anna Harrison',
+    shipping_country: 'US',
+    tiktok_url: 'https://www.tiktok.com/@alh_ugc?_r=1&_t=ZP-93AtErZ74Vr',
+    tiktok_follower: '11',
+    instagram_url: 'https://www.instagram.com/_annalharrison?igsh=eTFwYmcxNGk1dmkw&utm_source=qr',
+    instagram_follower: '2129',
+  },
+];
+
 /** admin_delivery_creators / JSON 행 → 표시용 (mergeSocialFieldsFromRecord 로 TT+IG 병합) */
 const toDisplayCreator = (r, idx) => {
   const m = mergeSocialFieldsFromRecord(r);
@@ -342,7 +385,25 @@ const toDisplayCreator = (r, idx) => {
     contact: '-',
     visit_date: m.visit_date || trimOrNull(r.visit_date) || null,
     _identifier: `${(m.name || r.name || '').trim()}`,
+    is_new_replacement: !!(r.is_new_replacement || r.is_replacement),
   };
+};
+
+const finalizeTroublessPdrnScale50DisplayCreators = (rows) => {
+  if (!Array.isArray(rows) || rows.length === 0) return rows;
+  const base = rows.filter(
+    (c) => !TROUBLESS_PDRN_REMOVED_FROM_FINAL_DELIVERY.has(normDeliveryListPersonName(c.name)),
+  );
+  const out = [...base];
+  for (const raw of TROUBLESS_PDRN_REPLACEMENT_SPEC_RAW) {
+    const key = normDeliveryListPersonName(raw.name);
+    const idx = out.findIndex((c) => normDeliveryListPersonName(c.name) === key);
+    const merged = mergeSocialFieldsFromRecord(raw);
+    const display = { ...toDisplayCreator(merged, idx >= 0 ? idx : out.length), is_new_replacement: true };
+    if (idx >= 0) out[idx] = display;
+    else out.push(display);
+  }
+  return out;
 };
 
 const testInfluencerToDisplayCreator = (c, idx) => toDisplayCreator(c, idx);
@@ -1297,6 +1358,23 @@ const CandidateList = ({
         // eslint-disable-next-line react-hooks/exhaustive-deps -- user.id·campaign.id만 의존 (객체 참조로 세션 재조회 방지)
     }, [user?.id, campaign?.id, isDeliveryTest, refType, refId]);
 
+    /** 명단에서 빠진 인원에 대한 드랍 체크는 DB에 남아 있어도 UI·카운트에서 제거 (Troubless PDRN 최종 교체 후) */
+    useEffect(() => {
+        if (!user || !campaign || !isDeliveryTest || !isTroublessPdrnSunscreenCampaign(campaign) || !dropsHydrated) return;
+        const validNames = new Set(
+            (candidates || []).map((c) => normDeliveryListPersonName(c._identifier || c.name)).filter(Boolean),
+        );
+        if (validNames.size === 0) return;
+        setDroppedIds((prev) => {
+            const next = new Set(
+                [...prev].filter((id) => validNames.has(normDeliveryListPersonName(normalizeDropIdentifier(id)))),
+            );
+            if (next.size === prev.size) return prev;
+            queueMicrotask(() => setSavedDroppedKey(serializeDroppedSet(next)));
+            return next;
+        });
+    }, [user, campaign, isDeliveryTest, dropsHydrated, candidates]);
+
     const [saving, setSaving] = useState(false);
     const [confirmingDrop, setConfirmingDrop] = useState(false);
     const [revertingAdminConfirm, setRevertingAdminConfirm] = useState(false);
@@ -1322,6 +1400,8 @@ const CandidateList = ({
     const dropNearDeadline = !dropWindowExpired && msUntilDropDeadline != null && msUntilDropDeadline > 0 && msUntilDropDeadline <= 24 * 60 * 60 * 1000;
     const dropConfirmed = !!dropConfirmedAt;
     const isHeatherFarmskinView = isHeatherFarmskinScale50Campaign(campaign, user);
+    const troublessReplacementUi =
+        isTroublessPdrnSunscreenCampaign(campaign) && (candidates || []).some((c) => c.is_new_replacement);
     const canDrop = !isHeatherFarmskinView && !dropConfirmed && !sessionLoading && (!sentAt || !dropWindowExpired);
 
     const handleDownloadCSV = () => {
@@ -1557,12 +1637,21 @@ const CandidateList = ({
     const deliveryTestTableColSpan = 5;
     const deliveryTestConfirmedColSpan = 4;
 
-    // 정렬: 이름 ABC순 | 팔로워 수
-    const [sortBy, setSortBy] = useState('name'); // 'name' | 'followers'
+    // 정렬: 이름 ABC순 | 팔로워 수 | 신규 교체 우선
+    const [sortBy, setSortBy] = useState('name'); // 'name' | 'followers' | 'new_first'
     const [sortOrder, setSortOrder] = useState('asc'); // 'asc' | 'desc'
     const sortedCandidates = useMemo(() => {
         const arr = [...allCandidates];
         arr.sort((a, b) => {
+            if (sortBy === 'new_first') {
+                const pa = a.is_new_replacement ? 0 : 1;
+                const pb = b.is_new_replacement ? 0 : 1;
+                if (pa !== pb) return pa - pb;
+                const na = (a.name || '').toLowerCase();
+                const nb = (b.name || '').toLowerCase();
+                const cmp = na.localeCompare(nb);
+                return sortOrder === 'asc' ? cmp : -cmp;
+            }
             if (sortBy === 'name') {
                 const na = (a.name || '').toLowerCase();
                 const nb = (b.name || '').toLowerCase();
@@ -1618,11 +1707,18 @@ const CandidateList = ({
 
     const renderDeliveryNameCell = (creator) => (
         <td className="px-8 py-6">
-            <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-black text-sm shadow-lg">
+            <div className="flex items-center gap-4 flex-wrap">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-black text-sm shadow-lg shrink-0">
                     {creator.name?.charAt(0) || '-'}
                 </div>
-                <p className="font-bold text-white text-base tracking-tight">{creator.name}</p>
+                <div className="flex flex-col gap-1.5 min-w-0">
+                    <p className="font-bold text-white text-base tracking-tight">{creator.name}</p>
+                    {creator.is_new_replacement ? (
+                        <span className="inline-flex w-fit items-center px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-emerald-500/25 text-emerald-200 border border-emerald-400/40">
+                            신규 교체 · 브랜드 합류
+                        </span>
+                    ) : null}
+                </div>
             </div>
         </td>
     );
@@ -1793,6 +1889,14 @@ const CandidateList = ({
                                     <ul className="text-slate-500 text-xs space-y-1 mt-3">
                                         <li>· 현재 리스트를 검토하신 뒤 하단의 <strong className="text-amber-400/90">「리스트 확정」</strong> 버튼을 눌러 최종 확정해 주세요.</li>
                                         <li>· 본 캠페인은 드랍 단계가 종료되어 <strong className="text-amber-400/90">추가 드랍은 불가</strong>합니다.</li>
+                                        {troublessReplacementUi ? (
+                                            <li>
+                                                ·{' '}
+                                                <strong className="text-emerald-400/90">「신규 교체 · 브랜드 합류」</strong> 표시는 브랜드사 드랍 후 새로 합류한
+                                                인플루언서입니다. 정렬에서 <strong className="text-slate-300">신규 교체 우선</strong>을 선택하면 목록 상단에 모을 수
+                                                있습니다.
+                                            </li>
+                                        ) : null}
                                     </ul>
                                 </>
                             ) : (
@@ -1894,7 +1998,10 @@ const CandidateList = ({
                                         confirmedList.map((creator) => {
                                             const identifier = normalizeDropIdentifier(creator._identifier || creator.name);
                                             return (
-                                                <tr key={`conf-${creator.id}-${identifier}`} className="hover:bg-white/5 transition-colors group">
+                                                <tr
+                                                    key={`conf-${creator.id}-${identifier}`}
+                                                    className={`hover:bg-white/5 transition-colors group ${creator.is_new_replacement ? 'bg-emerald-500/[0.06]' : ''}`}
+                                                >
                                                     {renderDeliveryDataCells(creator)}
                                                 </tr>
                                             );
@@ -2010,9 +2117,15 @@ const CandidateList = ({
                                 <select
                                     value={`${sortBy}-${sortOrder}`}
                                     onChange={(e) => {
-                                        const [s, o] = e.target.value.split('-');
-                                        setSortBy(s);
-                                        setSortOrder(o);
+                                        const v = e.target.value;
+                                        if (v.startsWith('new_first-')) {
+                                            setSortBy('new_first');
+                                            setSortOrder(v.endsWith('-desc') ? 'desc' : 'asc');
+                                        } else {
+                                            const [s, o] = v.split('-');
+                                            setSortBy(s);
+                                            setSortOrder(o);
+                                        }
                                         setCurrentPage(1);
                                     }}
                                     className="text-xs font-bold bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-slate-300 focus:ring-cyan-500/50 focus:border-cyan-500/50"
@@ -2021,6 +2134,12 @@ const CandidateList = ({
                                     <option value="name-desc">이름 Z→A</option>
                                     <option value="followers-asc">팔로워 ↑</option>
                                     <option value="followers-desc">팔로워 ↓</option>
+                                    {allCandidates.some((c) => c.is_new_replacement) ? (
+                                        <>
+                                            <option value="new_first-asc">신규 교체 우선 (이름 A→Z)</option>
+                                            <option value="new_first-desc">신규 교체 우선 (이름 Z→A)</option>
+                                        </>
+                                    ) : null}
                                 </select>
                                 <div className="flex items-center gap-2">
                                     <button
@@ -2135,6 +2254,12 @@ const CandidateList = ({
                                                         </>
                                                     ) : null}
                                                 </span>
+                                                {troublessReplacementUi ? (
+                                                    <span className="block mt-2 text-emerald-400/90">
+                                                        <strong className="text-emerald-300/95">신규 교체</strong> 행은 브랜드사 드랍 후 새로 합류한 인플루언서입니다. 정렬에서{' '}
+                                                        <strong className="text-slate-200">신규 교체 우선</strong>을 선택하면 상단에 모아 볼 수 있습니다.
+                                                    </span>
+                                                ) : null}
                                             </>
                                         )}
                                     </td>
@@ -2153,7 +2278,7 @@ const CandidateList = ({
                                 return (
                                     <tr
                                         key={`${creator.id}-${identifier}`}
-                                        className={`hover:bg-white/5 transition-all group ${isDropped ? 'opacity-50 bg-red-500/5' : ''}`}
+                                        className={`hover:bg-white/5 transition-all group ${isDropped ? 'opacity-50 bg-red-500/5' : ''} ${creator.is_new_replacement && !isDropped ? 'bg-emerald-500/[0.06]' : ''}`}
                                     >
                                         {isDeliveryTestView ? (
                                             <>
@@ -4248,7 +4373,11 @@ export default function Dashboard() {
           campaignList = campaignList.map((c) => {
             const slug = resolveLinkedDeliveryListSlug(c, user);
             if (!slug) return c;
-            return { ...c, linked_delivery_candidates: creatorsBySlug[slug] || [] };
+            let list = creatorsBySlug[slug] || [];
+            if (slug === LINKED_LIST_SLUG_FARMSKIN && isTroublessPdrnSunscreenCampaign(c)) {
+              list = finalizeTroublessPdrnScale50DisplayCreators(list);
+            }
+            return { ...c, linked_delivery_candidates: list };
           });
         }
 

@@ -12,7 +12,8 @@
     "preview": "vite preview",
     "import:farmskin": "node scripts/import-farmskin-excel.js",
     "import:welcos": "node scripts/import-welcos-excel.js",
-    "import:farmskin-phase2": "node scripts/farmskin-heather-phase2.js"
+    "import:farmskin-phase2": "node scripts/farmskin-heather-phase2.js",
+    "import:troubless-pdrn-replace3": "node scripts/troubless-pdrn-final-replace-3.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.87.1",

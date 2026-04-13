@@ -78,32 +78,6 @@
     ]
   },
   {
-    "id": 4,
-    "name": "Stephanie Padilla",
-    "handle": "https://www.tiktok.com/@itz_stephy_p",
-    "platform": "TikTok",
-    "followers": "3147",
-    "location": "US",
-    "status": "Pending Review",
-    "contact": "-",
-    "tiktok_url": "https://www.tiktok.com/@itz_stephy_p",
-    "tiktok_follower": "3147",
-    "instagram_url": "https://www.instagram.com/itz_stephy_p?igsh=cmZ6OGFsNXpwdHg3&utm_source=qr",
-    "instagram_follower": "1111",
-    "sns_channels": [
-      {
-        "platform": "TikTok",
-        "url": "https://www.tiktok.com/@itz_stephy_p",
-        "followers": "3147"
-      },
-      {
-        "platform": "Instagram",
-        "url": "https://www.instagram.com/itz_stephy_p?igsh=cmZ6OGFsNXpwdHg3&utm_source=qr",
-        "followers": "1111"
-      }
-    ]
-  },
-  {
     "id": 5,
     "name": "dirghoyee datta",
     "handle": "www.tiktok.com/@dirghoyeedatta",
@@ -1066,58 +1040,6 @@
         "platform": "TikTok",
         "url": "https://www.tiktok.com/@dgirlcarrot",
         "followers": "8575"
-      }
-    ]
-  },
-  {
-    "id": 46,
-    "name": "Gabrielle Diane Comeau",
-    "handle": "https://www.instagram.com/dianecomeau12345?igsh=MWt6bTR3amszMzE0OQ%3D%3D&utm_source=qr",
-    "platform": "Instagram",
-    "followers": "5266",
-    "location": "CA",
-    "status": "Pending Review",
-    "contact": "-",
-    "tiktok_url": "https://www.tiktok.com/@9494diane?_r=1&_t=ZS-94n1xXPMokf",
-    "tiktok_follower": "2022",
-    "instagram_url": "https://www.instagram.com/dianecomeau12345?igsh=MWt6bTR3amszMzE0OQ%3D%3D&utm_source=qr",
-    "instagram_follower": "5266",
-    "sns_channels": [
-      {
-        "platform": "TikTok",
-        "url": "https://www.tiktok.com/@9494diane?_r=1&_t=ZS-94n1xXPMokf",
-        "followers": "2022"
-      },
-      {
-        "platform": "Instagram",
-        "url": "https://www.instagram.com/dianecomeau12345?igsh=MWt6bTR3amszMzE0OQ%3D%3D&utm_source=qr",
-        "followers": "5266"
-      }
-    ]
-  },
-  {
-    "id": 47,
-    "name": "Holly  Curtis ",
-    "handle": "https://www.instagram.com/hollygoliteleee/",
-    "platform": "Instagram",
-    "followers": "4835",
-    "location": "CA",
-    "status": "Pending Review",
-    "contact": "-",
-    "tiktok_url": "https://www.tiktok.com/@hollygoliteleee",
-    "tiktok_follower": "2510",
-    "instagram_url": "https://www.instagram.com/hollygoliteleee/",
-    "instagram_follower": "4835",
-    "sns_channels": [
-      {
-        "platform": "TikTok",
-        "url": "https://www.tiktok.com/@hollygoliteleee",
-        "followers": "2510"
-      },
-      {
-        "platform": "Instagram",
-        "url": "https://www.instagram.com/hollygoliteleee/",
-        "followers": "4835"
       }
     ]
   },
