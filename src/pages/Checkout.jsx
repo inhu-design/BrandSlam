@@ -1112,7 +1112,7 @@ export default function Checkout() {
             </h1>
             <p className="text-lg text-slate-300 leading-relaxed max-w-xl mx-auto">
               {isCustomOfferActive
-                ? 'The Frameless 맞춤 견적(시딩·방문형 시딩)에 대한 결제입니다. 공급가에 부가세가 합산됩니다.'
+                ? 'The Frameless 맞춤 견적(시딩(건당))에 대한 결제입니다. 공급가에 부가세가 합산됩니다.'
                 : '원하는 플랜을 선택하고, 간편하게 시작하세요'}
             </p>
           </div>

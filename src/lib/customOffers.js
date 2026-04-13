@@ -12,13 +12,13 @@ export const FRAMELESS_PLAN_IDS = {
 
 export const FRAMELESS_OFFER_PRICING = {
   seedingUnitPrice: 35000,
-  seedingQty: 300,
+  seedingQty: 150,
   visitUnitPrice: 240000,
-  visitQty: 10,
+  visitQty: 0,
   vatRate: 0.1,
 };
 
-/** 시딩 35,000×300 + 방문형 시딩 240,000×10 (공급가, 부가세 별도) */
+/** 시딩 35,000×건수 (+ 방문형 시딩이 있으면 합산). 공급가 기준, 부가세 별도 */
 export function getFramelessOfferTotals() {
   const supply =
     FRAMELESS_OFFER_PRICING.seedingUnitPrice * FRAMELESS_OFFER_PRICING.seedingQty
@@ -28,10 +28,11 @@ export function getFramelessOfferTotals() {
 }
 
 export function getFramelessOfferCart() {
-  return [
-    { planId: FRAMELESS_PLAN_IDS.seeding, qty: FRAMELESS_OFFER_PRICING.seedingQty },
-    { planId: FRAMELESS_PLAN_IDS.visitSeeding, qty: FRAMELESS_OFFER_PRICING.visitQty },
-  ];
+  const lines = [{ planId: FRAMELESS_PLAN_IDS.seeding, qty: FRAMELESS_OFFER_PRICING.seedingQty }];
+  if (FRAMELESS_OFFER_PRICING.visitQty > 0) {
+    lines.push({ planId: FRAMELESS_PLAN_IDS.visitSeeding, qty: FRAMELESS_OFFER_PRICING.visitQty });
+  }
+  return lines;
 }
 
 export function isFramelessOfferForUser(state, userEmail) {
@@ -42,10 +43,10 @@ export function isFramelessOfferForUser(state, userEmail) {
 
 /**
  * 결제 완료 후 orders/order_items·캠페인 생성 시 사용 (buildCampaignRowsFromOrderItems와 호환)
- * — 시딩 300건은 supply_amount 합산 1행, 방문형 시딩 10건은 Visit 집계로 1행.
+ * — 시딩 N건 1행; 방문형 시딩 건수가 0보다 크면 Visit 집계 1행 추가.
  */
 export function getFramelessOrderItemsForDraft() {
-  return [
+  const items = [
     {
       plan_name: `시딩(건당) x${FRAMELESS_OFFER_PRICING.seedingQty}`,
       qty: 1,
@@ -54,14 +55,17 @@ export function getFramelessOrderItemsForDraft() {
       is_visit: false,
       supply_amount: FRAMELESS_OFFER_PRICING.seedingUnitPrice * FRAMELESS_OFFER_PRICING.seedingQty,
     },
-    {
+  ];
+  if (FRAMELESS_OFFER_PRICING.visitQty > 0) {
+    items.push({
       plan_name: `방문형 시딩(건당) x${FRAMELESS_OFFER_PRICING.visitQty}`,
       qty: FRAMELESS_OFFER_PRICING.visitQty,
       unit_price: FRAMELESS_OFFER_PRICING.visitUnitPrice,
       content_count: 1,
       is_visit: true,
-    },
-  ];
+    });
+  }
+  return items;
 }
 
 export function getFramelessOfferContentCount() {

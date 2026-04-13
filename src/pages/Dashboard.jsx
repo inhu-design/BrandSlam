@@ -19,6 +19,13 @@ import {
   getFramelessOfferTotals,
 } from '../lib/customOffers';
 
+/** The Frameless: DB orders.plan_price 와 무관하게 화면은 `customOffers` 확정 계약가와 통일 */
+function displayPaidOrderPlanPriceForViewer(order, viewerEmail) {
+  const em = String(viewerEmail || '').toLowerCase().trim();
+  if (em === CUSTOM_OFFER_FRAMELESS_EMAIL) return getFramelessOfferTotals().total;
+  return Number(order?.plan_price) || 0;
+}
+
 /** 팔로워 수 파싱 (11.5K → 11500) */
 const parseFollower = (val) => {
   if (val == null || val === '') return 0;
@@ -804,8 +811,24 @@ const InvoiceDetail = ({ campaign }) => {
         fetchOrderCampaigns();
     }, [campaign.order_number, campaign.id]);
 
-    // 라인아이템: ① orders.order_items (결제 원본) 우선 ② 없으면 동일 주문의 campaigns 집계
+    const customerEmailLower = String(campaign.customer_email || '').toLowerCase().trim();
+    const isFramelessContract = customerEmailLower === CUSTOM_OFFER_FRAMELESS_EMAIL;
+
+    // 라인아이템: ① The Frameless → 코드 확정 계약(시딩 N건) ② orders.order_items ③ campaigns 집계
     const lineItems = useMemo(() => {
+        if (customerEmailLower === CUSTOM_OFFER_FRAMELESS_EMAIL) {
+            const q = FRAMELESS_OFFER_PRICING.seedingQty;
+            const unit = FRAMELESS_OFFER_PRICING.seedingUnitPrice;
+            return [
+                {
+                    plan: `시딩(건당) x${q}`,
+                    qty: q,
+                    supplyAmount: unit * q,
+                    unitSupply: unit,
+                    isVisit: false,
+                },
+            ];
+        }
         const fromOrder = buildLineItemsFromOrderSummary(campaign.order_summary);
         if (fromOrder?.length) return fromOrder;
         const map = {};
@@ -821,17 +844,32 @@ const InvoiceDetail = ({ campaign }) => {
             unitSupply: li.qty > 0 ? Math.round(li.supplyAmount / li.qty) : li.supplyAmount,
             isVisit: li.isVisit,
         }));
-    }, [campaign.order_summary, orderCampaigns]);
+    }, [customerEmailLower, campaign.order_summary, orderCampaigns]);
 
     const isDemo = String(campaign.id).startsWith('demo-');
 
     const lineSupplySum = lineItems.reduce((s, li) => s + li.supplyAmount, 0);
-    const orderTotalInclVat = Number(campaign.order_summary?.plan_price);
-    const useOrderContractTotal = Number.isFinite(orderTotalInclVat) && orderTotalInclVat > 0;
+    const orderTotalInclVatDb = Number(campaign.order_summary?.plan_price);
+    const useOrderContractTotalFromDb = Number.isFinite(orderTotalInclVatDb) && orderTotalInclVatDb > 0;
 
-    const totalSupplyPrice = useOrderContractTotal ? Math.round(orderTotalInclVat / 1.1) : lineSupplySum;
-    const vatAmount = useOrderContractTotal ? orderTotalInclVat - totalSupplyPrice : Math.round(lineSupplySum * 0.1);
-    const totalAmount = useOrderContractTotal ? orderTotalInclVat : lineSupplySum + vatAmount;
+    const framelessTotals = isFramelessContract ? getFramelessOfferTotals() : null;
+
+    let totalSupplyPrice;
+    let vatAmount;
+    let totalAmount;
+    if (framelessTotals) {
+        totalSupplyPrice = framelessTotals.supply;
+        vatAmount = framelessTotals.vat;
+        totalAmount = framelessTotals.total;
+    } else if (useOrderContractTotalFromDb) {
+        totalSupplyPrice = Math.round(orderTotalInclVatDb / 1.1);
+        vatAmount = orderTotalInclVatDb - totalSupplyPrice;
+        totalAmount = orderTotalInclVatDb;
+    } else {
+        totalSupplyPrice = lineSupplySum;
+        vatAmount = Math.round(lineSupplySum * 0.1);
+        totalAmount = lineSupplySum + vatAmount;
+    }
     const supplyPrice = totalSupplyPrice;
 
     const invoiceId = isDemo ? campaign.id.toUpperCase() : (campaign.order_number || campaign.id.slice(0, 8)).toUpperCase();
@@ -4683,22 +4721,54 @@ export default function Dashboard() {
                 <p className="text-[10px] font-black tracking-[0.25em] uppercase text-emerald-400/90 mb-2">개인 맞춤 결제</p>
                 <h2 className="text-xl md:text-2xl font-black text-white mb-2">The Frameless 맞춤 견적</h2>
                 <p className="text-sm text-slate-400 leading-relaxed max-w-xl">
-                  시딩 35,000원 × {FRAMELESS_OFFER_PRICING.seedingQty}건 · 방문형 시딩 240,000원 × {FRAMELESS_OFFER_PRICING.visitQty}건 (공급가, 부가세 별도). 아래 금액은 부가세 포함 총액입니다.
+                  {FRAMELESS_OFFER_PRICING.visitQty > 0 ? (
+                    <>
+                      시딩 35,000원 × {FRAMELESS_OFFER_PRICING.seedingQty}건 · 방문형 시딩 240,000원 ×{' '}
+                      {FRAMELESS_OFFER_PRICING.visitQty}건 (공급가, 부가세 별도). 아래 금액은 부가세 포함 총액입니다.
+                    </>
+                  ) : (
+                    <>
+                      시딩(건당) 35,000원 × {FRAMELESS_OFFER_PRICING.seedingQty}건만 진행합니다 (공급가, 부가세 별도). 아래 금액은 부가세 포함
+                      총액입니다.
+                    </>
+                  )}
                 </p>
                 <ul className="mt-4 space-y-2 text-sm text-slate-300">
-                  <li className="flex justify-between gap-4 max-w-md"><span>시딩(건당) × {FRAMELESS_OFFER_PRICING.seedingQty}건 · 공급가</span><span className="font-mono text-white">{(FRAMELESS_OFFER_PRICING.seedingUnitPrice * FRAMELESS_OFFER_PRICING.seedingQty).toLocaleString()}원</span></li>
-                  <li className="flex justify-between gap-4 max-w-md"><span>방문형 시딩(건당) × {FRAMELESS_OFFER_PRICING.visitQty}건 · 공급가</span><span className="font-mono text-white">{(FRAMELESS_OFFER_PRICING.visitUnitPrice * FRAMELESS_OFFER_PRICING.visitQty).toLocaleString()}원</span></li>
+                  <li className="flex justify-between gap-4 max-w-md">
+                    <span>시딩(건당) × {FRAMELESS_OFFER_PRICING.seedingQty}건 · 공급가</span>
+                    <span className="font-mono text-white">
+                      {(FRAMELESS_OFFER_PRICING.seedingUnitPrice * FRAMELESS_OFFER_PRICING.seedingQty).toLocaleString()}원
+                    </span>
+                  </li>
+                  {FRAMELESS_OFFER_PRICING.visitQty > 0 ? (
+                    <li className="flex justify-between gap-4 max-w-md">
+                      <span>방문형 시딩(건당) × {FRAMELESS_OFFER_PRICING.visitQty}건 · 공급가</span>
+                      <span className="font-mono text-white">
+                        {(FRAMELESS_OFFER_PRICING.visitUnitPrice * FRAMELESS_OFFER_PRICING.visitQty).toLocaleString()}원
+                      </span>
+                    </li>
+                  ) : null}
                   <li className="flex justify-between gap-4 max-w-md border-t border-white/10 pt-2 mt-2"><span className="text-emerald-200/90">부가세(10%)</span><span className="font-mono text-emerald-200">{getFramelessOfferTotals().vat.toLocaleString()}원</span></li>
-                  <li className="flex justify-between gap-4 max-w-md text-lg font-black text-white"><span>결제 예정(VAT 포함)</span><span className="text-emerald-400">{getFramelessOfferTotals().total.toLocaleString()}원</span></li>
+                  <li className="flex justify-between gap-4 max-w-md text-lg font-black text-white">
+                    <span>{paidOrders.length > 0 ? '확정 계약(VAT 포함)' : '결제 예정(VAT 포함)'}</span>
+                    <span className="text-emerald-400">{getFramelessOfferTotals().total.toLocaleString()}원</span>
+                  </li>
                 </ul>
               </div>
-              <button
-                type="button"
-                onClick={() => navigate('/checkout', { state: { customOfferId: CUSTOM_OFFER_FRAMELESS_ID } })}
-                className="shrink-0 inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-black text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-500 hover:from-emerald-300 hover:to-teal-400 transition-all shadow-lg shadow-emerald-500/20"
-              >
-                맞춤 견적 결제하기 <ArrowRight size={18} />
-              </button>
+              {paidOrders.length > 0 ? (
+                <div className="shrink-0 max-w-xs rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-6 py-4 text-sm text-emerald-100/95 leading-relaxed">
+                  결제가 완료된 계약입니다. 시딩 {FRAMELESS_OFFER_PRICING.seedingQty}건 · VAT 포함{' '}
+                  <span className="font-black text-white">{getFramelessOfferTotals().total.toLocaleString()}원</span>으로 진행 중입니다.
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => navigate('/checkout', { state: { customOfferId: CUSTOM_OFFER_FRAMELESS_ID } })}
+                  className="shrink-0 inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-black text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-500 hover:from-emerald-300 hover:to-teal-400 transition-all shadow-lg shadow-emerald-500/20"
+                >
+                  맞춤 견적 결제하기 <ArrowRight size={18} />
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -4980,7 +5050,9 @@ export default function Dashboard() {
                     <tr key={o.order_number} className="border-b border-white/5 hover:bg-white/[0.03]">
                       <td className="py-3 pr-4 font-mono text-slate-300">{o.order_number}</td>
                       <td className="py-3 pr-4 text-white">{o.plan_name}</td>
-                      <td className="py-3 pr-4 text-purple-400 font-semibold">{Number(o.plan_price).toLocaleString()}원</td>
+                      <td className="py-3 pr-4 text-purple-400 font-semibold">
+                        {displayPaidOrderPlanPriceForViewer(o, user?.email).toLocaleString()}원
+                      </td>
                       <td className="py-3 text-slate-400">{o.created_at ? new Date(o.created_at).toLocaleString('ko-KR') : '-'}</td>
                     </tr>
                   ))}

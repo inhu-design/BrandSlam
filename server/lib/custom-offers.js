@@ -7,9 +7,9 @@ export const CUSTOM_OFFER_FRAMELESS_EMAIL = 'suyoungkim@theframeless.co';
 
 const FRAMELESS_OFFER_PRICING = {
   seedingUnitPrice: 35000,
-  seedingQty: 300,
+  seedingQty: 150,
   visitUnitPrice: 240000,
-  visitQty: 10,
+  visitQty: 0,
   vatRate: 0.1,
 };
 
