@@ -5189,7 +5189,14 @@ const KickoffView = ({ campaign, user, isAdminUser = false, onCampaignScheduleUp
 
 // --- Main Campaign Detail Container ---
 const CampaignDetail = ({ campaign, isDemoMode, user, isAdminUser = false, onCampaignScheduleUpdated }) => {
-  if (!campaign) return <div className="flex flex-col items-center justify-center py-40 text-slate-700 font-black uppercase tracking-[0.3em]"><Package size={48} className="mb-4 opacity-20"/> Select Campaign</div>;
+  if (!campaign) {
+    return (
+      <div className="flex flex-col items-center justify-center py-40 text-slate-400 font-black uppercase tracking-[0.3em]">
+        <Package size={48} className="mb-4 opacity-30 text-slate-500" />
+        캠페인을 선택해 주세요
+      </div>
+    );
+  }
 
   if (campaign.status === CampaignStatus.PAYMENT_PENDING) {
       if (isDemoMode) return <DemoInvoiceExample />;
@@ -5305,6 +5312,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     const fetchData = async () => {
+      try {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
 
@@ -5520,7 +5528,11 @@ export default function Dashboard() {
         setSelectedCampaignId(DEMO_CAMPAIGNS[0].id);
         setIsDemoMode(true);
       }
-      setLoading(false);
+      } catch (e) {
+        console.error('[Dashboard] fetchData', e);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchData();
@@ -6739,6 +6751,13 @@ export default function Dashboard() {
                         >
                             <Zap size={24} /> Start New Campaign
                         </button>
+                    </div>
+                ) : !selectedCampaign ? (
+                    <div className="rounded-[4rem] border border-white/10 bg-slate-900/60 px-8 py-16 text-center text-slate-300 text-sm min-h-[400px] flex flex-col items-center justify-center">
+                      <p className="font-bold text-white mb-2">표시할 캠페인을 찾지 못했습니다</p>
+                      <p className="text-slate-400 max-w-md leading-relaxed">
+                        목록이 갱신되는 중이거나 필터 때문에 선택이 풀렸을 수 있습니다. 왼쪽 목록에서 캠페인을 다시 눌러 주세요.
+                      </p>
                     </div>
                 ) : (
                     // 기존 Campaign Detail 컨테이너

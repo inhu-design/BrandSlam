@@ -15,12 +15,21 @@ import {
 const MAX_LEN = 8000;
 const READ_PREFIX = 'bs_support_last_read_';
 
-/** 카카오 플로터(Footer)와 같은 우하단이되, 아래쪽은 카카오·위쪽은 문의로 세로 배치 */
-const FAB_RIGHT = 'right-10';
-const FAB_BOTTOM = 'bottom-[7.25rem]';
-const PANEL_RIGHT = 'right-10';
-const PANEL_BOTTOM = 'bottom-[11.25rem]';
-const FLOAT_Z = 'z-[9999]';
+/** 카카오(Footer: bottom-10 right-10, h-16) 위에 문의 FAB·패널을 쌓음. inset은 인라인으로 고정해 LTR/레이아웃 간섭 방지 */
+const FAB_FIXED_STYLE = {
+  position: 'fixed',
+  left: 'auto',
+  right: '2.5rem',
+  bottom: '7.25rem',
+  zIndex: 9999,
+};
+const PANEL_FIXED_STYLE = {
+  position: 'fixed',
+  left: 'auto',
+  right: '2.5rem',
+  bottom: '11.25rem',
+  zIndex: 9999,
+};
 
 export default function SupportChatWidget() {
   const { user } = useAuth();
@@ -51,21 +60,27 @@ export default function SupportChatWidget() {
       return undefined;
     }
     let cancelled = false;
-    setBooting(true);
-    setBootError(null);
-    (async () => {
-      const { conversation: conv, error: err } = await ensureCustomerConversation(user);
+    const boot = () => {
       if (cancelled) return;
-      setBooting(false);
-      if (err) {
-        setBootError(typeof err === 'string' ? err : '대화를 불러오지 못했습니다.');
-        setConversation(null);
-      } else {
-        setConversation(conv);
-      }
-    })();
+      setBooting(true);
+      setBootError(null);
+      (async () => {
+        const { conversation: conv, error: err } = await ensureCustomerConversation(user);
+        if (cancelled) return;
+        setBooting(false);
+        if (err) {
+          setBootError(typeof err === 'string' ? err : '대화를 불러오지 못했습니다.');
+          setConversation(null);
+        } else {
+          setConversation(conv);
+        }
+      })();
+    };
+    const delayMs = 400;
+    const timer = setTimeout(boot, delayMs);
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
   }, [user?.id]);
 
@@ -193,8 +208,6 @@ export default function SupportChatWidget() {
   if (!user?.id) return null;
   if (!adminLoading && isAdmin) return null;
 
-  const fabPos = `fixed ${FAB_BOTTOM} ${FAB_RIGHT} ${FLOAT_Z}`;
-
   const floatingUi = (
     <>
       <button
@@ -202,7 +215,8 @@ export default function SupportChatWidget() {
         aria-expanded={open}
         aria-controls="support-chat-panel"
         onClick={() => setOpen((v) => !v)}
-        className={`${fabPos} relative flex h-14 w-14 items-center justify-center rounded-full border border-white/15 bg-gradient-to-br from-slate-800 to-slate-900 text-cyan-300 shadow-lg shadow-black/40 transition hover:from-slate-700 hover:to-slate-800 hover:text-cyan-200`}
+        style={FAB_FIXED_STYLE}
+        className="relative flex h-14 w-14 items-center justify-center rounded-full border border-white/15 bg-gradient-to-br from-slate-800 to-slate-900 text-cyan-300 shadow-lg shadow-black/40 transition hover:from-slate-700 hover:to-slate-800 hover:text-cyan-200"
       >
         {!open && unreadCount > 0 ? (
           <span className="absolute -right-0.5 -top-0.5 flex h-[22px] min-w-[22px] items-center justify-center rounded-full border-2 border-slate-950 bg-rose-500 px-1 text-[10px] font-black text-white tabular-nums shadow-md">
@@ -216,7 +230,8 @@ export default function SupportChatWidget() {
       {open && (
         <div
           id="support-chat-panel"
-          className={`fixed ${PANEL_BOTTOM} ${PANEL_RIGHT} ${FLOAT_Z} flex w-[min(100vw-2.5rem,22rem)] flex-col overflow-hidden rounded-2xl border border-white/10 bg-slate-950/95 shadow-2xl shadow-black/50 backdrop-blur-md`}
+          style={PANEL_FIXED_STYLE}
+          className="flex w-[min(100vw-2.5rem,22rem)] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-white/10 bg-slate-950/95 shadow-2xl shadow-black/50 backdrop-blur-md"
           role="dialog"
           aria-label="운영팀 1:1 문의"
         >
