@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { MessageCircle, Send, X, Loader2, Bell, BellOff } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useAdminSession } from '../../hooks/useAdminSession';
 import { ensureCustomerConversation, useSupportMessages } from '../../hooks/useSupportChat';
 import {
   SUPPORT_CHAT_BASE_TAB_TITLE,
@@ -18,9 +20,11 @@ const FAB_RIGHT = 'right-10';
 const FAB_BOTTOM = 'bottom-[7.25rem]';
 const PANEL_RIGHT = 'right-10';
 const PANEL_BOTTOM = 'bottom-[11.25rem]';
+const FLOAT_Z = 'z-[9999]';
 
 export default function SupportChatWidget() {
   const { user } = useAuth();
+  const { isAdmin, loading: adminLoading } = useAdminSession();
   const [open, setOpen] = useState(false);
   const [conversation, setConversation] = useState(null);
   const [bootError, setBootError] = useState(null);
@@ -113,8 +117,14 @@ export default function SupportChatWidget() {
   }, [messages, user?.id, lastReadAt]);
 
   useEffect(() => {
+    if (!adminLoading && isAdmin) {
+      if (typeof document !== 'undefined') {
+        document.title = SUPPORT_CHAT_BASE_TAB_TITLE;
+      }
+      return;
+    }
     applyUnreadTabTitle(unreadCount);
-  }, [unreadCount]);
+  }, [unreadCount, adminLoading, isAdmin]);
 
   useEffect(() => {
     return () => {
@@ -181,10 +191,11 @@ export default function SupportChatWidget() {
   };
 
   if (!user?.id) return null;
+  if (!adminLoading && isAdmin) return null;
 
-  const fabPos = `fixed ${FAB_BOTTOM} ${FAB_RIGHT} z-[190]`;
+  const fabPos = `fixed ${FAB_BOTTOM} ${FAB_RIGHT} ${FLOAT_Z}`;
 
-  return (
+  const floatingUi = (
     <>
       <button
         type="button"
@@ -205,7 +216,7 @@ export default function SupportChatWidget() {
       {open && (
         <div
           id="support-chat-panel"
-          className={`fixed ${PANEL_BOTTOM} ${PANEL_RIGHT} z-[190] flex w-[min(100vw-2.5rem,22rem)] flex-col overflow-hidden rounded-2xl border border-white/10 bg-slate-950/95 shadow-2xl shadow-black/50 backdrop-blur-md`}
+          className={`fixed ${PANEL_BOTTOM} ${PANEL_RIGHT} ${FLOAT_Z} flex w-[min(100vw-2.5rem,22rem)] flex-col overflow-hidden rounded-2xl border border-white/10 bg-slate-950/95 shadow-2xl shadow-black/50 backdrop-blur-md`}
           role="dialog"
           aria-label="운영팀 1:1 문의"
         >
@@ -315,4 +326,7 @@ export default function SupportChatWidget() {
       )}
     </>
   );
+
+  if (typeof document === 'undefined') return null;
+  return createPortal(floatingUi, document.body);
 }

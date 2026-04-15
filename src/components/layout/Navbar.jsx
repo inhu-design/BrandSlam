@@ -85,9 +85,11 @@ const Navbar = () => {
   ];
 
   return (
-    <nav className={`fixed w-full z-50 transition-all duration-500 bg-white/95 backdrop-blur-xl border-b ${
-      scrolled ? 'py-4 border-slate-200 shadow-sm' : 'py-6 border-transparent'
-    }`}> {/* [변경] py-3/5 -> py-4/6 (높이 약간 증가) */}
+    <nav
+      className={`fixed top-0 left-0 right-0 z-50 w-full border-b py-4 bg-white/95 backdrop-blur-xl transition-shadow duration-300 ${
+        scrolled ? 'border-slate-200 shadow-sm' : 'border-transparent shadow-none'
+      }`}
+    >
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="relative flex justify-between items-center">

@@ -6429,26 +6429,65 @@ export default function Dashboard() {
                     </div>
                     <div className="px-6 py-6 space-y-4 bg-slate-950/40">
                       <p className="text-sm text-slate-400 leading-relaxed">
-                        고객이 로그인할 때 쓰는 <strong className="text-slate-200">이메일 주소</strong>를 넣으면 됩니다. 우리 쪽에 가입되어 있는 이메일이어야 합니다.
+                        위 캠페인 데이터에 포함된 <strong className="text-slate-200">고객 이메일</strong>은 아래 목록에서 바로 고를 수 있습니다. 목록에 없으면 입력란에 직접 적어도 됩니다. Supabase Auth에 가입된 주소여야 합니다.
                       </p>
-                      <div className="flex flex-wrap gap-3 items-stretch">
-                        <input
-                          type="email"
-                          placeholder="예: heather@example.com"
-                          value={impersonateEmail}
-                          onChange={(e) => setImpersonateEmail(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && handleImpersonateLogin()}
-                          className="flex-1 min-w-[220px] px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 text-sm"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleImpersonateLogin}
-                          disabled={impersonateLoading}
-                          className="px-6 py-3 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 rounded-xl font-bold text-sm text-white transition-all flex items-center justify-center gap-2"
-                        >
-                          {impersonateLoading ? <RefreshCw size={16} className="animate-spin" /> : null}
-                          새 탭에서 열기
-                        </button>
+                      {adminCustomerOptions.length === 0 ? (
+                        <p className="text-xs text-amber-200/90 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+                          아직 대시보드에 캠페인이 없어 이메일 목록이 비어 있습니다. 아래 입력란에 이메일을 직접 입력해 주세요.
+                        </p>
+                      ) : null}
+                      <div className="space-y-3">
+                        {adminCustomerOptions.length > 0 ? (
+                          <div>
+                            <label htmlFor="impersonate-customer-select" className="block text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-1.5">
+                              캠페인 진행 이력이 있는 고객
+                            </label>
+                            <select
+                              id="impersonate-customer-select"
+                              value={
+                                adminCustomerOptions.includes(impersonateEmail.trim())
+                                  ? impersonateEmail.trim()
+                                  : ''
+                              }
+                              onChange={(e) => setImpersonateEmail(e.target.value)}
+                              className="w-full max-w-xl px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-sm text-white focus:outline-none focus:border-cyan-500/50"
+                            >
+                              <option value="" className="bg-slate-900 text-slate-400">
+                                — 이메일 선택 —
+                              </option>
+                              {adminCustomerOptions.map((v) => (
+                                <option key={v} value={v} className="bg-slate-900 text-white">
+                                  {v}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        ) : null}
+                        <div>
+                          <label htmlFor="impersonate-email-input" className="block text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-1.5">
+                            이메일 (선택 반영 · 직접 입력)
+                          </label>
+                          <div className="flex flex-wrap gap-3 items-stretch">
+                            <input
+                              id="impersonate-email-input"
+                              type="email"
+                              placeholder="예: heather@example.com"
+                              value={impersonateEmail}
+                              onChange={(e) => setImpersonateEmail(e.target.value)}
+                              onKeyDown={(e) => e.key === 'Enter' && handleImpersonateLogin()}
+                              className="flex-1 min-w-[220px] px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 text-sm"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleImpersonateLogin}
+                              disabled={impersonateLoading}
+                              className="px-6 py-3 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 rounded-xl font-bold text-sm text-white transition-all flex items-center justify-center gap-2"
+                            >
+                              {impersonateLoading ? <RefreshCw size={16} className="animate-spin" /> : null}
+                              새 탭에서 열기
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
