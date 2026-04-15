@@ -230,7 +230,7 @@ const FloatingConsultButton = () => (
       href="http://pf.kakao.com/_VxmWxon/chat" 
       target="_blank" 
       rel="noopener noreferrer"
-      className="fixed bottom-10 right-10 z-[60] group"
+      className="fixed bottom-10 right-10 z-[100] group"
   >
       <img
           src={kakaoLogo}

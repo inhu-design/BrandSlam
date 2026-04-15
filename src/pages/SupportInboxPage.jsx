@@ -25,6 +25,7 @@ export default function SupportInboxPage() {
   const { messages, loading: msgLoading, error: msgError, sendMessage, reload } = useSupportMessages(
     selectedId,
     user,
+    8000,
   );
 
   useEffect(() => {

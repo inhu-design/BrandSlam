@@ -4,8 +4,9 @@ import { supabase } from '../lib/supabase';
 /**
  * @param {string|null} conversationId
  * @param {{ id: string }|null} user
+ * @param {number} [fallbackPollMs] Realtime 누락 대비 주기적 재조회(밀리초). 0이면 비활성.
  */
-export function useSupportMessages(conversationId, user) {
+export function useSupportMessages(conversationId, user, fallbackPollMs = 0) {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(!!conversationId);
   const [error, setError] = useState(null);
@@ -38,6 +39,14 @@ export function useSupportMessages(conversationId, user) {
   }, [load]);
 
   useEffect(() => {
+    if (!fallbackPollMs || !conversationId || !user?.id) return undefined;
+    const id = setInterval(() => {
+      load();
+    }, fallbackPollMs);
+    return () => clearInterval(id);
+  }, [fallbackPollMs, conversationId, user?.id, load]);
+
+  useEffect(() => {
     if (!conversationId || !user?.id) return undefined;
 
     const channel = supabase
@@ -59,14 +68,18 @@ export function useSupportMessages(conversationId, user) {
           });
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          load();
+        }
+      });
 
     channelRef.current = channel;
     return () => {
       supabase.removeChannel(channel);
       channelRef.current = null;
     };
-  }, [conversationId, user?.id]);
+  }, [conversationId, user?.id, load]);
 
   const sendMessage = useCallback(
     async (body) => {

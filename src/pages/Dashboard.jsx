@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { 
   Package, Clock, Truck, UserCheck, AlertCircle, 
   Lock, Settings, BarChart3, Users, PlayCircle, Eye, Heart, MessageCircle, Share2, 
@@ -5295,6 +5295,15 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
+    if (!isPasswordMode) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [isPasswordMode]);
+
+  useEffect(() => {
     const fetchData = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
@@ -5647,6 +5656,12 @@ export default function Dashboard() {
     }
   }, [filteredCampaigns, selectedCampaignId]);
 
+  const closePasswordModal = () => {
+    setIsPasswordMode(false);
+    setNewPassword('');
+    setNewPasswordConfirm('');
+  };
+
   const handlePasswordUpdate = async () => {
     if (newPassword.length < 8) return alert("비밀번호는 8자 이상이어야 합니다.");
     if (newPassword !== newPasswordConfirm) return alert("비밀번호가 일치하지 않습니다.");
@@ -5654,7 +5669,8 @@ export default function Dashboard() {
     if (error) alert("실패: " + error.message);
     else {
       await supabase.auth.updateUser({ data: { ...(user?.user_metadata || {}), password_set: true } });
-      alert("비밀번호가 성공적으로 변경되었습니다."); setIsPasswordMode(false); setNewPassword(''); setNewPasswordConfirm('');
+      alert("비밀번호가 성공적으로 변경되었습니다.");
+      closePasswordModal();
     }
   };
 
@@ -5919,21 +5935,13 @@ export default function Dashboard() {
                   </p>
                 </div>
                 {user && (
-                  <div className="flex flex-wrap items-center gap-2 shrink-0">
-                    <Link
-                      to="/admin/support"
-                      className="flex items-center gap-2 px-5 py-3 bg-cyan-500/15 border border-cyan-400/35 rounded-xl text-xs font-bold hover:bg-cyan-500/25 text-cyan-100"
-                    >
-                      <MessageCircle size={16} className="text-cyan-300" /> 고객 1:1 문의
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => setIsPasswordMode(!isPasswordMode)}
-                      className="flex items-center gap-2 px-5 py-3 bg-white/5 border border-white/10 rounded-xl text-xs font-bold hover:bg-white/10 text-slate-200"
-                    >
-                      <Settings size={16} className="text-slate-400" /> 비밀번호·계정 설정
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsPasswordMode(true)}
+                    className="shrink-0 flex items-center gap-2 px-5 py-3 bg-white/5 border border-white/10 rounded-xl text-xs font-bold hover:bg-white/10 text-slate-200"
+                  >
+                    <Settings size={16} className="text-slate-400" /> 비밀번호·계정 설정
+                  </button>
                 )}
               </div>
               <div className="px-5 sm:px-8 py-4 grid grid-cols-2 lg:grid-cols-4 gap-3 bg-slate-950/40">
@@ -6073,9 +6081,28 @@ export default function Dashboard() {
                   { id: 'ops_tools', label: '최근 주문 한눈에 보기', sub: '입금·환불·취소 수정', icon: ClipboardList },
                   { id: 'excel_delivery', label: '엑셀로 명단 납품하기', sub: '파일 올려 반영', icon: FileSpreadsheet },
                   { id: 'campaign_quick_edit', label: '캠페인 정보 수정', sub: '기본 정보·일정·가이드', icon: FileText },
+                  { id: 'support_inbox', label: '고객 1:1 문의', sub: '사이트 내 문의·답장', icon: MessageCircle, to: '/admin/support' },
                 ].map((item) => {
                   const Icon = item.icon;
                   const on = adminPanel === item.id;
+                  if (item.to) {
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => navigate(item.to)}
+                        className="flex shrink-0 lg:w-full items-center gap-3 text-left rounded-xl px-3 py-3 transition-colors min-w-[200px] lg:min-w-0 border border-transparent text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"
+                      >
+                        <span className="flex h-9 w-9 items-center justify-center rounded-lg shrink-0 bg-white/5 text-cyan-400">
+                          <Icon size={18} />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-xs font-bold leading-tight text-slate-200">{item.label}</span>
+                          <span className="block text-[10px] text-slate-500 mt-0.5 leading-snug">{item.sub}</span>
+                        </span>
+                      </button>
+                    );
+                  }
                   return (
                     <button
                       key={item.id}
@@ -6509,7 +6536,8 @@ export default function Dashboard() {
             </div>
             {user && (
                 <button 
-                    onClick={() => setIsPasswordMode(!isPasswordMode)}
+                    type="button"
+                    onClick={() => setIsPasswordMode(true)}
                     className="flex items-center gap-3 px-6 py-3 bg-white/5 border border-white/10 rounded-2xl text-xs font-bold hover:bg-white/10 transition-all shadow-xl text-slate-200"
                 >
                     <Settings size={18} className="text-slate-400" /> 비밀번호·계정 설정
@@ -6549,44 +6577,6 @@ export default function Dashboard() {
               </table>
             </div>
           </div>
-        )}
-
-        {isPasswordMode && user && (
-            <div className="mb-12 bg-white/5 backdrop-blur-3xl p-8 rounded-[2.5rem] shadow-2xl border border-purple-500/30 animate-fade-in-up max-w-xl">
-                <h3 className="text-[10px] font-black tracking-widest uppercase mb-6 flex items-center gap-3 text-purple-400">
-                    <Lock size={18} /> Update Security Key
-                </h3>
-                <div className="space-y-4">
-                    <div className="flex gap-4">
-                        <input 
-                            type="password" 
-                            placeholder="NEW PASSWORD (8글자 이상)" 
-                            value={newPassword}
-                            onChange={(e) => setNewPassword(e.target.value)}
-                            className="flex-1 px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-sm font-bold text-white outline-none focus:border-purple-500 transition-all uppercase tracking-widest"
-                        />
-                    </div>
-                    <div className="flex gap-4">
-                        <input 
-                            type="password" 
-                            placeholder="CONFIRM PASSWORD" 
-                            value={newPasswordConfirm}
-                            onChange={(e) => setNewPasswordConfirm(e.target.value)}
-                            className="flex-1 px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-sm font-bold text-white outline-none focus:border-purple-500 transition-all uppercase tracking-widest"
-                        />
-                    </div>
-                    {newPassword && newPasswordConfirm && newPassword !== newPasswordConfirm && (
-                        <p className="text-red-400 text-sm font-medium">비밀번호가 일치하지 않습니다.</p>
-                    )}
-                    <button 
-                        onClick={handlePasswordUpdate}
-                        disabled={newPassword.length < 8 || newPassword !== newPasswordConfirm}
-                        className="bg-purple-600 text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-purple-500 transition-all shadow-[0_0_15px_rgba(147,51,234,0.3)] disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                        Update
-                    </button>
-                </div>
-            </div>
         )}
 
         {!isAdminUser ? (
@@ -6745,7 +6735,80 @@ export default function Dashboard() {
         </div>
         ) : null}
       </div>
-      <Footer /> 
+
+      {isPasswordMode && user && (
+        <div
+          className="fixed inset-0 z-[260] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="dashboard-password-modal-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closePasswordModal();
+          }}
+        >
+          <div className="relative w-full max-w-md rounded-2xl border border-purple-500/35 bg-slate-950 shadow-2xl shadow-black/60">
+            <button
+              type="button"
+              onClick={closePasswordModal}
+              className="absolute right-4 top-4 rounded-full p-2 text-slate-400 hover:bg-white/10 hover:text-white"
+              aria-label="닫기"
+            >
+              <X size={20} />
+            </button>
+            <div className="p-6 sm:p-8 pt-12 sm:pt-10">
+              <h3
+                id="dashboard-password-modal-title"
+                className="text-sm font-black tracking-wide uppercase mb-2 flex items-center gap-2 text-purple-300"
+              >
+                <Lock size={18} /> 비밀번호 변경
+              </h3>
+              <p className="text-xs text-slate-500 mb-6 leading-relaxed">
+                새 비밀번호를 8자 이상 입력하고, 아래에서 한 번 더 확인한 뒤 저장하세요.
+              </p>
+              <div className="space-y-4">
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="새 비밀번호 (8자 이상)"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full px-4 py-3.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/40"
+                />
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="새 비밀번호 확인"
+                  value={newPasswordConfirm}
+                  onChange={(e) => setNewPasswordConfirm(e.target.value)}
+                  className="w-full px-4 py-3.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/40"
+                />
+                {newPassword && newPasswordConfirm && newPassword !== newPasswordConfirm && (
+                  <p className="text-red-400 text-sm font-medium">비밀번호가 일치하지 않습니다.</p>
+                )}
+                <div className="flex flex-col-reverse sm:flex-row gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={closePasswordModal}
+                    className="flex-1 px-4 py-3 rounded-xl border border-white/15 text-sm font-bold text-slate-300 hover:bg-white/5"
+                  >
+                    닫기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handlePasswordUpdate}
+                    disabled={newPassword.length < 8 || newPassword !== newPasswordConfirm}
+                    className="flex-1 px-4 py-3 rounded-xl bg-purple-600 text-white text-sm font-black hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    비밀번호 저장
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Footer />
     </div>
   );
 }
