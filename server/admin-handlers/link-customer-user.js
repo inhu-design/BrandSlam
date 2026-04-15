@@ -6,6 +6,7 @@
  */
 import { createClient } from '@supabase/supabase-js';
 import { supabase as supabaseAdmin } from '../lib/supabase-server.js';
+import { resolveAuthUserIdByEmail } from '../lib/resolve-auth-user-by-email.js';
 
 const supabaseUrl = process.env.SUPABASE_URL || '';
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
@@ -17,20 +18,6 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-async function resolveAuthUserIdByEmail(adminClient, emailNorm) {
-  let page = 1;
-  const perPage = 1000;
-  for (; page <= 25; page += 1) {
-    const { data, error } = await adminClient.auth.admin.listUsers({ page, perPage });
-    if (error) throw new Error(error.message || 'listUsers failed');
-    const batch = data?.users || [];
-    const hit = batch.find((u) => (u.email || '').toLowerCase().trim() === emailNorm);
-    if (hit?.id) return hit.id;
-    if (batch.length < perPage) break;
-  }
-  return null;
-}
 
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');

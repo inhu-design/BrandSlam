@@ -13,6 +13,9 @@ import deliveryCreatorsImport from '../../server/admin-handlers/delivery-creator
 import campaignUpdate from '../../server/admin-handlers/campaign-update.js';
 import campaignRuntimeSettings from '../../server/admin-handlers/campaign-runtime-settings.js';
 import impersonateLogin from '../../server/admin-handlers/impersonate-login.js';
+import campaignCreate from '../../server/admin-handlers/campaign-create.js';
+import campaignDelete from '../../server/admin-handlers/campaign-delete.js';
+import adminSession from '../../server/admin-handlers/admin-session.js';
 
 const handlers = {
   'dashboard-overview': dashboardOverview,
@@ -26,6 +29,9 @@ const handlers = {
   'campaign-update': campaignUpdate,
   'campaign-runtime-settings': campaignRuntimeSettings,
   'impersonate-login': impersonateLogin,
+  'campaign-create': campaignCreate,
+  'campaign-delete': campaignDelete,
+  'admin-session': adminSession,
 };
 
 /**

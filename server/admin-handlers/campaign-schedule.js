@@ -8,7 +8,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { supabase as supabaseAdmin } from '../lib/supabase-server.js';
 
-const supabaseUrl = process.env.SUPABASE_URL || 'https://grlayjybcxrcaufnwysb.supabase.co';
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
 
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
@@ -62,6 +61,11 @@ export default async function handler(req, res) {
 
   if (!supabaseAdmin) {
     return res.status(503).json({ error: 'SUPABASE_SERVICE_ROLE_KEY required' });
+  }
+
+  const supabaseUrl = (process.env.SUPABASE_URL || '').trim();
+  if (!supabaseUrl) {
+    return res.status(503).json({ error: 'SUPABASE_URL not configured' });
   }
 
   const authHeader = req.headers.authorization || '';

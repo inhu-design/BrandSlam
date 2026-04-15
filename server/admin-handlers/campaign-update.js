@@ -1,13 +1,12 @@
 /**
  * 관리자 전용: 캠페인 핵심 정보 수정
  * - POST /api/admin/campaign-update
- * - Body: { campaign_id, brand_name?, product_name?, plan?, status?, customer_name?, customer_email?, customer_phone?, start_date?, target_creators?, matched_creators?, plan_price? }
+ * - Body: { campaign_id, brand_name?, product_name?, plan?, order_number?, status?, customer_name?, customer_email?, customer_phone?, start_date?, target_creators?, matched_creators?, plan_price? }
  * - Authorization: Bearer <Supabase JWT>, ADMIN_EMAILS 등록 계정만
  */
 import { createClient } from '@supabase/supabase-js';
 import { supabase as supabaseAdmin } from '../lib/supabase-server.js';
 
-const supabaseUrl = process.env.SUPABASE_URL || 'https://grlayjybcxrcaufnwysb.supabase.co';
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
 
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
@@ -25,6 +24,7 @@ const ALLOWED_STRING_FIELDS = [
   'customer_name',
   'customer_email',
   'customer_phone',
+  'order_number',
 ];
 
 const ALLOWED_INT_FIELDS = ['target_creators', 'matched_creators', 'plan_price'];
@@ -74,6 +74,10 @@ export default async function handler(req, res) {
   }
   if (!supabaseAdmin) {
     return res.status(503).json({ error: 'SUPABASE_SERVICE_ROLE_KEY required' });
+  }
+  const supabaseUrl = (process.env.SUPABASE_URL || '').trim();
+  if (!supabaseUrl) {
+    return res.status(503).json({ error: 'SUPABASE_URL not configured' });
   }
 
   const authHeader = req.headers.authorization || '';

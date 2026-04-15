@@ -120,11 +120,19 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'name 열이 있는 데이터 행이 없습니다. 첫 시트·헤더명을 확인해 주세요.' });
   }
 
-  let toInsert = toDbInsertRows(parsed.rows, listSlug, campaignId ? { campaignId } : {});
+  let toInsert = toDbInsertRows(parsed.rows, listSlug, {
+    campaignId: campaignId || undefined,
+    /** 고객 대시보드에서 신규 반영 인원으로 표시 (컬럼 없으면 Supabase 마이그레이션 실행) */
+    markReplacements: true,
+  });
 
   const stripVisitDate = !!body.omit_visit_date;
   if (stripVisitDate) {
-    toInsert = toInsert.map(({ visit_date, ...rest }) => rest);
+    toInsert = toInsert.map((row) => {
+      const rest = { ...row };
+      delete rest.visit_date;
+      return rest;
+    });
   }
 
   if (dryRun) {
@@ -162,10 +170,14 @@ export default async function handler(req, res) {
       const { data, error: insErr } = await supabaseAdmin.from('admin_delivery_creators').insert(chunk).select('id');
       if (insErr) {
         const msg = String(insErr.message || '');
-        const hint =
-          msg.toLowerCase().includes('visit_date') || msg.includes('visit_date')
-            ? ' visit_date 컬럼이 없다면 supabase-migration-admin-delivery-visit-date.sql 을 실행하거나, 요청에 omit_visit_date: true 를 넣어 주세요.'
-            : '';
+        let hint = '';
+        if (msg.toLowerCase().includes('visit_date') || msg.includes('visit_date')) {
+          hint =
+            ' visit_date 컬럼이 없다면 supabase-migration-admin-delivery-visit-date.sql 을 실행하거나, 요청에 omit_visit_date: true 를 넣어 주세요.';
+        } else if (msg.toLowerCase().includes('is_replacement') || msg.includes('is_replacement')) {
+          hint =
+            ' is_replacement 컬럼이 없다면 supabase-migration-admin-delivery-creators-is-replacement.sql 을 Supabase에서 실행해 주세요.';
+        }
         return res.status(500).json({ error: `${msg}${hint}` });
       }
       inserted += data?.length || 0;

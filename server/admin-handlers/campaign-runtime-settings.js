@@ -13,7 +13,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { supabase as supabaseAdmin } from '../lib/supabase-server.js';
 
-const supabaseUrl = process.env.SUPABASE_URL || 'https://grlayjybcxrcaufnwysb.supabase.co';
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
   .split(',')
@@ -42,6 +41,9 @@ export default async function handler(req, res) {
   if (ADMIN_EMAILS.length === 0) return res.status(503).json({ error: 'ADMIN_EMAILS not configured' });
   if (!supabaseAnonKey) return res.status(503).json({ error: 'SUPABASE_ANON_KEY required' });
   if (!supabaseAdmin) return res.status(503).json({ error: 'SUPABASE_SERVICE_ROLE_KEY required' });
+
+  const supabaseUrl = (process.env.SUPABASE_URL || '').trim();
+  if (!supabaseUrl) return res.status(503).json({ error: 'SUPABASE_URL not configured' });
 
   const authHeader = req.headers.authorization || '';
   const token = authHeader.replace(/^Bearer\s+/i, '');

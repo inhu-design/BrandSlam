@@ -7,9 +7,7 @@
  */
 import { createClient } from '@supabase/supabase-js';
 import { supabase as supabaseAdmin } from '../lib/supabase-server.js';
-
-const supabaseUrl = process.env.SUPABASE_URL || 'https://grlayjybcxrcaufnwysb.supabase.co';
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+import { resolveAllowedRedirectOrigin } from '../lib/allowed-redirect-origin.js';
 
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
   .split(',')
@@ -29,6 +27,15 @@ export default async function handler(req, res) {
 
   if (!supabaseAdmin) {
     return res.status(503).json({ error: 'SUPABASE_SERVICE_ROLE_KEY required' });
+  }
+
+  const supabaseUrl = (process.env.SUPABASE_URL || '').trim();
+  const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+  if (!supabaseUrl) {
+    return res.status(503).json({ error: 'SUPABASE_URL not configured' });
+  }
+  if (!supabaseAnonKey) {
+    return res.status(503).json({ error: 'SUPABASE_ANON_KEY required' });
   }
 
   const authHeader = req.headers.authorization || '';
@@ -61,8 +68,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    const baseUrl = (req.headers.origin || req.headers['x-forwarded-host'] || 'https://www.slam-global.com').replace(/\/$/, '');
-    const redirectTo = `${baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`}/dashboard`;
+    const baseUrl = resolveAllowedRedirectOrigin(req).replace(/\/$/, '');
+    const redirectTo = `${baseUrl}/dashboard`;
 
     const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'magiclink',
@@ -82,7 +89,7 @@ export default async function handler(req, res) {
       if (!hashedToken) {
         return res.status(500).json({ error: 'No token in response' });
       }
-      impersonateUrl = `${baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`}/auth/impersonate?token_hash=${encodeURIComponent(hashedToken)}`;
+      impersonateUrl = `${baseUrl}/auth/impersonate?token_hash=${encodeURIComponent(hashedToken)}`;
     }
 
     return res.status(200).json({

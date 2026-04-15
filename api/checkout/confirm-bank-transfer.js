@@ -10,14 +10,17 @@ import { buildCampaignRowsFromOrderItems } from '../../server/lib/build-campaign
 import { assertFramelessBankPayload } from '../../server/lib/custom-offers.js';
 import { assertDbCustomPaymentBankPayload } from '../../server/lib/db-custom-payment-offers.js';
 
-const supabaseUrl = process.env.SUPABASE_URL || 'https://grlayjybcxrcaufnwysb.supabase.co';
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdybGF5anliY3hyY2F1Zm53eXNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUzNDM4NzksImV4cCI6MjA4MDkxOTg3OX0.Voj60xKccEl2_r8EzLVO-fot5WiEiUHb6UTfya2ql8Q';
+const supabaseUrl = (process.env.SUPABASE_URL || '').trim();
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
 
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return res.status(503).json({ error: 'Supabase 환경변수(SUPABASE_URL, SUPABASE_ANON_KEY)가 설정되지 않았습니다.' });
   }
 
   const authHeader = req.headers.authorization || '';

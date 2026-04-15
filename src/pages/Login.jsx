@@ -32,6 +32,9 @@ const handleMagicLogin = async (e) => {
       if (returnState?.customPaymentOfferId && !u.searchParams.get('offer')) {
         u.searchParams.set('offer', returnState.customPaymentOfferId);
       }
+      if (returnState?.customOfferId && !u.searchParams.get('customOffer')) {
+        u.searchParams.set('customOffer', returnState.customOfferId);
+      }
       if (returnState?.plan) {
         const pid = typeof returnState.plan === 'object' ? returnState.plan.id : returnState.plan;
         if (pid && !u.searchParams.get('plan')) u.searchParams.set('plan', pid);
@@ -79,6 +82,9 @@ const handleMagicLogin = async (e) => {
         }
         if (returnState?.customPaymentOfferId && !u.searchParams.get('offer')) {
           u.searchParams.set('offer', returnState.customPaymentOfferId);
+        }
+        if (returnState?.customOfferId && !u.searchParams.get('customOffer')) {
+          u.searchParams.set('customOffer', returnState.customOfferId);
         }
         if (returnState?.plan) {
           const pid = typeof returnState.plan === 'object' ? returnState.plan.id : returnState.plan;

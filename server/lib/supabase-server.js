@@ -4,7 +4,7 @@
  */
 import { createClient } from '@supabase/supabase-js';
 
-const url = process.env.SUPABASE_URL || 'https://grlayjybcxrcaufnwysb.supabase.co';
+const url = (process.env.SUPABASE_URL || '').trim();
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!serviceRoleKey) {

@@ -424,15 +424,18 @@ export default function Checkout() {
   const { user, loading: authLoading } = useAuth();
   const initialResume = useMemo(() => readCheckoutResume(), []);
 
-  /** 로그인 복귀 시 state에 plan·customOfferId·customPaymentOfferId 등이 올 수 있음 */
+  const queryPlan = new URLSearchParams(location.search).get('plan');
+  const offerFromUrl = new URLSearchParams(location.search).get('offer');
+  const customOfferFromQuery = (new URLSearchParams(location.search).get('customOffer') || '').trim();
+
+  /** 로그인 복귀 시 state에 plan·customOfferId·customPaymentOfferId 등이 올 수 있음. URL ?customOffer= 는 The Frameless 고정 견적용 */
   const effectiveCheckoutState = useMemo(() => {
     const s = location.state || {};
     const c = s.checkoutState || {};
-    return { ...c, ...s };
-  }, [location.state]);
-
-  const queryPlan = new URLSearchParams(location.search).get('plan');
-  const offerFromUrl = new URLSearchParams(location.search).get('offer');
+    const fromQuery =
+      customOfferFromQuery === CUSTOM_OFFER_FRAMELESS_ID ? { customOfferId: CUSTOM_OFFER_FRAMELESS_ID } : {};
+    return { ...c, ...s, ...fromQuery };
+  }, [location.state, customOfferFromQuery]);
   const initialPlanId = effectiveCheckoutState?.plan?.id || effectiveCheckoutState?.plan || queryPlan || null;
   // cart: [{ planId, qty }, ...] - 복합/다중 구매 지원
   const [cart, setCart] = useState(() => {
@@ -514,7 +517,37 @@ export default function Checkout() {
     return 0;
   });
   const [submitting, setSubmitting] = useState(false);
+  /** 서버에서만 관리자 여부 확인 (VITE_ADMIN_EMAILS 미사용) */
+  const [isAdminServer, setIsAdminServer] = useState(false);
   const resumedCustomOfferId = initialResume?.customOfferId;
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!user) {
+        if (!cancelled) setIsAdminServer(false);
+        return;
+      }
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) {
+        if (!cancelled) setIsAdminServer(false);
+        return;
+      }
+      try {
+        const res = await fetch(`${window.location.origin}/api/admin/admin-session`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!cancelled) setIsAdminServer(!!(res.ok && data.is_admin));
+      } catch {
+        if (!cancelled) setIsAdminServer(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   const isCustomOfferActive = useMemo(
     () => (
@@ -647,18 +680,20 @@ export default function Checkout() {
   useEffect(() => {
     if (!authLoading && !user) {
       const offerQ = (offerFromUrl || '').trim() || null;
+      const framelessQ = customOfferFromQuery === CUSTOM_OFFER_FRAMELESS_ID ? CUSTOM_OFFER_FRAMELESS_ID : null;
       navigate('/login', {
         replace: true,
         state: {
-          from: '/checkout',
+          from: `/checkout${location.search || ''}`,
           checkoutState: {
             ...(typeof location.state === 'object' && location.state ? location.state : {}),
             ...(offerQ ? { customPaymentOfferId: offerQ } : {}),
+            ...(framelessQ ? { customOfferId: framelessQ } : {}),
           },
         },
       });
     }
-  }, [authLoading, user, navigate, location.state, offerFromUrl]);
+  }, [authLoading, user, navigate, location.state, location.search, offerFromUrl, customOfferFromQuery]);
 
   useEffect(() => { window.scrollTo(0, 0); }, []);
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'smooth' }); }, [currentStep]);
@@ -1121,11 +1156,8 @@ export default function Checkout() {
     }
   };
 
-  const adminEmails = (import.meta.env.VITE_ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
-  const isAdmin = adminEmails.length > 0 && user?.email && adminEmails.includes(user.email.toLowerCase());
-
   const handleAdminSkipPayment = async () => {
-    if (!isAdmin || paymentInProgressRef.current || !hasCartItems) return;
+    if (!isAdminServer || paymentInProgressRef.current || !hasCartItems) return;
     paymentInProgressRef.current = true;
     setSubmitting(true);
     const now = new Date();
@@ -1814,7 +1846,7 @@ export default function Checkout() {
                   </button>
                 )}
               </div>
-              {isAdmin && (
+              {isAdminServer && (
                 <div className="mt-6 pt-6 border-t border-white/10">
                   <button
                     type="button"

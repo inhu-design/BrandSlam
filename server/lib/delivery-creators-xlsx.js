@@ -105,7 +105,7 @@ export function parseDeliveryCreatorsWorkbook(buffer, opts = {}) {
  * @param {{ campaignId?: string }} [opts] campaign_id 가 있으면 해당 캠페인에만 귀속
  */
 export function toDbInsertRows(parsedRows, listSlug, opts = {}) {
-  const { campaignId } = opts;
+  const { campaignId, markReplacements } = opts;
   return parsedRows.map((r) => {
     const base = {
       list_slug: listSlug,
@@ -117,6 +117,7 @@ export function toDbInsertRows(parsedRows, listSlug, opts = {}) {
       instagram_follower: r.instagram_follower,
     };
     if (campaignId) base.campaign_id = campaignId;
+    if (markReplacements) base.is_replacement = true;
     if (r.visit_date != null && String(r.visit_date).trim() !== '') {
       base.visit_date = r.visit_date;
     }
