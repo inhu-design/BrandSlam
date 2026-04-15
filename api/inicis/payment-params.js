@@ -7,6 +7,7 @@
 import { createHash } from 'crypto';
 import { supabase } from '../../server/lib/supabase-server.js';
 import { assertFramelessOfferPrice } from '../../server/lib/custom-offers.js';
+import { assertDbCustomPaymentOfferPrice } from '../../server/lib/db-custom-payment-offers.js';
 
 const INICIS_MID = process.env.INICIS_MID || '';
 const INICIS_SIGNKEY = process.env.INICIS_SIGNKEY || '';
@@ -43,9 +44,14 @@ export default async function handler(req, res) {
   }
 
   if (orderDraft != null && typeof orderDraft === 'object') {
-    const framelessCheck = assertFramelessOfferPrice(orderDraft, price);
-    if (!framelessCheck.ok) {
-      return res.status(framelessCheck.status || 400).json({ error: framelessCheck.error });
+    let priceCheck;
+    if (orderDraft.custom_payment_offer_id) {
+      priceCheck = await assertDbCustomPaymentOfferPrice(orderDraft, price, supabase);
+    } else {
+      priceCheck = assertFramelessOfferPrice(orderDraft, price);
+    }
+    if (!priceCheck.ok) {
+      return res.status(priceCheck.status || 400).json({ error: priceCheck.error });
     }
     if (!supabase) {
       return res.status(503).json({ error: 'Server cannot persist checkout (Supabase service role missing).' });

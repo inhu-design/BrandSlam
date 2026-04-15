@@ -20,14 +20,34 @@ const handleMagicLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     
+    const buildCheckoutRedirectUrl = () => {
+      const baseOrigin = window.location.origin;
+      const path = returnTo.startsWith('http') ? returnTo : `${baseOrigin}${returnTo.startsWith('/') ? returnTo : `/${returnTo}`}`;
+      let u;
+      try {
+        u = new URL(path);
+      } catch {
+        u = new URL('/checkout', baseOrigin);
+      }
+      if (returnState?.customPaymentOfferId && !u.searchParams.get('offer')) {
+        u.searchParams.set('offer', returnState.customPaymentOfferId);
+      }
+      if (returnState?.plan) {
+        const pid = typeof returnState.plan === 'object' ? returnState.plan.id : returnState.plan;
+        if (pid && !u.searchParams.get('plan')) u.searchParams.set('plan', pid);
+      }
+      return u.toString();
+    };
+
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        // 기존: window.location.origin + '/dashboard', 
-        // 수정: 메인 페이지로 리다이렉트 (404 방지용)
-        emailRedirectTo: returnTo !== '/dashboard'
-          ? `${window.location.origin}${returnTo}${returnState?.plan ? `?plan=${typeof returnState.plan === 'object' ? returnState.plan.id : returnState.plan}` : ''}`
-          : window.location.origin, 
+        emailRedirectTo:
+          returnTo === '/dashboard'
+            ? window.location.origin
+            : String(returnTo).startsWith('/checkout')
+              ? buildCheckoutRedirectUrl()
+              : `${window.location.origin}${returnTo}${returnState?.plan ? `?plan=${typeof returnState.plan === 'object' ? returnState.plan.id : returnState.plan}` : ''}`,
       },
     });
   
@@ -49,7 +69,25 @@ const handleMagicLogin = async (e) => {
     if (error) {
       alert("로그인 실패: 이메일이나 비밀번호를 확인해주세요.\n(아직 비밀번호를 설정하지 않았다면 '간편 로그인'을 이용하세요)");
     } else {
-      navigate(returnTo, { state: returnState });
+      if (String(returnTo).startsWith('/checkout')) {
+        const baseOrigin = window.location.origin;
+        let u;
+        try {
+          u = new URL(`${baseOrigin}${returnTo}`);
+        } catch {
+          u = new URL('/checkout', baseOrigin);
+        }
+        if (returnState?.customPaymentOfferId && !u.searchParams.get('offer')) {
+          u.searchParams.set('offer', returnState.customPaymentOfferId);
+        }
+        if (returnState?.plan) {
+          const pid = typeof returnState.plan === 'object' ? returnState.plan.id : returnState.plan;
+          if (pid && !u.searchParams.get('plan')) u.searchParams.set('plan', pid);
+        }
+        navigate(`${u.pathname}${u.search}`, { state: returnState });
+      } else {
+        navigate(returnTo, { state: returnState });
+      }
     }
     setLoading(false);
   };

@@ -6,7 +6,8 @@ import {
   Lock, Settings, BarChart3, Users, PlayCircle, Eye, Heart, MessageCircle, Share2, 
   ChevronLeft, ChevronRight, Calendar, ExternalLink, Zap, Trash2, CheckCircle2, MoreHorizontal,
   Plane, Gift, TrendingUp, BarChart2, Trophy, RefreshCw, AlertTriangle, Download,
-  FileText, CreditCard, Printer, Video, ShieldCheck, X, Rocket, ArrowRight, Building2, Info, UserX, RotateCcw
+  FileText, CreditCard, Printer, Video, ShieldCheck, X, Rocket, ArrowRight, Building2, Info, UserX, RotateCcw,
+  ClipboardList, Link2, Upload,
 } from 'lucide-react';
 import Navbar from '../components/layout/Navbar'; 
 import Footer from '../components/layout/Footer';
@@ -18,6 +19,7 @@ import {
   FRAMELESS_OFFER_PRICING,
   getFramelessOfferTotals,
 } from '../lib/customOffers';
+import { computeDbOfferTotals } from '../lib/customPaymentOffers';
 
 /** The Frameless: DB orders.plan_price 와 무관하게 화면은 `customOffers` 확정 계약가와 통일 */
 function displayPaidOrderPlanPriceForViewer(order, viewerEmail) {
@@ -3579,6 +3581,822 @@ function AdminCampaignScheduleByIdPanel() {
   );
 }
 
+function AdminSignupOnlyUsersPanel() {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+  const [rows, setRows] = useState([]);
+  const [meta, setMeta] = useState(null);
+
+  const load = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) {
+      setErr('로그인 세션이 없습니다.');
+      return;
+    }
+    setLoading(true);
+    setErr('');
+    try {
+      const res = await fetch(`${window.location.origin}/api/admin/signup-only-users`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `조회 실패 (${res.status})`);
+      setRows(data.users || []);
+      setMeta({
+        total_auth_users: data.total_auth_users,
+        users_with_campaigns: data.users_with_campaigns,
+      });
+    } catch (e) {
+      setErr(e?.message || String(e));
+      setRows([]);
+      setMeta(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (open) load();
+  }, [open]);
+
+  return (
+    <div className="bg-white/[0.03] border border-violet-500/25 rounded-2xl overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full px-5 py-4 flex items-center justify-between text-left bg-violet-500/[0.08] border-b border-white/10"
+      >
+        <span className="text-sm font-black tracking-widest uppercase text-violet-200 flex items-center gap-2">
+          <Users size={18} className="text-violet-400" /> 캠페인 없음 · 가입만 한 계정
+        </span>
+        <ChevronRight size={18} className={`text-slate-500 transition-transform ${open ? 'rotate-90' : ''}`} />
+      </button>
+      {open && (
+        <div className="p-5 space-y-4">
+          <p className="text-xs text-slate-500">
+            Supabase Auth에는 있으나 <code className="text-slate-400">campaigns.user_id</code>로 연결된 캠페인이 한 건도 없는 계정입니다. 새로고침으로 최신 목록을 가져옵니다.
+          </p>
+          <div className="flex flex-wrap gap-2 items-center">
+            <button
+              type="button"
+              onClick={load}
+              disabled={loading}
+              className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-sm font-bold text-white flex items-center gap-2"
+            >
+              {loading ? <RefreshCw size={16} className="animate-spin" /> : null}
+              목록 불러오기
+            </button>
+            {meta && (
+              <span className="text-[11px] text-slate-500">
+                Auth 사용자 {meta.total_auth_users}명 중 캠페인 보유 {meta.users_with_campaigns}명
+              </span>
+            )}
+          </div>
+          {err && <p className="text-red-400 text-sm">{err}</p>}
+          <div className="max-h-[320px] overflow-auto rounded-xl border border-white/10">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-[#0b1327] text-slate-400 border-b border-white/10">
+                <tr>
+                  <th className="text-left px-3 py-2">이메일</th>
+                  <th className="text-right px-3 py-2">가입일</th>
+                  <th className="text-right px-3 py-2">최근 로그인</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {rows.map((u) => (
+                  <tr key={u.id} className="hover:bg-white/[0.03]">
+                    <td className="px-3 py-2 text-slate-200">{u.email || '—'}</td>
+                    <td className="px-3 py-2 text-right text-slate-500">
+                      {u.created_at ? new Date(u.created_at).toLocaleString('ko-KR') : '—'}
+                    </td>
+                    <td className="px-3 py-2 text-right text-slate-500">
+                      {u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString('ko-KR') : '—'}
+                    </td>
+                  </tr>
+                ))}
+                {!loading && rows.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="px-3 py-8 text-center text-slate-500">
+                      조건에 해당하는 계정이 없거나 아직 불러오지 않았습니다.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AdminCustomPaymentOffersPanel() {
+  const [open, setOpen] = useState(true);
+  const [listLoading, setListLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+  const [msg, setMsg] = useState('');
+  const [offers, setOffers] = useState([]);
+  const [form, setForm] = useState({
+    customer_email: '',
+    title: '',
+    seeding_qty: '150',
+    seeding_unit_price: '35000',
+    seeding_line_label: '시딩(건당)',
+    visit_qty: '0',
+    visit_unit_price: '0',
+    visit_line_label: '방문형 시딩(건당)',
+    vat_rate: '0.1',
+    note: '',
+  });
+
+  const loadList = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) return;
+    setListLoading(true);
+    setErr('');
+    try {
+      const res = await fetch(`${window.location.origin}/api/admin/custom-payment-offers?limit=80`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `목록 실패 (${res.status})`);
+      setOffers(data.offers || []);
+    } catch (e) {
+      setErr(e?.message || String(e));
+    } finally {
+      setListLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (open) loadList();
+  }, [open]);
+
+  const setField = (k) => (e) => {
+    setForm((f) => ({ ...f, [k]: e.target.value }));
+    setMsg('');
+    setErr('');
+  };
+
+  const handleCreate = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) {
+      alert('로그인 세션이 없습니다.');
+      return;
+    }
+    setSaving(true);
+    setErr('');
+    setMsg('');
+    try {
+      const res = await fetch(`${window.location.origin}/api/admin/custom-payment-offers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          customer_email: form.customer_email.trim(),
+          title: form.title.trim() || undefined,
+          seeding_qty: Number(form.seeding_qty),
+          seeding_unit_price: Number(form.seeding_unit_price),
+          visit_qty: Number(form.visit_qty),
+          visit_unit_price: Number(form.visit_unit_price),
+          seeding_line_label: form.seeding_line_label,
+          visit_line_label: form.visit_line_label,
+          vat_rate: Number(form.vat_rate),
+          note: form.note.trim() || undefined,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || '생성 실패');
+      const path = data.offer?.checkout_path || `/checkout?offer=${data.offer?.id}`;
+      const fullUrl = `${window.location.origin}${path}`;
+      setMsg(`생성됨. 고객에게 결제 링크를 전달하세요: ${fullUrl}`);
+      await loadList();
+    } catch (e) {
+      setErr(e?.message || String(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const copyText = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      alert('클립보드에 복사했습니다.');
+    } catch {
+      alert('복사에 실패했습니다. 링크를 직접 선택해 복사해 주세요.');
+    }
+  };
+
+  const deactivate = async (id) => {
+    if (!window.confirm('이 결제창을 비활성화할까요? (고객은 더 이상 결제할 수 없습니다)')) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) return;
+    try {
+      const res = await fetch(`${window.location.origin}/api/admin/custom-payment-offers`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ id, is_active: false }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || '비활성화 실패');
+      await loadList();
+    } catch (e) {
+      alert(e?.message || String(e));
+    }
+  };
+
+  return (
+    <div className="bg-white/[0.03] border border-emerald-500/25 rounded-2xl overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full px-5 py-4 flex items-center justify-between text-left bg-emerald-500/[0.08] border-b border-white/10"
+      >
+        <span className="text-sm font-black tracking-widest uppercase text-emerald-200 flex items-center gap-2">
+          <CreditCard size={18} className="text-emerald-400" /> 개인 결제창 발급 (수량·단가 커스텀)
+        </span>
+        <ChevronRight size={18} className={`text-slate-500 transition-transform ${open ? 'rotate-90' : ''}`} />
+      </button>
+      {open && (
+        <div className="p-5 space-y-6">
+          <p className="text-xs text-slate-500">
+            고객 이메일(로그인 계정과 동일)로 오퍼를 만들면 해당 고객의 대시보드에만 카드가 뜨고, 여기서 복사한 링크로도 결제할 수 있습니다. 시딩·방문 단가·건수는 공용 체크아웃 가격과 무관하게 자유 입력입니다. 금액은 서버에서 DB 기준으로 다시 검증합니다.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <input
+              value={form.customer_email}
+              onChange={setField('customer_email')}
+              placeholder="고객 이메일 *"
+              className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm text-white md:col-span-2"
+            />
+            <input
+              value={form.title}
+              onChange={setField('title')}
+              placeholder="표시 제목 (선택)"
+              className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm text-white md:col-span-2"
+            />
+            <input
+              value={form.seeding_qty}
+              onChange={setField('seeding_qty')}
+              placeholder="시딩 수량"
+              className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm text-white"
+            />
+            <input
+              value={form.seeding_unit_price}
+              onChange={setField('seeding_unit_price')}
+              placeholder="시딩 단가(원, 공급가)"
+              className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm text-white"
+            />
+            <input
+              value={form.seeding_line_label}
+              onChange={setField('seeding_line_label')}
+              placeholder="시딩 라인 표시명"
+              className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm text-white md:col-span-2"
+            />
+            <input
+              value={form.visit_qty}
+              onChange={setField('visit_qty')}
+              placeholder="방문형 시딩 수량 (없으면 0)"
+              className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm text-white"
+            />
+            <input
+              value={form.visit_unit_price}
+              onChange={setField('visit_unit_price')}
+              placeholder="방문 단가(원, 공급가)"
+              className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm text-white"
+            />
+            <input
+              value={form.visit_line_label}
+              onChange={setField('visit_line_label')}
+              placeholder="방문 라인 표시명"
+              className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm text-white md:col-span-2"
+            />
+            <input
+              value={form.vat_rate}
+              onChange={setField('vat_rate')}
+              placeholder="부가세율 (예: 0.1)"
+              className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm text-white"
+            />
+            <input
+              value={form.note}
+              onChange={setField('note')}
+              placeholder="내부 메모 (선택)"
+              className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm text-white md:col-span-2"
+            />
+          </div>
+          <div className="flex flex-wrap gap-2 items-center">
+            <button
+              type="button"
+              onClick={handleCreate}
+              disabled={saving || !form.customer_email.trim()}
+              className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-sm font-bold text-white"
+            >
+              {saving ? '생성 중…' : '결제창 생성'}
+            </button>
+            <button
+              type="button"
+              onClick={loadList}
+              disabled={listLoading}
+              className="px-4 py-2.5 rounded-xl bg-white/10 border border-white/15 text-sm text-slate-200"
+            >
+              목록 새로고침
+            </button>
+          </div>
+          {err && <p className="text-red-400 text-sm">{err}</p>}
+          {msg && <p className="text-emerald-300 text-sm break-all">{msg}</p>}
+          <div className="max-h-[280px] overflow-auto rounded-xl border border-white/10">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-[#0b1327] text-slate-400 border-b border-white/10">
+                <tr>
+                  <th className="text-left px-3 py-2">고객</th>
+                  <th className="text-right px-3 py-2">합계(VAT)</th>
+                  <th className="text-center px-3 py-2">상태</th>
+                  <th className="text-right px-3 py-2">액션</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {offers.map((o) => {
+                  const link = `${window.location.origin}/checkout?offer=${o.id}`;
+                  return (
+                    <tr key={o.id} className="hover:bg-white/[0.03]">
+                      <td className="px-3 py-2 text-slate-200">
+                        <p className="font-mono text-[11px] text-slate-500">{o.id}</p>
+                        <p>{o.customer_email}</p>
+                      </td>
+                      <td className="px-3 py-2 text-right text-white font-mono">
+                        {typeof o.expected_total === 'number' ? o.expected_total.toLocaleString() : '—'}
+                      </td>
+                      <td className="px-3 py-2 text-center">{o.is_active ? <span className="text-emerald-400">활성</span> : <span className="text-slate-500">비활성</span>}</td>
+                      <td className="px-3 py-2 text-right space-y-1">
+                        <button type="button" onClick={() => copyText(link)} className="block w-full text-cyan-300 hover:underline">
+                          링크 복사
+                        </button>
+                        {o.is_active ? (
+                          <button type="button" onClick={() => deactivate(o.id)} className="block w-full text-amber-400 hover:underline">
+                            비활성화
+                          </button>
+                        ) : null}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {!listLoading && offers.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-3 py-6 text-center text-slate-500">
+                      등록된 개인 결제창이 없습니다.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** 최근 주문 조회 · 주문 상태/금액 보정 · 고객 Auth 계정과 캠페인/주문 user_id 연결 */
+function AdminOpsToolsPanel({ onFocusOrderNumber }) {
+  const [open, setOpen] = useState(false);
+  const [orders, setOrders] = useState([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
+  const [orderErr, setOrderErr] = useState('');
+  const [editingOrderNumber, setEditingOrderNumber] = useState(null);
+  const [editStatus, setEditStatus] = useState('paid');
+  const [editPlanPrice, setEditPlanPrice] = useState('');
+  const [orderSaveMsg, setOrderSaveMsg] = useState('');
+  const [linkEmail, setLinkEmail] = useState('');
+  const [linkUserId, setLinkUserId] = useState('');
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [linkMsg, setLinkMsg] = useState('');
+
+  const loadOrders = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) return;
+    setLoadingOrders(true);
+    setOrderErr('');
+    try {
+      const res = await fetch(`${window.location.origin}/api/admin/recent-orders?limit=80`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `조회 실패 (${res.status})`);
+      setOrders(data.orders || []);
+    } catch (e) {
+      setOrderErr(e?.message || String(e));
+      setOrders([]);
+    } finally {
+      setLoadingOrders(false);
+    }
+  };
+
+  useEffect(() => {
+    if (open) loadOrders();
+  }, [open]);
+
+  const startEditOrder = (o) => {
+    setEditingOrderNumber(o.order_number);
+    setEditStatus(o.status || 'paid');
+    setEditPlanPrice(String(o.plan_price ?? ''));
+    setOrderSaveMsg('');
+  };
+
+  const saveOrderPatch = async () => {
+    if (!editingOrderNumber) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) return;
+    setOrderSaveMsg('');
+    try {
+      const body = { order_number: editingOrderNumber, status: editStatus };
+      if (editPlanPrice.trim() !== '') {
+        body.plan_price = Number(editPlanPrice);
+        if (!Number.isFinite(body.plan_price)) {
+          setOrderSaveMsg('금액은 숫자로 입력해 주세요.');
+          return;
+        }
+      }
+      const res = await fetch(`${window.location.origin}/api/admin/order-update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || '저장 실패');
+      setOrderSaveMsg('저장되었습니다.');
+      await loadOrders();
+    } catch (e) {
+      setOrderSaveMsg(e?.message || String(e));
+    }
+  };
+
+  const runLinkUser = async () => {
+    const em = linkEmail.trim().toLowerCase();
+    if (!em || !em.includes('@')) {
+      setLinkMsg('고객 이메일을 입력해 주세요.');
+      return;
+    }
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) return;
+    setLinkBusy(true);
+    setLinkMsg('');
+    try {
+      const body = { customer_email: em };
+      const uid = linkUserId.trim();
+      if (uid) body.user_id = uid;
+      const res = await fetch(`${window.location.origin}/api/admin/link-customer-user`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || '연결 실패');
+      setLinkMsg(
+        `완료: 캠페인 ${data.campaigns_updated}건, 주문 ${data.orders_updated}건에 user_id 반영 (user_id: ${data.user_id})`,
+      );
+    } catch (e) {
+      setLinkMsg(e?.message || String(e));
+    } finally {
+      setLinkBusy(false);
+    }
+  };
+
+  return (
+    <div className="mb-10 bg-white/[0.03] border border-amber-500/25 rounded-2xl overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full px-5 py-4 flex items-center justify-between text-left bg-amber-500/[0.08] border-b border-white/10"
+      >
+        <span className="text-sm font-black tracking-widest uppercase text-amber-200 flex items-center gap-2">
+          <ClipboardList size={18} className="text-amber-400" /> 운영 도구 — 전역 주문 · 환불 표기 · 계정 연결
+        </span>
+        <ChevronRight size={18} className={`text-slate-500 transition-transform ${open ? 'rotate-90' : ''}`} />
+      </button>
+      {open && (
+        <div className="p-5 space-y-8">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+            <div>
+              <h4 className="text-xs font-black text-amber-300/90 uppercase tracking-widest mb-2">최근 주문 (전체 고객)</h4>
+              <p className="text-xs text-slate-500 mb-3">
+                PG·입금 건 정리, 환불/취소 시 <code className="text-slate-400">orders.status</code>를 표기합니다. 금액 오타는 <code className="text-slate-400">plan_price</code>로 보정합니다.
+              </p>
+              <div className="flex gap-2 mb-3">
+                <button
+                  type="button"
+                  onClick={loadOrders}
+                  disabled={loadingOrders}
+                  className="px-3 py-2 rounded-xl bg-amber-600/80 hover:bg-amber-500 text-xs font-bold text-white disabled:opacity-50"
+                >
+                  {loadingOrders ? '불러오는 중…' : '새로고침'}
+                </button>
+              </div>
+              {orderErr && <p className="text-red-400 text-sm mb-2">{orderErr}</p>}
+              <div className="max-h-[340px] overflow-auto rounded-xl border border-white/10">
+                <table className="w-full text-[11px]">
+                  <thead className="sticky top-0 bg-[#0b1327] text-slate-400 border-b border-white/10">
+                    <tr>
+                      <th className="text-left px-2 py-2">주문번호</th>
+                      <th className="text-left px-2 py-2">이메일</th>
+                      <th className="text-right px-2 py-2">금액</th>
+                      <th className="text-center px-2 py-2">상태</th>
+                      <th className="text-right px-2 py-2">액션</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {orders.map((o) => (
+                      <tr key={o.order_number} className="hover:bg-white/[0.03]">
+                        <td className="px-2 py-2 font-mono text-slate-300">{o.order_number}</td>
+                        <td className="px-2 py-2 text-slate-400 break-all">{o.email}</td>
+                        <td className="px-2 py-2 text-right text-white">{Number(o.plan_price || 0).toLocaleString()}</td>
+                        <td className="px-2 py-2 text-center text-slate-400">{o.status}</td>
+                        <td className="px-2 py-2 text-right space-y-1">
+                          {onFocusOrderNumber ? (
+                            <button
+                              type="button"
+                              className="block w-full text-cyan-300 hover:underline"
+                              onClick={() => onFocusOrderNumber(o.order_number)}
+                            >
+                              캠페인 검색
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            className="block w-full text-amber-300 hover:underline"
+                            onClick={() => startEditOrder(o)}
+                          >
+                            상태·금액
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {!loadingOrders && orders.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="px-2 py-6 text-center text-slate-500">
+                          주문이 없습니다.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              {editingOrderNumber && (
+                <div className="mt-4 p-4 rounded-xl border border-amber-500/20 bg-amber-500/5 space-y-3">
+                  <p className="text-xs text-amber-200/90 font-mono">{editingOrderNumber}</p>
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <label className="text-[10px] text-slate-500 uppercase">상태</label>
+                    <select
+                      value={editStatus}
+                      onChange={(e) => setEditStatus(e.target.value)}
+                      className="px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-white"
+                    >
+                      <option value="paid">paid</option>
+                      <option value="pending_payment">pending_payment</option>
+                      <option value="refunded">refunded</option>
+                      <option value="cancelled">cancelled</option>
+                    </select>
+                    <label className="text-[10px] text-slate-500 uppercase ml-2">plan_price</label>
+                    <input
+                      value={editPlanPrice}
+                      onChange={(e) => setEditPlanPrice(e.target.value)}
+                      className="w-28 px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={saveOrderPatch}
+                      className="px-3 py-1.5 rounded-lg bg-amber-600 text-xs font-bold text-white"
+                    >
+                      저장
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingOrderNumber(null)}
+                      className="px-3 py-1.5 rounded-lg bg-white/10 text-xs text-slate-300"
+                    >
+                      닫기
+                    </button>
+                  </div>
+                  {orderSaveMsg && <p className="text-xs text-slate-400">{orderSaveMsg}</p>}
+                </div>
+              )}
+            </div>
+            <div>
+              <h4 className="text-xs font-black text-amber-300/90 uppercase tracking-widest mb-2 flex items-center gap-2">
+                <Link2 size={14} /> 고객 계정 ↔ 캠페인·주문 연결
+              </h4>
+              <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+                대시보드는 <code className="text-slate-400">campaigns.user_id</code> 기준으로만 고객 캠페인을 보여 줍니다. 결제 이메일과 가입 이메일이 같아도 <code className="text-slate-400">user_id</code>가 비어 있으면 목록에 안 나올 수 있습니다. 아래에서 해당 이메일의 모든 캠페인·주문에 Auth 사용자 UUID를 붙입니다. UUID는 Supabase Auth 사용자 목록에서 복사하거나, 비워 두면 같은 이메일로 Auth에서 자동 조회합니다.
+              </p>
+              <div className="space-y-2">
+                <input
+                  value={linkEmail}
+                  onChange={(e) => setLinkEmail(e.target.value)}
+                  placeholder="고객 이메일 (campaigns.customer_email / orders.email)"
+                  className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white"
+                />
+                <input
+                  value={linkUserId}
+                  onChange={(e) => setLinkUserId(e.target.value)}
+                  placeholder="Auth user UUID (선택, 비우면 이메일로 조회)"
+                  className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={runLinkUser}
+                  disabled={linkBusy}
+                  className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-sm font-bold text-white"
+                >
+                  {linkBusy ? '처리 중…' : 'user_id 일괄 연결'}
+                </button>
+              </div>
+              {linkMsg && <p className="text-xs text-slate-300 mt-2 whitespace-pre-wrap">{linkMsg}</p>}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** 엑셀 → admin_delivery_creators (납품 리스트). 캠페인의 linked_list_slug 와 동일 slug면 대시보드에 반영됨 */
+function AdminDeliveryExcelImportPanel() {
+  const [open, setOpen] = useState(false);
+  const [listSlug, setListSlug] = useState('BS-US-FARMSKIN');
+  const [mode, setMode] = useState('replace');
+  const [omitVisitDate, setOmitVisitDate] = useState(false);
+  const [file, setFile] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [err, setErr] = useState('');
+  const [preview, setPreview] = useState(null);
+
+  const readFileBase64 = (f) =>
+    new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => {
+        const s = r.result;
+        if (typeof s !== 'string') {
+          reject(new Error('파일 읽기 실패'));
+          return;
+        }
+        const i = s.indexOf('base64,');
+        resolve(i >= 0 ? s.slice(i + 7) : s);
+      };
+      r.onerror = () => reject(r.error || new Error('read error'));
+      r.readAsDataURL(f);
+    });
+
+  const postImport = async (dryRun) => {
+    setErr('');
+    setMsg('');
+    setPreview(null);
+    if (!file) {
+      setErr('엑셀 파일(.xlsx / .xls)을 선택해 주세요.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const b64 = await readFileBase64(file);
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) {
+        setErr('로그인 세션이 없습니다.');
+        return;
+      }
+      const res = await fetch(`${window.location.origin}/api/admin/delivery-creators-import`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          file_base64: b64,
+          list_slug: listSlug.trim(),
+          mode,
+          dry_run: dryRun,
+          omit_visit_date: omitVisitDate,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `요청 실패 (${res.status})`);
+      if (dryRun) {
+        setPreview(data);
+        setMsg(
+          `미리보기: 시트 "${data.sheet_name}" · 유효 ${data.valid_row_count}명 (원본 행 ${data.raw_row_count}). 아래 샘플 확인 후 「${mode === 'replace' ? '전체 교체' : '추가'} 반영」을 누르세요.`,
+        );
+      } else {
+        setPreview(null);
+        setMsg(`반영 완료: ${data.inserted}명 삽입 (slug: ${data.list_slug}, 모드: ${data.mode}). 고객 캠페인에 이미 연결된 list_slug 라면 새로고침 후 납품 탭에서 확인됩니다.`);
+        setFile(null);
+      }
+    } catch (e) {
+      setErr(e?.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mb-10 bg-white/[0.03] border border-rose-500/25 rounded-2xl overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full px-5 py-4 flex items-center justify-between text-left bg-rose-500/[0.08] border-b border-white/10"
+      >
+        <span className="text-sm font-black tracking-widest uppercase text-rose-200 flex items-center gap-2">
+          <Upload size={18} className="text-rose-400" /> 납품 엑셀 → Supabase (재배포 없음)
+        </span>
+        <ChevronRight size={18} className={`text-slate-500 transition-transform ${open ? 'rotate-90' : ''}`} />
+      </button>
+      {open && (
+        <div className="p-5 space-y-4">
+          <p className="text-xs text-slate-500 leading-relaxed">
+            기존 <code className="text-slate-400">import-farmskin-excel</code> 스크립트와 동일한 열 매핑(name, Shipping country, TikTok/Instagram URL·Follower, 선택 visit date)입니다.{' '}
+            <strong className="text-rose-200/90">replace</strong>는 해당 <code className="text-slate-400">list_slug</code> 전체 삭제 후 삽입,
+            <strong className="text-rose-200/90"> append</strong>는 기존 행을 두고 뒤에 추가합니다. 캠페인 런타임 설정의 납품 slug와 반드시 일치시키세요.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <label className="text-[10px] text-slate-500 uppercase tracking-widest">
+              list_slug
+              <input
+                value={listSlug}
+                onChange={(e) => setListSlug(e.target.value)}
+                className="mt-1 w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white font-mono"
+                placeholder="BS-US-FARMSKIN"
+              />
+            </label>
+            <label className="text-[10px] text-slate-500 uppercase tracking-widest">
+              모드
+              <select
+                value={mode}
+                onChange={(e) => setMode(e.target.value)}
+                className="mt-1 w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white"
+              >
+                <option value="replace">replace (slug 전체 교체)</option>
+                <option value="append">append (기존 + 추가)</option>
+              </select>
+            </label>
+          </div>
+          <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={omitVisitDate}
+              onChange={(e) => setOmitVisitDate(e.target.checked)}
+              className="rounded border-white/20"
+            />
+            visit_date 컬럼 없이 삽입 (DB에 visit_date 마이그레이션 전)
+          </label>
+          <input
+            type="file"
+            accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+            onChange={(e) => {
+              setFile(e.target.files?.[0] || null);
+              setMsg('');
+              setErr('');
+              setPreview(null);
+            }}
+            className="block w-full text-xs text-slate-300 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-rose-500/20 file:text-rose-200"
+          />
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => postImport(true)}
+              className="px-4 py-2 rounded-xl bg-white/10 border border-white/15 text-sm font-bold text-slate-200 hover:bg-white/15 disabled:opacity-50"
+            >
+              미리보기만
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                if (!window.confirm(`정말 Supabase에 반영할까요? (${mode === 'replace' ? '기존 동일 slug 행은 삭제됩니다' : '기존 행 뒤에 추가됩니다'})`)) return;
+                postImport(false);
+              }}
+              className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-sm font-bold text-white disabled:opacity-50"
+            >
+              {busy ? '처리 중…' : 'Supabase 반영'}
+            </button>
+          </div>
+          {err && <p className="text-red-400 text-sm">{err}</p>}
+          {msg && <p className="text-emerald-300/90 text-sm">{msg}</p>}
+          {preview?.sample && (
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 text-[11px] text-slate-400 font-mono overflow-x-auto">
+              <p className="text-slate-500 mb-2">샘플 (최대 3행)</p>
+              <pre className="whitespace-pre-wrap break-all">{JSON.stringify(preview.sample, null, 2)}</pre>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const AdminCampaignQuickEditor = ({ campaign, onSaved }) => {
   const [fields, setFields] = useState({
     brand_name: '',
@@ -4285,6 +5103,8 @@ export default function Dashboard() {
   const [user, setUser] = useState(null);
   const [campaigns, setCampaigns] = useState([]);
   const [paidOrders, setPaidOrders] = useState([]);
+  /** 관리자가 발급한 활성 개인 결제창 — 해당 이메일 유저 대시보드에만 노출 */
+  const [myCustomPaymentOffers, setMyCustomPaymentOffers] = useState([]);
   const [selectedCampaignId, setSelectedCampaignId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isDemoMode, setIsDemoMode] = useState(false);
@@ -4451,8 +5271,29 @@ export default function Dashboard() {
           .order('created_at', { ascending: false })
           .limit(20);
         setPaidOrders(ordersData || []);
+
+        try {
+          const { data: { session: s2 } } = await supabase.auth.getSession();
+          const t2 = s2?.access_token;
+          if (t2) {
+            const resOffers = await fetch(`${window.location.origin}/api/my-custom-payment-offers`, {
+              headers: { Authorization: `Bearer ${t2}` },
+            });
+            if (resOffers.ok) {
+              const j = await resOffers.json();
+              setMyCustomPaymentOffers(Array.isArray(j.offers) ? j.offers : []);
+            } else {
+              setMyCustomPaymentOffers([]);
+            }
+          } else {
+            setMyCustomPaymentOffers([]);
+          }
+        } catch {
+          setMyCustomPaymentOffers([]);
+        }
       } else {
         // [수정됨] 비로그인 유저: 데모 모드 노출
+        setMyCustomPaymentOffers([]);
         setCampaigns(DEMO_CAMPAIGNS);
         setSelectedCampaignId(DEMO_CAMPAIGNS[0].id);
         setIsDemoMode(true);
@@ -4529,6 +5370,16 @@ export default function Dashboard() {
     setAdminFilterStatus('all');
     setAdminFilterDelivery('all');
     setAdminSearch(next === 'all' ? '' : customerEmail);
+  };
+
+  const handleAdminFocusOrderNumber = (orderNum) => {
+    if (!isAdminUser || !orderNum) return;
+    setAdminFilterCustomer('all');
+    setAdminFilterBrand('all');
+    setAdminFilterPlan('all');
+    setAdminFilterStatus('all');
+    setAdminFilterDelivery('all');
+    setAdminSearch(String(orderNum).trim());
   };
 
   const handleAdminDrilldownMetric = (customerEmail, metric) => {
@@ -4773,6 +5624,67 @@ export default function Dashboard() {
           </div>
         )}
 
+        {!isDemoMode && user && myCustomPaymentOffers.length > 0 && (
+          <div className="mb-10 space-y-4">
+            <p className="text-[10px] font-black tracking-[0.25em] uppercase text-sky-400/90 px-1">개인 결제창</p>
+            {myCustomPaymentOffers.map((offer) => {
+              const t = computeDbOfferTotals(offer);
+              const seedLine = `${offer.seeding_line_label || '시딩(건당)'} × ${Number(offer.seeding_qty) || 0}건 · 공급가`;
+              const seedSupply = (Number(offer.seeding_unit_price) || 0) * (Number(offer.seeding_qty) || 0);
+              const visitQty = Number(offer.visit_qty) || 0;
+              const visitSupply = visitQty > 0 ? (Number(offer.visit_unit_price) || 0) * visitQty : 0;
+              return (
+                <div
+                  key={offer.id}
+                  className="p-6 md:p-8 rounded-[2rem] border border-sky-500/35 bg-gradient-to-br from-sky-950/45 to-slate-900/80 shadow-[0_0_32px_rgba(14,165,233,0.1)]"
+                >
+                  <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
+                    <div>
+                      <h2 className="text-xl md:text-2xl font-black text-white mb-2">
+                        {offer.title?.trim() || '맞춤 견적 결제'}
+                      </h2>
+                      <p className="text-sm text-slate-400 leading-relaxed max-w-xl">
+                        관리자가 귀하의 계정으로만 발급한 결제창입니다. 시딩·방문 라인의 단가·수량은 공용 요금제와 별도이며, 아래는 부가세 포함 총액입니다.
+                      </p>
+                      <ul className="mt-4 space-y-2 text-sm text-slate-300">
+                        {(Number(offer.seeding_qty) || 0) > 0 && (
+                          <li className="flex justify-between gap-4 max-w-md">
+                            <span>{seedLine}</span>
+                            <span className="font-mono text-white">{seedSupply.toLocaleString()}원</span>
+                          </li>
+                        )}
+                        {visitQty > 0 && (
+                          <li className="flex justify-between gap-4 max-w-md">
+                            <span>
+                              {offer.visit_line_label || '방문형 시딩(건당)'} × {visitQty}건 · 공급가
+                            </span>
+                            <span className="font-mono text-white">{visitSupply.toLocaleString()}원</span>
+                          </li>
+                        )}
+                        <li className="flex justify-between gap-4 max-w-md border-t border-white/10 pt-2 mt-2">
+                          <span className="text-sky-200/90">부가세</span>
+                          <span className="font-mono text-sky-200">{t.vat.toLocaleString()}원</span>
+                        </li>
+                        <li className="flex justify-between gap-4 max-w-md text-lg font-black text-white">
+                          <span>결제 예정(VAT 포함)</span>
+                          <span className="text-sky-400">{t.total.toLocaleString()}원</span>
+                        </li>
+                      </ul>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/checkout?offer=${offer.id}`)}
+                      className="shrink-0 inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-black text-slate-950 bg-gradient-to-r from-sky-400 to-cyan-500 hover:from-sky-300 hover:to-cyan-400 transition-all shadow-lg shadow-sky-500/20"
+                    >
+                      이 견적으로 결제하기 <ArrowRight size={18} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {isAdminUser && (
             <div className="mb-10 p-5 bg-cyan-500/10 border border-cyan-500/30 rounded-3xl text-cyan-100 text-sm animate-fade-in-down">
                 <div className="flex items-center gap-3 mb-3">
@@ -4994,6 +5906,17 @@ export default function Dashboard() {
                 )}
                 <AdminCampaignScheduleByIdPanel />
             </div>
+        )}
+
+        {isAdminUser && (
+          <>
+            <div className="mb-10 grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <AdminSignupOnlyUsersPanel />
+              <AdminCustomPaymentOffersPanel />
+            </div>
+            <AdminOpsToolsPanel onFocusOrderNumber={handleAdminFocusOrderNumber} />
+            <AdminDeliveryExcelImportPanel />
+          </>
         )}
 
         {user && !user?.user_metadata?.password_set && (

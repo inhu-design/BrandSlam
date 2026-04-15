@@ -17,6 +17,12 @@ import {
   getFramelessOrderItemsForDraft,
   isFramelessOfferForUser,
 } from '../lib/customOffers';
+import {
+  buildDbCustomOfferLineItems,
+  getDbOfferContentCount,
+  getDbOfferOrderItemsForDraft,
+  isDbOfferForUser,
+} from '../lib/customPaymentOffers';
 
 const CHECKOUT_RESUME_KEY = 'checkout_resume_state_v1';
 
@@ -418,15 +424,15 @@ export default function Checkout() {
   const { user, loading: authLoading } = useAuth();
   const initialResume = useMemo(() => readCheckoutResume(), []);
 
-  /** 로그인 복귀 시 { checkoutState: { customOfferId } } 형태로 올 수 있음 */
+  /** 로그인 복귀 시 state에 plan·customOfferId·customPaymentOfferId 등이 올 수 있음 */
   const effectiveCheckoutState = useMemo(() => {
-    const s = location.state;
-    if (s?.customOfferId) return s;
-    if (s?.checkoutState?.customOfferId) return s.checkoutState;
-    return s || {};
+    const s = location.state || {};
+    const c = s.checkoutState || {};
+    return { ...c, ...s };
   }, [location.state]);
 
   const queryPlan = new URLSearchParams(location.search).get('plan');
+  const offerFromUrl = new URLSearchParams(location.search).get('offer');
   const initialPlanId = effectiveCheckoutState?.plan?.id || effectiveCheckoutState?.plan || queryPlan || null;
   // cart: [{ planId, qty }, ...] - 복합/다중 구매 지원
   const [cart, setCart] = useState(() => {
@@ -439,29 +445,55 @@ export default function Checkout() {
     return [];
   });
 
-  // cart에서 line items 및 총액 계산
-  const lineItems = cart
-    .filter((item) => item.qty > 0)
-    .map((item) => {
-      const p = PLANS[item.planId];
-      if (!p) return null;
-      const isVisit = p.isVisit;
-      const unitPrice = isVisit ? p.pricePerPerson : p.priceNum;
-      const count = isVisit ? item.qty : p.count * item.qty;
-      const supplyAmount = unitPrice * item.qty;
-      return {
-        planId: item.planId,
-        plan: p,
-        qty: item.qty,
-        unitPrice,
-        supplyAmount,
-        count,
-        isVisit,
-      };
-    })
-    .filter(Boolean);
+  const activeCustomPaymentOfferId = useMemo(() => {
+    const fromUrl = (offerFromUrl || '').trim() || null;
+    const fromState = (effectiveCheckoutState?.customPaymentOfferId || '').trim() || null;
+    const fromResume = (initialResume?.customPaymentOfferId || '').trim() || null;
+    return fromUrl || fromState || fromResume || null;
+  }, [offerFromUrl, effectiveCheckoutState?.customPaymentOfferId, initialResume?.customPaymentOfferId]);
 
-  const vatRate = 0.1;
+  const [dbCustomOffer, setDbCustomOffer] = useState(null);
+  const [dbOfferError, setDbOfferError] = useState('');
+  const [dbOfferLoading, setDbOfferLoading] = useState(false);
+
+  const isDbCustomOfferActive = useMemo(() => {
+    if (!dbCustomOffer || dbOfferError || !user?.email) return false;
+    return isDbOfferForUser(dbCustomOffer, user.email);
+  }, [dbCustomOffer, dbOfferError, user?.email]);
+
+  // cart 또는 DB 개인결제창에서 line items 계산
+  const lineItems = useMemo(() => {
+    if (isDbCustomOfferActive && dbCustomOffer) {
+      return buildDbCustomOfferLineItems(dbCustomOffer);
+    }
+    return cart
+      .filter((item) => item.qty > 0)
+      .map((item) => {
+        const p = PLANS[item.planId];
+        if (!p) return null;
+        const isVisit = p.isVisit;
+        const unitPrice = isVisit ? p.pricePerPerson : p.priceNum;
+        const count = isVisit ? item.qty : p.count * item.qty;
+        const supplyAmount = unitPrice * item.qty;
+        return {
+          planId: item.planId,
+          plan: p,
+          qty: item.qty,
+          unitPrice,
+          supplyAmount,
+          count,
+          isVisit,
+        };
+      })
+      .filter(Boolean);
+  }, [isDbCustomOfferActive, dbCustomOffer, cart]);
+
+  const vatRate = isDbCustomOfferActive && dbCustomOffer
+    ? (() => {
+        const r = Number(dbCustomOffer.vat_rate);
+        return Number.isFinite(r) && r >= 0 && r <= 1 ? r : 0.1;
+      })()
+    : 0.1;
   const supplyPrice = lineItems.reduce((sum, li) => sum + li.supplyAmount, 0);
   const vatAmount = Math.round(supplyPrice * vatRate);
   const totalPrice = supplyPrice + vatAmount;
@@ -495,9 +527,77 @@ export default function Checkout() {
     [effectiveCheckoutState, user?.email, resumedCustomOfferId],
   );
 
+  const isCheckoutCustomPayment = isCustomOfferActive || isDbCustomOfferActive;
+
+  const dbOfferStepBootRef = useRef(null);
+
+  useEffect(() => {
+    if (!activeCustomPaymentOfferId || !user) {
+      setDbCustomOffer(null);
+      setDbOfferError('');
+      setDbOfferLoading(false);
+      return undefined;
+    }
+    let cancelled = false;
+    setDbOfferLoading(true);
+    setDbOfferError('');
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        if (!token) {
+          if (!cancelled) {
+            setDbOfferError('로그인 세션이 없습니다.');
+            setDbCustomOffer(null);
+          }
+          return;
+        }
+        const res = await fetch(
+          `${window.location.origin}/api/custom-payment-offer?id=${encodeURIComponent(activeCustomPaymentOfferId)}`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (!res.ok) {
+          setDbCustomOffer(null);
+          setDbOfferError(data.error || '결제 정보를 불러오지 못했습니다.');
+          return;
+        }
+        setDbCustomOffer(data.offer);
+        setDbOfferError('');
+      } catch {
+        if (!cancelled) {
+          setDbCustomOffer(null);
+          setDbOfferError('네트워크 오류로 결제 정보를 불러오지 못했습니다.');
+        }
+      } finally {
+        if (!cancelled) setDbOfferLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCustomPaymentOfferId, user?.id]);
+
+  useLayoutEffect(() => {
+    if (authLoading || !user || !dbCustomOffer || dbOfferError) return;
+    if (!isDbOfferForUser(dbCustomOffer, user.email)) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [authLoading, user, dbCustomOffer, dbOfferError, navigate]);
+
+  useLayoutEffect(() => {
+    if (authLoading || !user || !dbCustomOffer || dbOfferError) return;
+    if (!isDbOfferForUser(dbCustomOffer, user.email)) return;
+    if (dbOfferStepBootRef.current === dbCustomOffer.id) return;
+    dbOfferStepBootRef.current = dbCustomOffer.id;
+    setCurrentStep(1);
+  }, [authLoading, user, dbCustomOffer, dbOfferError]);
+
   useLayoutEffect(() => {
     if (authLoading) return;
     if (!user) return;
+    if (activeCustomPaymentOfferId) return;
     if (effectiveCheckoutState?.customOfferId !== CUSTOM_OFFER_FRAMELESS_ID) return;
     if (user.email?.toLowerCase().trim() !== CUSTOM_OFFER_FRAMELESS_EMAIL) {
       navigate('/dashboard', { replace: true });
@@ -505,7 +605,7 @@ export default function Checkout() {
     }
     setCart(getFramelessOfferCart());
     setCurrentStep(1);
-  }, [authLoading, user, effectiveCheckoutState?.customOfferId, navigate]);
+  }, [authLoading, user, activeCustomPaymentOfferId, effectiveCheckoutState?.customOfferId, navigate]);
 
   const hasExistingPassword = user?.user_metadata?.password_set === true;
   const [isSettingPassword, setIsSettingPassword] = useState(!hasExistingPassword);
@@ -546,12 +646,19 @@ export default function Checkout() {
 
   useEffect(() => {
     if (!authLoading && !user) {
+      const offerQ = (offerFromUrl || '').trim() || null;
       navigate('/login', {
         replace: true,
-        state: { from: '/checkout', checkoutState: location.state },
+        state: {
+          from: '/checkout',
+          checkoutState: {
+            ...(typeof location.state === 'object' && location.state ? location.state : {}),
+            ...(offerQ ? { customPaymentOfferId: offerQ } : {}),
+          },
+        },
       });
     }
-  }, [authLoading, user, navigate, location.state]);
+  }, [authLoading, user, navigate, location.state, offerFromUrl]);
 
   useEffect(() => { window.scrollTo(0, 0); }, []);
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'smooth' }); }, [currentStep]);
@@ -563,6 +670,7 @@ export default function Checkout() {
       currentStep,
       paymentMethod,
       customOfferId: isCustomOfferActive ? CUSTOM_OFFER_FRAMELESS_ID : null,
+      customPaymentOfferId: activeCustomPaymentOfferId || null,
       cart,
       form: {
         email: form.email,
@@ -573,7 +681,20 @@ export default function Checkout() {
       clientForm,
       agree,
     });
-  }, [user?.email, currentStep, paymentMethod, isCustomOfferActive, cart, form.email, form.name, form.phone, form.company, clientForm, agree]);
+  }, [
+    user?.email,
+    currentStep,
+    paymentMethod,
+    isCustomOfferActive,
+    activeCustomPaymentOfferId,
+    cart,
+    form.email,
+    form.name,
+    form.phone,
+    form.company,
+    clientForm,
+    agree,
+  ]);
 
   useEffect(() => {
     const onMessage = (e) => {
@@ -654,6 +775,34 @@ export default function Checkout() {
     );
   }
 
+  if (activeCustomPaymentOfferId && dbOfferLoading) {
+    return (
+      <div className="font-sans antialiased text-white bg-[#020617] min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center">
+        <Loader2 className="w-10 h-10 animate-spin text-emerald-500" />
+        <p className="text-slate-400 text-sm">개인 결제창 정보를 불러오는 중입니다…</p>
+      </div>
+    );
+  }
+
+  if (activeCustomPaymentOfferId && dbOfferError) {
+    return (
+      <div className="font-sans antialiased text-white bg-[#020617] min-h-screen flex flex-col items-center justify-center gap-6 px-6 text-center">
+        <AlertTriangle className="w-12 h-12 text-amber-400" />
+        <div>
+          <p className="text-white font-bold mb-2">결제창을 열 수 없습니다</p>
+          <p className="text-slate-400 text-sm max-w-md">{dbOfferError}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => navigate('/dashboard', { replace: true })}
+          className="px-6 py-3 rounded-xl bg-white/10 border border-white/20 text-sm font-bold hover:bg-white/15"
+        >
+          대시보드로 돌아가기
+        </button>
+      </div>
+    );
+  }
+
   const set = (field) => (e) => setForm(prev => ({ ...prev, [field]: e.target.value }));
   const setClient = (field) => (e) => setClientForm(prev => ({ ...prev, [field]: e.target.value }));
 
@@ -715,15 +864,17 @@ export default function Checkout() {
 
     // 1) 결제 파라미터 먼저 확인. 실패하면 주문/캠페인 생성 없이 종료
     let params;
-    const orderItems = isCustomOfferActive
-      ? getFramelessOrderItemsForDraft()
-      : lineItems.map((li) => ({
-          plan_name: li.plan.name,
-          qty: li.qty,
-          unit_price: li.unitPrice,
-          content_count: li.isVisit ? 1 : li.plan.count,
-          is_visit: !!li.isVisit,
-        }));
+    const orderItems = isDbCustomOfferActive
+      ? getDbOfferOrderItemsForDraft(dbCustomOffer)
+      : isCustomOfferActive
+        ? getFramelessOrderItemsForDraft()
+        : lineItems.map((li) => ({
+            plan_name: li.plan.name,
+            qty: li.qty,
+            unit_price: li.unitPrice,
+            content_count: li.isVisit ? 1 : li.plan.count,
+            is_visit: !!li.isVisit,
+          }));
     const orderDraft = {
       order_number: orderNum,
       plan_name: planSummary,
@@ -736,8 +887,13 @@ export default function Checkout() {
       client_address: clientForm.address || null,
       client_biz_reg_no: clientForm.bizRegNo || null,
       order_items: orderItems,
-      content_count: isCustomOfferActive ? getFramelessOfferContentCount() : totalContentCount,
-      ...(isCustomOfferActive ? { custom_offer_id: CUSTOM_OFFER_FRAMELESS_ID } : {}),
+      content_count: isDbCustomOfferActive
+        ? getDbOfferContentCount(dbCustomOffer)
+        : isCustomOfferActive
+          ? getFramelessOfferContentCount()
+          : totalContentCount,
+      ...(isDbCustomOfferActive ? { custom_payment_offer_id: dbCustomOffer.id } : {}),
+      ...(isCustomOfferActive && !isDbCustomOfferActive ? { custom_offer_id: CUSTOM_OFFER_FRAMELESS_ID } : {}),
     };
 
     try {
@@ -868,15 +1024,17 @@ export default function Checkout() {
     const orderNum = `BS-${datePart}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
     const planSummary = lineItems.map((li) => `${li.plan.name} x ${li.qty}`).join(', ');
     const totalContentCount = lineItems.reduce((s, li) => s + li.count, 0);
-    const orderItems = isCustomOfferActive
-      ? getFramelessOrderItemsForDraft()
-      : lineItems.map((li) => ({
-          plan_name: li.plan.name,
-          qty: li.qty,
-          unit_price: li.unitPrice,
-          content_count: li.isVisit ? 1 : li.plan.count,
-          is_visit: !!li.isVisit,
-        }));
+    const orderItems = isDbCustomOfferActive
+      ? getDbOfferOrderItemsForDraft(dbCustomOffer)
+      : isCustomOfferActive
+        ? getFramelessOrderItemsForDraft()
+        : lineItems.map((li) => ({
+            plan_name: li.plan.name,
+            qty: li.qty,
+            unit_price: li.unitPrice,
+            content_count: li.isVisit ? 1 : li.plan.count,
+            is_visit: !!li.isVisit,
+          }));
     const bankPayload = {
       order_number: orderNum,
       plan_name: planSummary,
@@ -889,8 +1047,13 @@ export default function Checkout() {
       client_address: clientForm.address || null,
       client_biz_reg_no: clientForm.bizRegNo || null,
       order_items: orderItems,
-      content_count: isCustomOfferActive ? getFramelessOfferContentCount() : totalContentCount,
-      ...(isCustomOfferActive ? { custom_offer_id: CUSTOM_OFFER_FRAMELESS_ID } : {}),
+      content_count: isDbCustomOfferActive
+        ? getDbOfferContentCount(dbCustomOffer)
+        : isCustomOfferActive
+          ? getFramelessOfferContentCount()
+          : totalContentCount,
+      ...(isDbCustomOfferActive ? { custom_payment_offer_id: dbCustomOffer.id } : {}),
+      ...(isCustomOfferActive && !isDbCustomOfferActive ? { custom_offer_id: CUSTOM_OFFER_FRAMELESS_ID } : {}),
     };
 
     try {
@@ -1053,7 +1216,7 @@ export default function Checkout() {
 
   const goPrev = () => setCurrentStep((s) => {
     const next = Math.max(0, s - 1);
-    if (isCustomOfferActive && next === 0) return 1;
+    if ((isCustomOfferActive || isDbCustomOfferActive) && next === 0) return 1;
     return next;
   });
 
@@ -1108,12 +1271,16 @@ export default function Checkout() {
               </div>
             </div>
             <h1 className="text-3xl md:text-5xl font-black tracking-tight mb-4">
-              {isCustomOfferActive ? '맞춤 견적 결제' : '빠른 구매'}
+              {isCheckoutCustomPayment ? '맞춤 견적 결제' : '빠른 구매'}
             </h1>
             <p className="text-lg text-slate-300 leading-relaxed max-w-xl mx-auto">
-              {isCustomOfferActive
-                ? 'The Frameless 맞춤 견적(시딩(건당))에 대한 결제입니다. 공급가에 부가세가 합산됩니다.'
-                : '원하는 플랜을 선택하고, 간편하게 시작하세요'}
+              {isDbCustomOfferActive
+                ? (dbCustomOffer?.title
+                    ? `${dbCustomOffer.title} — 관리자 발급 개인 결제창입니다. 공급가에 부가세가 합산됩니다.`
+                    : '관리자가 발급한 개인 결제창입니다. 수량·단가는 계약과 동일하며, 공급가에 부가세가 합산됩니다.')
+                : isCustomOfferActive
+                  ? 'The Frameless 맞춤 견적(시딩(건당))에 대한 결제입니다. 공급가에 부가세가 합산됩니다.'
+                  : '원하는 플랜을 선택하고, 간편하게 시작하세요'}
             </p>
           </div>
 
@@ -1163,7 +1330,7 @@ export default function Checkout() {
               </div>
 
               {/* Visit plan with quantity */}
-              {!isCustomOfferActive && (
+              {!isCheckoutCustomPayment && (
               <div className={`relative w-full p-8 rounded-2xl border-2 transition-all ${
                 getCartQty('Visit') > 0 ? 'border-orange-500/50 bg-orange-500/5' : 'border-white/10 bg-white/[0.03] hover:border-white/20'
               }`}>
