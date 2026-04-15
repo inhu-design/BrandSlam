@@ -13,8 +13,10 @@ export function useAdminSession() {
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
-      setIsAdmin(false);
-      setLoading(false);
+      queueMicrotask(() => {
+        setIsAdmin(false);
+        setLoading(false);
+      });
       return;
     }
 

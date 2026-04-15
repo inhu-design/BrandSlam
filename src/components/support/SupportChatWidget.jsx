@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MessageCircle, Send, X, Loader2, Bell, BellOff } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -55,8 +55,10 @@ export default function SupportChatWidget() {
 
   useEffect(() => {
     if (!user?.id) {
-      setConversation(null);
-      setBooting(false);
+      queueMicrotask(() => {
+        setConversation(null);
+        setBooting(false);
+      });
       return undefined;
     }
     let cancelled = false;
@@ -67,27 +69,28 @@ export default function SupportChatWidget() {
       (async () => {
         const { conversation: conv, error: err } = await ensureCustomerConversation(user);
         if (cancelled) return;
-        setBooting(false);
-        if (err) {
-          setBootError(typeof err === 'string' ? err : '대화를 불러오지 못했습니다.');
-          setConversation(null);
-        } else {
-          setConversation(conv);
-        }
+        queueMicrotask(() => {
+          if (cancelled) return;
+          setBooting(false);
+          if (err) {
+            setBootError(typeof err === 'string' ? err : '대화를 불러오지 못했습니다.');
+            setConversation(null);
+          } else {
+            setConversation(conv);
+          }
+        });
       })();
     };
-    const delayMs = 400;
-    const timer = setTimeout(boot, delayMs);
+    queueMicrotask(boot);
     return () => {
       cancelled = true;
-      clearTimeout(timer);
     };
-  }, [user?.id]);
+  }, [user]);
 
   const { messages, loading, error, sendMessage } = useSupportMessages(
     conversation?.id,
     user,
-    10_000,
+    0,
   );
 
   const readKey =
@@ -95,12 +98,14 @@ export default function SupportChatWidget() {
 
   useEffect(() => {
     if (!readKey || typeof window === 'undefined') return;
-    try {
-      const s = window.localStorage.getItem(readKey);
-      setLastReadAt(s ? new Date(s).getTime() : 0);
-    } catch {
-      setLastReadAt(0);
-    }
+    queueMicrotask(() => {
+      try {
+        const s = window.localStorage.getItem(readKey);
+        setLastReadAt(s ? new Date(s).getTime() : 0);
+      } catch {
+        setLastReadAt(0);
+      }
+    });
   }, [readKey]);
 
   useEffect(() => {
@@ -109,12 +114,14 @@ export default function SupportChatWidget() {
       messages.length > 0
         ? Math.max(...messages.map((m) => new Date(m.created_at || 0).getTime()))
         : Date.now();
-    try {
-      window.localStorage.setItem(readKey, new Date(t).toISOString());
-    } catch {
-      /* ignore quota */
-    }
-    setLastReadAt(t);
+    queueMicrotask(() => {
+      try {
+        window.localStorage.setItem(readKey, new Date(t).toISOString());
+      } catch {
+        /* ignore quota */
+      }
+      setLastReadAt(t);
+    });
   }, [open, messages, user?.id, conversation?.id, readKey]);
 
   useEffect(() => {
@@ -122,14 +129,14 @@ export default function SupportChatWidget() {
     listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [messages, open]);
 
-  const unreadCount = useMemo(() => {
-    if (!user?.id) return 0;
-    return messages.filter((m) => {
-      if (m.sender_id === user.id) return false;
-      const ts = new Date(m.created_at || 0).getTime();
-      return ts > lastReadAt;
-    }).length;
-  }, [messages, user?.id, lastReadAt]);
+  const unreadCount =
+    !user?.id
+      ? 0
+      : messages.filter((m) => {
+          if (m.sender_id === user.id) return false;
+          const ts = new Date(m.created_at || 0).getTime();
+          return ts > lastReadAt;
+        }).length;
 
   useEffect(() => {
     if (!adminLoading && isAdmin) {
@@ -151,7 +158,9 @@ export default function SupportChatWidget() {
 
   useEffect(() => {
     if (typeof window === 'undefined' || !('Notification' in window)) return;
-    setNotifyPerm(Notification.permission);
+    queueMicrotask(() => {
+      setNotifyPerm(Notification.permission);
+    });
   }, []);
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Loader2, MessageCircle, Send } from 'lucide-react';
 import Navbar from '../components/layout/Navbar';
@@ -40,7 +40,7 @@ export default function SupportInboxPage() {
     }
   }, [authLoading, adminLoading, user, isAdmin, navigate]);
 
-  const refreshList = async () => {
+  const refreshList = useCallback(async () => {
     setListError(null);
     const { rows: next, error } = await fetchStaffConversations();
     if (error) {
@@ -50,12 +50,14 @@ export default function SupportInboxPage() {
       setRows(next);
     }
     setListLoading(false);
-  };
+  }, []);
 
   useEffect(() => {
     if (!user || !isAdmin || adminLoading) return;
-    refreshList();
-  }, [user, isAdmin, adminLoading]);
+    queueMicrotask(() => {
+      void refreshList();
+    });
+  }, [user, isAdmin, adminLoading, refreshList]);
 
   useEffect(() => {
     if (!listRef.current) return;

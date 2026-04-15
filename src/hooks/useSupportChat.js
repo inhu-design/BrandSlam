@@ -12,36 +12,47 @@ export function useSupportMessages(conversationId, user, fallbackPollMs = 0) {
   const [error, setError] = useState(null);
   const channelRef = useRef(null);
 
-  const load = useCallback(async () => {
-    if (!conversationId || !user?.id) {
-      setMessages([]);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    const { data, error: err } = await supabase
-      .from('support_messages')
-      .select('id, conversation_id, sender_id, body, created_at')
-      .eq('conversation_id', conversationId)
-      .order('created_at', { ascending: true });
-    if (err) {
-      setError(err.message || String(err));
-      setMessages([]);
-    } else {
-      setMessages(data || []);
-    }
-    setLoading(false);
-  }, [conversationId, user?.id]);
+  const load = useCallback(
+    async (opts = {}) => {
+      const silent = !!opts.silent;
+      if (!conversationId || !user?.id) {
+        setMessages([]);
+        if (!silent) setLoading(false);
+        return;
+      }
+      if (!silent) {
+        setLoading(true);
+        setError(null);
+      }
+      const { data, error: err } = await supabase
+        .from('support_messages')
+        .select('id, conversation_id, sender_id, body, created_at')
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: true });
+      if (err) {
+        if (!silent) {
+          setError(err.message || String(err));
+          setMessages([]);
+        }
+      } else {
+        setMessages(data || []);
+        if (!silent) setError(null);
+      }
+      if (!silent) setLoading(false);
+    },
+    [conversationId, user?.id],
+  );
 
   useEffect(() => {
-    load();
+    queueMicrotask(() => {
+      void load();
+    });
   }, [load]);
 
   useEffect(() => {
     if (!fallbackPollMs || !conversationId || !user?.id) return undefined;
     const id = setInterval(() => {
-      load();
+      load({ silent: true });
     }, fallbackPollMs);
     return () => clearInterval(id);
   }, [fallbackPollMs, conversationId, user?.id, load]);
@@ -70,7 +81,7 @@ export function useSupportMessages(conversationId, user, fallbackPollMs = 0) {
       )
       .subscribe((status) => {
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          load();
+          load({ silent: true });
         }
       });
 
@@ -100,7 +111,7 @@ export function useSupportMessages(conversationId, user, fallbackPollMs = 0) {
       }
       return { error: null };
     },
-    [conversationId, user?.id],
+    [conversationId, user],
   );
 
   return { messages, loading, error, sendMessage, reload: load };

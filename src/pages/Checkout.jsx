@@ -547,7 +547,7 @@ export default function Checkout() {
     return () => {
       cancelled = true;
     };
-  }, [user?.id]);
+  }, [user]);
 
   const isCustomOfferActive = useMemo(
     () => (
@@ -610,7 +610,7 @@ export default function Checkout() {
     return () => {
       cancelled = true;
     };
-  }, [activeCustomPaymentOfferId, user?.id]);
+  }, [activeCustomPaymentOfferId, user]);
 
   useLayoutEffect(() => {
     if (authLoading || !user || !dbCustomOffer || dbOfferError) return;
