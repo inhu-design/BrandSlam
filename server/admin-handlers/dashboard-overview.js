@@ -166,6 +166,30 @@ export default async function handler(req, res) {
       }
     }
 
+    const creatorsByCampaignId = {};
+    if (campaignIds.length > 0) {
+      const { data: byCampRows, error: bcErr } = await supabaseAdmin
+        .from('admin_delivery_creators')
+        .select('*')
+        .in('campaign_id', campaignIds)
+        .order('created_at', { ascending: true });
+      if (bcErr) {
+        const msg = String(bcErr.message || '').toLowerCase();
+        const colMissing =
+          msg.includes('campaign_id') && (msg.includes('does not exist') || msg.includes('column'));
+        if (!colMissing) {
+          return res.status(500).json({ error: bcErr.message || 'Failed to load campaign-scoped delivery creators' });
+        }
+      } else {
+        for (const row of byCampRows || []) {
+          const cid = row?.campaign_id;
+          if (!cid) continue;
+          if (!creatorsByCampaignId[cid]) creatorsByCampaignId[cid] = [];
+          creatorsByCampaignId[cid].push(row);
+        }
+      }
+    }
+
     const orderNumbers = [...new Set((campaigns || []).map((c) => c.order_number).filter(Boolean))];
     const orderSummaryByNumber = {};
     if (orderNumbers.length > 0) {
@@ -200,6 +224,7 @@ export default async function handler(req, res) {
       ok: true,
       campaigns: campaigns || [],
       creators_by_slug: creatorsBySlug,
+      creators_by_campaign_id: creatorsByCampaignId,
       order_summary_by_number: orderSummaryByNumber,
       setup_by_campaign_id: setupByCampaignId,
       settings_by_campaign_id: settingsByCampaignId,

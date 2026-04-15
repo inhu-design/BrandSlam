@@ -4,10 +4,12 @@
  * Content-Type: application/json
  * Body: {
  *   file_base64: string (xlsx/xls, data URL prefix 없이 pure base64),
- *   list_slug: string (예: BS-US-FARMSKIN),
+ *   list_slug?: string (레거시 공유 풀, 예: BS-US-FARMSKIN),
+ *   campaign_id?: string (권장: campaigns.id UUID — 해당 캠페인에만 행 귀속),
  *   mode: "replace" | "append",
  *   dry_run?: boolean
  * }
+ * list_slug 와 campaign_id 중 하나는 필수입니다.
  */
 import { createClient } from '@supabase/supabase-js';
 import { supabase as supabaseAdmin } from '../lib/supabase-server.js';
@@ -25,6 +27,8 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
   .filter(Boolean);
 
 const LIST_SLUG_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]{1,79}$/;
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_DECODED_BYTES = 6 * 1024 * 1024;
 const MAX_ROWS = 5000;
 const INSERT_CHUNK = 250;
@@ -58,10 +62,29 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Invalid JSON' });
   }
 
-  const listSlug = String(body.list_slug || '').trim();
-  if (!LIST_SLUG_RE.test(listSlug)) {
+  const campaignIdRaw = String(body.campaign_id || '').trim();
+  const listSlugManual = String(body.list_slug || '').trim();
+
+  let listSlug = '';
+  let campaignId = null;
+  if (UUID_RE.test(campaignIdRaw)) {
+    const { data: campRow, error: campErr } = await supabaseAdmin
+      .from('campaigns')
+      .select('id')
+      .eq('id', campaignIdRaw)
+      .maybeSingle();
+    if (campErr) return res.status(500).json({ error: campErr.message || '캠페인 조회 실패' });
+    if (!campRow?.id) {
+      return res.status(404).json({ error: 'campaign_id에 해당하는 캠페인이 없습니다.' });
+    }
+    campaignId = campaignIdRaw;
+    listSlug = `c${campaignIdRaw.replace(/-/g, '')}`;
+  } else if (LIST_SLUG_RE.test(listSlugManual)) {
+    listSlug = listSlugManual;
+  } else {
     return res.status(400).json({
-      error: 'list_slug은 영문·숫자·._- 조합 2~80자 (예: BS-US-FARMSKIN) 이어야 합니다.',
+      error:
+        'campaign_id(캠페인 UUID) 또는 list_slug(영문·숫자·._- 조합 2~80자) 중 하나를 올바르게 보내 주세요.',
     });
   }
 
@@ -97,7 +120,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'name 열이 있는 데이터 행이 없습니다. 첫 시트·헤더명을 확인해 주세요.' });
   }
 
-  let toInsert = toDbInsertRows(parsed.rows, listSlug);
+  let toInsert = toDbInsertRows(parsed.rows, listSlug, campaignId ? { campaignId } : {});
 
   const stripVisitDate = !!body.omit_visit_date;
   if (stripVisitDate) {
@@ -109,6 +132,7 @@ export default async function handler(req, res) {
       ok: true,
       dry_run: true,
       list_slug: listSlug,
+      campaign_id: campaignId,
       mode,
       sheet_name: parsed.sheetName,
       raw_row_count: parsed.rawCount,
@@ -119,9 +143,16 @@ export default async function handler(req, res) {
 
   try {
     if (mode === 'replace') {
-      const { error: delErr } = await supabaseAdmin.from('admin_delivery_creators').delete().eq('list_slug', listSlug);
+      const del = campaignId
+        ? supabaseAdmin.from('admin_delivery_creators').delete().eq('campaign_id', campaignId)
+        : supabaseAdmin.from('admin_delivery_creators').delete().eq('list_slug', listSlug);
+      const { error: delErr } = await del;
       if (delErr) {
-        return res.status(500).json({ error: delErr.message || '기존 행 삭제 실패' });
+        const hint =
+          delErr.message?.includes('campaign_id') || String(delErr).includes('campaign_id')
+            ? ' Supabase에 supabase-migration-admin-delivery-creators-campaign-id.sql 을 실행했는지 확인하세요.'
+            : '';
+        return res.status(500).json({ error: `${delErr.message || '기존 행 삭제 실패'}${hint}` });
       }
     }
 
@@ -143,6 +174,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       list_slug: listSlug,
+      campaign_id: campaignId,
       mode,
       sheet_name: parsed.sheetName,
       raw_row_count: parsed.rawCount,

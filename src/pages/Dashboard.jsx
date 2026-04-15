@@ -244,7 +244,8 @@ const KWAILNARA_EUPHORIA_NOTION_GUIDELINE_URL =
 const getCampaignRuntimeSettings = (campaign) => campaign?.admin_runtime_settings || null;
 
 /**
- * 납품 리스트 Supabase list_slug (고객·캠페인별).
+ * 납품 리스트 Supabase list_slug (레거시 공유 풀 키).
+ * 동일 캠페인에 admin_delivery_creators.campaign_id 가 있으면 그 행이 우선(엑셀 업로드 시 UUID 지정).
  * 우선순위: VITE_LINKED_DELIVERY_CAMPAIGN_ID + VITE_LINKED_DELIVERY_LIST_SLUG → 이메일·캠페인 규칙
  */
 const resolveLinkedDeliveryListSlug = (campaign, user) => {
@@ -279,7 +280,12 @@ const resolveLinkedDeliveryListSlug = (campaign, user) => {
   return null;
 };
 
-const campaignMatchesLinkedDeliveryList = (campaign, user) => resolveLinkedDeliveryListSlug(campaign, user) != null;
+const campaignMatchesLinkedDeliveryList = (campaign, user) => {
+  if (Array.isArray(campaign?.linked_delivery_candidates) && campaign.linked_delivery_candidates.length > 0) {
+    return true;
+  }
+  return resolveLinkedDeliveryListSlug(campaign, user) != null;
+};
 const isHeatherFarmskinScale50Campaign = (campaign) => {
   const runtime = getCampaignRuntimeSettings(campaign);
   // 드랍 강제 종료 여부는 캠페인별 런타임 설정으로만 제어합니다.
@@ -428,6 +434,23 @@ const CampaignStatus = {
   COMPLETED: 'COMPLETED'
 };
 
+/** 캠페인 진행 단계 — 화면용 한글 (값은 그대로 CampaignStatus) */
+const CAMPAIGN_STATUS_KO = {
+  [CampaignStatus.PAYMENT_PENDING]: '입금·계약 대기',
+  [CampaignStatus.KICKOFF]: '착수(온보딩)',
+  [CampaignStatus.CONTACTING]: '인플루언서 섭외 중',
+  [CampaignStatus.SHIPPING]: '제품 발송 중',
+  [CampaignStatus.UPLOADING]: '콘텐츠 업로드 중',
+  [CampaignStatus.COMPLETED]: '캠페인 완료',
+};
+
+const ORDER_PAYMENT_STATUS_KO = {
+  paid: '결제 완료',
+  pending_payment: '입금 대기',
+  refunded: '환불됨',
+  cancelled: '취소됨',
+};
+
 const maskData = (text, type = 'general') => {
   if (!text) return '-';
   if (type === 'email') {
@@ -558,20 +581,31 @@ const StatusBadge = ({ status }) => {
     [CampaignStatus.COMPLETED]: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
   };
   
-  const labels = {
-    [CampaignStatus.PAYMENT_PENDING]: "계약/입금 대기",
-    [CampaignStatus.KICKOFF]: "착수",
-    [CampaignStatus.CONTACTING]: "인플루언서 섭외 중",
-    [CampaignStatus.SHIPPING]: "제품 발송 중",
-    [CampaignStatus.UPLOADING]: "콘텐츠 업로드 중",
-    [CampaignStatus.COMPLETED]: "캠페인 완료",
-  };
-
   return (
     <span className={`px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase border backdrop-blur-md ${styles[status] || styles[CampaignStatus.PAYMENT_PENDING]}`}>
-      {labels[status] || status}
+      {CAMPAIGN_STATUS_KO[status] || status}
     </span>
   );
+};
+
+/** 관리자 표·칩에서 납품 묶음 이름을 사람이 읽기 쉽게 */
+const formatAdminDeliveryGroupLabel = (slug) => {
+  const s = String(slug || '').trim();
+  if (!s) return '—';
+  if (/^c[0-9a-f]{32}$/i.test(s)) return '캠페인에 직접 올린 인플루언서 명단';
+  return `공용 명단 이름: ${s}`;
+};
+
+const getCampaignProgressSubtitle = (status) => {
+  const m = {
+    [CampaignStatus.PAYMENT_PENDING]: '고객 입금·계약 확인을 기다리는 중입니다.',
+    [CampaignStatus.KICKOFF]: '캠페인이 시작되어 세팅·일정을 잡는 단계입니다.',
+    [CampaignStatus.CONTACTING]: '인플루언서를 섭외하고 있습니다.',
+    [CampaignStatus.SHIPPING]: '제품을 발송하는 단계입니다.',
+    [CampaignStatus.UPLOADING]: '콘텐츠 업로드·검수를 진행 중입니다.',
+    [CampaignStatus.COMPLETED]: '캠페인이 끝나 보고 단계입니다.',
+  };
+  return m[status] || '진행 중인 캠페인입니다.';
 };
 
 const MetricCard = ({ icon: Icon, label, value, color }) => (
@@ -3435,14 +3469,15 @@ function AdminCampaignScheduleEditor({ campaign, onSaved, className = '' }) {
 
   return (
     <div className={`rounded-2xl border border-amber-500/25 bg-amber-500/5 p-6 ${className}`}>
-      <h5 className="text-[10px] font-black text-amber-400/90 uppercase tracking-widest mb-4 flex items-center gap-2">
-        <Settings size={16} /> 관리자 · 착수 일정 수동 저장{isVisit ? ' (Visit Content)' : ''}
+      <h5 className="text-sm font-bold text-amber-100 mb-2 flex items-center gap-2">
+        <Settings size={16} className="text-amber-400 shrink-0" />
+        {isVisit ? '방문·행사형 캠페인 일정 직접 넣기' : '일반 캠페인 일정 직접 넣기'}
       </h5>
-      <p className="text-xs text-slate-500 mb-4 font-light">
+      <p className="text-xs text-slate-400 mb-4 leading-relaxed">
         {isVisit
-          ? 'Visit 플랜은 명단 납품 이후 일정이 방문·행사 기준 템플릿입니다. 비운 칸은 템플릿을 따릅니다.'
-          : '비워 두면 해당 항목은 템플릿 자동 일정을 따릅니다.'}{' '}
-        저장은 관리자 계정(API·ADMIN_EMAILS)만 가능합니다.
+          ? '방문 일정이 있는 캠페인입니다. 칸을 비우면 자동으로 잡힌 일정을 따르고, 날짜를 넣으면 그날짜가 고객 화면에 그대로 반영됩니다.'
+          : '칸을 비우면 자동 일정을 따릅니다. 날짜를 넣으면 그 항목만 수동으로 고정됩니다.'}{' '}
+        <span className="text-amber-200/90">운영 권한이 있는 계정만 저장할 수 있습니다.</span>
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
         {row('schedule_list_delivery_date', '명단 납품')}
@@ -3500,7 +3535,7 @@ function AdminCampaignScheduleByIdPanel() {
   const load = async () => {
     const id = idInput.trim();
     if (!CAMPAIGN_ROW_UUID_RE.test(id)) {
-      setErr('유효한 캠페인 UUID를 입력하세요.');
+      setErr('캠페인 코드 형식이 맞는지 확인해 주세요. (하이픈 포함 긴 코드, 지원팀에 문의 가능)');
       return;
     }
     const { data: { session } } = await supabase.auth.getSession();
@@ -3528,29 +3563,35 @@ function AdminCampaignScheduleByIdPanel() {
   };
 
   return (
-    <div className="mt-4 pt-4 border-t border-slate-600/30">
+    <div>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between text-left"
+        className="w-full flex items-center justify-between text-left rounded-xl px-1 py-2 hover:bg-white/[0.03] transition-colors"
       >
-        <span className="font-bold text-slate-300 flex items-center gap-2">
-          <Calendar size={18} className="text-amber-400" /> 캠페인 ID로 착수 일정 수정
+        <span className="font-bold text-white flex items-center gap-3">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/15 border border-amber-500/30">
+            <Calendar size={18} className="text-amber-300" />
+          </span>
+          <span>
+            <span className="block text-sm">캠페인 코드로 일정만 따로 열기</span>
+            <span className="block text-xs font-normal text-slate-400 mt-0.5">왼쪽 목록에 없을 때, 지원에서 받은 코드로 같은 화면을 띄웁니다.</span>
+          </span>
         </span>
-        <ChevronRight size={18} className={`text-slate-500 transition-transform ${open ? 'rotate-90' : ''}`} />
+        <ChevronRight size={18} className={`text-slate-500 transition-transform shrink-0 ${open ? 'rotate-90' : ''}`} />
       </button>
       {open && (
-        <div className="mt-4 space-y-4">
-          <p className="text-slate-500 text-sm">
-            고객으로 가장한 화면이 아닌, 관리자 본인 계정으로 Supabase의 캠페인 UUID를 넣어 일정을 저장할 수 있습니다.
+        <div className="mt-4 space-y-4 pl-1">
+          <p className="text-sm text-slate-400 leading-relaxed">
+            아래에 <strong className="text-slate-200">캠페인 코드</strong>를 붙여 넣은 뒤 불러오기를 누르면, 위와 같은 날짜 입력 칸이 나옵니다. 고객 로그인으로 가장할 필요는 없습니다.
           </p>
           <div className="flex flex-wrap gap-3">
             <input
               type="text"
-              placeholder="캠페인 UUID (예: a1b2c3d4-...)"
+              placeholder="캠페인 코드 붙여넣기 (하이픈 포함)"
               value={idInput}
               onChange={(e) => setIdInput(e.target.value)}
-              className="flex-1 min-w-[220px] px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/50 text-sm font-mono"
+              className="flex-1 min-w-[220px] px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/50 text-sm"
             />
             <button
               type="button"
@@ -3628,15 +3669,15 @@ function AdminSignupOnlyUsersPanel() {
         onClick={() => setOpen((o) => !o)}
         className="w-full px-5 py-4 flex items-center justify-between text-left bg-violet-500/[0.08] border-b border-white/10"
       >
-        <span className="text-sm font-black tracking-widest uppercase text-violet-200 flex items-center gap-2">
-          <Users size={18} className="text-violet-400" /> 캠페인 없음 · 가입만 한 계정
+        <span className="text-sm font-bold text-violet-100 flex items-center gap-2">
+          <Users size={18} className="text-violet-400" /> 캠페인은 없고 회원가입만 한 사람
         </span>
         <ChevronRight size={18} className={`text-slate-500 transition-transform ${open ? 'rotate-90' : ''}`} />
       </button>
       {open && (
         <div className="p-5 space-y-4">
-          <p className="text-xs text-slate-500">
-            Supabase Auth에는 있으나 <code className="text-slate-400">campaigns.user_id</code>로 연결된 캠페인이 한 건도 없는 계정입니다. 새로고침으로 최신 목록을 가져옵니다.
+          <p className="text-xs text-slate-400 leading-relaxed">
+            로그인 계정은 있는데, 아직 어떤 캠페인에도 연결되지 않은 이메일입니다. 왜 목록에 안 보이는지 확인할 때 쓰세요. 아래 버튼으로 목록을 다시 받습니다.
           </p>
           <div className="flex flex-wrap gap-2 items-center">
             <button
@@ -3649,8 +3690,8 @@ function AdminSignupOnlyUsersPanel() {
               목록 불러오기
             </button>
             {meta && (
-              <span className="text-[11px] text-slate-500">
-                Auth 사용자 {meta.total_auth_users}명 중 캠페인 보유 {meta.users_with_campaigns}명
+              <span className="text-[11px] text-slate-400">
+                가입된 사람 {meta.total_auth_users}명 중, 캠페인이 있는 사람 {meta.users_with_campaigns}명
               </span>
             )}
           </div>
@@ -3817,15 +3858,15 @@ function AdminCustomPaymentOffersPanel() {
         onClick={() => setOpen((o) => !o)}
         className="w-full px-5 py-4 flex items-center justify-between text-left bg-emerald-500/[0.08] border-b border-white/10"
       >
-        <span className="text-sm font-black tracking-widest uppercase text-emerald-200 flex items-center gap-2">
-          <CreditCard size={18} className="text-emerald-400" /> 개인 결제창 발급 (수량·단가 커스텀)
+        <span className="text-sm font-bold text-emerald-100 flex items-center gap-2">
+          <CreditCard size={18} className="text-emerald-400" /> 고객 전용 결제 링크 만들기
         </span>
         <ChevronRight size={18} className={`text-slate-500 transition-transform ${open ? 'rotate-90' : ''}`} />
       </button>
       {open && (
         <div className="p-5 space-y-6">
-          <p className="text-xs text-slate-500">
-            고객 이메일(로그인 계정과 동일)로 오퍼를 만들면 해당 고객의 대시보드에만 카드가 뜨고, 여기서 복사한 링크로도 결제할 수 있습니다. 시딩·방문 단가·건수는 공용 체크아웃 가격과 무관하게 자유 입력입니다. 금액은 서버에서 DB 기준으로 다시 검증합니다.
+          <p className="text-xs text-slate-400 leading-relaxed">
+            고객이 로그인할 때 쓰는 <strong className="text-slate-200">이메일</strong>을 넣으면, 그 사람 대시보드에만 결제 카드가 보입니다. 건수·단가는 견적에 맞게 적으면 되고, 링크를 복사해 문자나 메일로 내면 됩니다.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <input
@@ -3879,13 +3920,13 @@ function AdminCustomPaymentOffersPanel() {
             <input
               value={form.vat_rate}
               onChange={setField('vat_rate')}
-              placeholder="부가세율 (예: 0.1)"
+              placeholder="세금 비율 (보통 0.1 = 10%)"
               className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm text-white"
             />
             <input
               value={form.note}
               onChange={setField('note')}
-              placeholder="내부 메모 (선택)"
+              placeholder="우리 팀 메모 (고객에게 안 보임)"
               className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm text-white md:col-span-2"
             />
           </div>
@@ -3914,9 +3955,9 @@ function AdminCustomPaymentOffersPanel() {
               <thead className="sticky top-0 bg-[#0b1327] text-slate-400 border-b border-white/10">
                 <tr>
                   <th className="text-left px-3 py-2">고객</th>
-                  <th className="text-right px-3 py-2">합계(VAT)</th>
+                  <th className="text-right px-3 py-2">합계(세금 포함)</th>
                   <th className="text-center px-3 py-2">상태</th>
-                  <th className="text-right px-3 py-2">액션</th>
+                  <th className="text-right px-3 py-2">동작</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -3925,8 +3966,9 @@ function AdminCustomPaymentOffersPanel() {
                   return (
                     <tr key={o.id} className="hover:bg-white/[0.03]">
                       <td className="px-3 py-2 text-slate-200">
-                        <p className="font-mono text-[11px] text-slate-500">{o.id}</p>
-                        <p>{o.customer_email}</p>
+                        <p className="text-[10px] text-slate-500 mb-0.5">내부 관리 번호</p>
+                        <p className="font-mono text-[10px] text-slate-500 break-all">{o.id}</p>
+                        <p className="mt-1">{o.customer_email}</p>
                       </td>
                       <td className="px-3 py-2 text-right text-white font-mono">
                         {typeof o.expected_total === 'number' ? o.expected_total.toLocaleString() : '—'}
@@ -4060,7 +4102,7 @@ function AdminOpsToolsPanel({ onFocusOrderNumber }) {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || '연결 실패');
       setLinkMsg(
-        `완료: 캠페인 ${data.campaigns_updated}건, 주문 ${data.orders_updated}건에 user_id 반영 (user_id: ${data.user_id})`,
+        `완료: 캠페인 ${data.campaigns_updated}건, 주문 ${data.orders_updated}건이 고객 로그인과 연결되었습니다.`,
       );
     } catch (e) {
       setLinkMsg(e?.message || String(e));
@@ -4076,8 +4118,8 @@ function AdminOpsToolsPanel({ onFocusOrderNumber }) {
         onClick={() => setOpen((o) => !o)}
         className="w-full px-5 py-4 flex items-center justify-between text-left bg-amber-500/[0.08] border-b border-white/10"
       >
-        <span className="text-sm font-black tracking-widest uppercase text-amber-200 flex items-center gap-2">
-          <ClipboardList size={18} className="text-amber-400" /> 운영 도구 — 전역 주문 · 환불 표기 · 계정 연결
+        <span className="text-sm font-bold text-amber-100 flex items-center gap-2">
+          <ClipboardList size={18} className="text-amber-400" /> 주문 정리 · 환불 표시 · 고객 계정 연결
         </span>
         <ChevronRight size={18} className={`text-slate-500 transition-transform ${open ? 'rotate-90' : ''}`} />
       </button>
@@ -4085,9 +4127,9 @@ function AdminOpsToolsPanel({ onFocusOrderNumber }) {
         <div className="p-5 space-y-8">
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
             <div>
-              <h4 className="text-xs font-black text-amber-300/90 uppercase tracking-widest mb-2">최근 주문 (전체 고객)</h4>
-              <p className="text-xs text-slate-500 mb-3">
-                PG·입금 건 정리, 환불/취소 시 <code className="text-slate-400">orders.status</code>를 표기합니다. 금액 오타는 <code className="text-slate-400">plan_price</code>로 보정합니다.
+              <h4 className="text-sm font-bold text-amber-100 mb-2">최근 주문 한눈에 보기</h4>
+              <p className="text-xs text-slate-400 mb-3 leading-relaxed">
+                입금·환불·취소 상태를 여기서 바로 고칠 수 있습니다. 금액이 잘못 적혀 있으면 아래에서 숫자만 고쳐 저장하면 됩니다.
               </p>
               <div className="flex gap-2 mb-3">
                 <button
@@ -4117,7 +4159,7 @@ function AdminOpsToolsPanel({ onFocusOrderNumber }) {
                         <td className="px-2 py-2 font-mono text-slate-300">{o.order_number}</td>
                         <td className="px-2 py-2 text-slate-400 break-all">{o.email}</td>
                         <td className="px-2 py-2 text-right text-white">{Number(o.plan_price || 0).toLocaleString()}</td>
-                        <td className="px-2 py-2 text-center text-slate-400">{o.status}</td>
+                        <td className="px-2 py-2 text-center text-slate-300">{ORDER_PAYMENT_STATUS_KO[o.status] || o.status}</td>
                         <td className="px-2 py-2 text-right space-y-1">
                           {onFocusOrderNumber ? (
                             <button
@@ -4152,18 +4194,18 @@ function AdminOpsToolsPanel({ onFocusOrderNumber }) {
                 <div className="mt-4 p-4 rounded-xl border border-amber-500/20 bg-amber-500/5 space-y-3">
                   <p className="text-xs text-amber-200/90 font-mono">{editingOrderNumber}</p>
                   <div className="flex flex-wrap gap-2 items-center">
-                    <label className="text-[10px] text-slate-500 uppercase">상태</label>
+                    <label className="text-[10px] text-slate-400 font-semibold">결제 상태</label>
                     <select
                       value={editStatus}
                       onChange={(e) => setEditStatus(e.target.value)}
                       className="px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-white"
                     >
-                      <option value="paid">paid</option>
-                      <option value="pending_payment">pending_payment</option>
-                      <option value="refunded">refunded</option>
-                      <option value="cancelled">cancelled</option>
+                      <option value="paid">결제 완료</option>
+                      <option value="pending_payment">입금 대기</option>
+                      <option value="refunded">환불됨</option>
+                      <option value="cancelled">취소됨</option>
                     </select>
-                    <label className="text-[10px] text-slate-500 uppercase ml-2">plan_price</label>
+                    <label className="text-[10px] text-slate-400 font-semibold ml-2">결제 금액(원)</label>
                     <input
                       value={editPlanPrice}
                       onChange={(e) => setEditPlanPrice(e.target.value)}
@@ -4189,23 +4231,23 @@ function AdminOpsToolsPanel({ onFocusOrderNumber }) {
               )}
             </div>
             <div>
-              <h4 className="text-xs font-black text-amber-300/90 uppercase tracking-widest mb-2 flex items-center gap-2">
-                <Link2 size={14} /> 고객 계정 ↔ 캠페인·주문 연결
+              <h4 className="text-sm font-bold text-amber-100 mb-2 flex items-center gap-2">
+                <Link2 size={14} /> 고객 로그인과 캠페인·주문 연결
               </h4>
-              <p className="text-xs text-slate-500 mb-3 leading-relaxed">
-                대시보드는 <code className="text-slate-400">campaigns.user_id</code> 기준으로만 고객 캠페인을 보여 줍니다. 결제 이메일과 가입 이메일이 같아도 <code className="text-slate-400">user_id</code>가 비어 있으면 목록에 안 나올 수 있습니다. 아래에서 해당 이메일의 모든 캠페인·주문에 Auth 사용자 UUID를 붙입니다. UUID는 Supabase Auth 사용자 목록에서 복사하거나, 비워 두면 같은 이메일로 Auth에서 자동 조회합니다.
+              <p className="text-xs text-slate-400 mb-3 leading-relaxed">
+                결제는 됐는데 고객 화면에 캠페인이 안 보일 때가 대부분 이 경우입니다. 아래에 <strong className="text-slate-200">고객 이메일</strong>을 넣고 실행하면, 같은 이메일의 캠페인·주문이 그 고객 로그인과 이어집니다. 두 번째 칸은 비워 두면 자동으로 같은 이메일 계정을 찾습니다.
               </p>
               <div className="space-y-2">
                 <input
                   value={linkEmail}
                   onChange={(e) => setLinkEmail(e.target.value)}
-                  placeholder="고객 이메일 (campaigns.customer_email / orders.email)"
+                  placeholder="고객 이메일 (캠페인·주문에 적힌 주소)"
                   className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white"
                 />
                 <input
                   value={linkUserId}
                   onChange={(e) => setLinkUserId(e.target.value)}
-                  placeholder="Auth user UUID (선택, 비우면 이메일로 조회)"
+                  placeholder="계정 코드 (선택, 비우면 이메일로 자동 찾기)"
                   className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white font-mono"
                 />
                 <button
@@ -4214,7 +4256,7 @@ function AdminOpsToolsPanel({ onFocusOrderNumber }) {
                   disabled={linkBusy}
                   className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-sm font-bold text-white"
                 >
-                  {linkBusy ? '처리 중…' : 'user_id 일괄 연결'}
+                  {linkBusy ? '처리 중…' : '이메일로 계정 연결 실행'}
                 </button>
               </div>
               {linkMsg && <p className="text-xs text-slate-300 mt-2 whitespace-pre-wrap">{linkMsg}</p>}
@@ -4226,9 +4268,23 @@ function AdminOpsToolsPanel({ onFocusOrderNumber }) {
   );
 }
 
-/** 엑셀 → admin_delivery_creators (납품 리스트). 캠페인의 linked_list_slug 와 동일 slug면 대시보드에 반영됨 */
-function AdminDeliveryExcelImportPanel() {
+/** 대시보드 납품 업로드용 — 비개발자도 알아볼 수 있게 브랜드·제품·주문번호로 표시 */
+const formatCampaignDeliveryLabel = (c) => {
+  const brand = String(c?.brand_name || '').trim();
+  const product = String(c?.product_name || '').trim();
+  const parts = [];
+  if (brand) parts.push(brand);
+  if (product) parts.push(product);
+  const core = parts.length > 0 ? parts.join(' / ') : '이름 없음';
+  const ord = String(c?.order_number || '').trim();
+  return ord ? `${core} · ${ord}` : core;
+};
+
+/** 엑셀 → admin_delivery_creators. 권장: 캠페인 선택(이름). 레거시: list_slug */
+function AdminDeliveryExcelImportPanel({ campaigns = [] }) {
   const [open, setOpen] = useState(false);
+  const [importCampaignId, setImportCampaignId] = useState('');
+  const [importCampaignFilter, setImportCampaignFilter] = useState('');
   const [listSlug, setListSlug] = useState('BS-US-FARMSKIN');
   const [mode, setMode] = useState('replace');
   const [omitVisitDate, setOmitVisitDate] = useState(false);
@@ -4254,6 +4310,18 @@ function AdminDeliveryExcelImportPanel() {
       r.readAsDataURL(f);
     });
 
+  const campaignsForImportSelect = useMemo(() => {
+    const q = importCampaignFilter.trim().toLowerCase();
+    const list = [...campaigns].sort((a, b) =>
+      String(b.created_at || '').localeCompare(String(a.created_at || '')),
+    );
+    if (!q) return list;
+    return list.filter((c) => {
+      const hay = `${c.brand_name || ''} ${c.product_name || ''} ${c.order_number || ''} ${c.customer_email || ''}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }, [campaigns, importCampaignFilter]);
+
   const postImport = async (dryRun) => {
     setErr('');
     setMsg('');
@@ -4271,16 +4339,28 @@ function AdminDeliveryExcelImportPanel() {
         setErr('로그인 세션이 없습니다.');
         return;
       }
+      const cid = importCampaignId.trim();
+      const uuidRe =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const payload = {
+        file_base64: b64,
+        mode,
+        dry_run: dryRun,
+        omit_visit_date: omitVisitDate,
+      };
+      if (uuidRe.test(cid)) {
+        payload.campaign_id = cid;
+      } else {
+        payload.list_slug = listSlug.trim();
+      }
+      if (!payload.campaign_id && !payload.list_slug) {
+        setErr('아래에서 캠페인을 선택하거나, 레거시 list_slug를 입력해 주세요.');
+        return;
+      }
       const res = await fetch(`${window.location.origin}/api/admin/delivery-creators-import`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          file_base64: b64,
-          list_slug: listSlug.trim(),
-          mode,
-          dry_run: dryRun,
-          omit_visit_date: omitVisitDate,
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `요청 실패 (${res.status})`);
@@ -4291,7 +4371,14 @@ function AdminDeliveryExcelImportPanel() {
         );
       } else {
         setPreview(null);
-        setMsg(`반영 완료: ${data.inserted}명 삽입 (slug: ${data.list_slug}, 모드: ${data.mode}). 고객 캠페인에 이미 연결된 list_slug 라면 새로고침 후 납품 탭에서 확인됩니다.`);
+        setMsg(() => {
+          if (data.campaign_id) {
+            const picked = campaigns.find((x) => x.id === data.campaign_id);
+            const name = picked ? formatCampaignDeliveryLabel(picked) : data.campaign_id;
+            return `반영 완료: ${data.inserted}명 삽입 (캠페인: ${name}, 모드: ${data.mode}). 새로고침 후 납품 탭에서 확인하세요.`;
+          }
+          return `반영 완료: ${data.inserted}명 삽입 (옛 묶음 이름: ${data.list_slug}, 방식: ${data.mode}). 새로고침 후 납품 탭에서 확인하세요.`;
+        });
         setFile(null);
       }
     } catch (e) {
@@ -4308,21 +4395,54 @@ function AdminDeliveryExcelImportPanel() {
         onClick={() => setOpen((o) => !o)}
         className="w-full px-5 py-4 flex items-center justify-between text-left bg-rose-500/[0.08] border-b border-white/10"
       >
-        <span className="text-sm font-black tracking-widest uppercase text-rose-200 flex items-center gap-2">
-          <Upload size={18} className="text-rose-400" /> 납품 엑셀 → Supabase (재배포 없음)
+        <span className="text-sm font-bold text-rose-100 flex items-center gap-2">
+          <Upload size={18} className="text-rose-400" /> 인플루언서 명단 엑셀 올리기
         </span>
         <ChevronRight size={18} className={`text-slate-500 transition-transform ${open ? 'rotate-90' : ''}`} />
       </button>
       {open && (
         <div className="p-5 space-y-4">
-          <p className="text-xs text-slate-500 leading-relaxed">
-            기존 <code className="text-slate-400">import-farmskin-excel</code> 스크립트와 동일한 열 매핑(name, Shipping country, TikTok/Instagram URL·Follower, 선택 visit date)입니다.{' '}
-            <strong className="text-rose-200/90">replace</strong>는 해당 <code className="text-slate-400">list_slug</code> 전체 삭제 후 삽입,
-            <strong className="text-rose-200/90"> append</strong>는 기존 행을 두고 뒤에 추가합니다. 캠페인 런타임 설정의 납품 slug와 반드시 일치시키세요.
+          <p className="text-xs text-slate-400 leading-relaxed">
+            엑셀 첫 시트에 <strong className="text-slate-200">이름</strong>, 배송 국가, 틱톡·인스타 주소와 팔로워 수가 있으면 됩니다. 방문 일정이 있으면 “visit date” 같은 열 이름도 인식합니다.{' '}
+            <strong className="text-rose-200/90">꼭 할 일:</strong> 아래에서 <strong className="text-rose-200/90">캠페인을 고르기</strong>만 하면 그 캠페인에만 명단이 붙습니다.{' '}
+            <strong className="text-rose-200/90">전체 갈아끼우기</strong>는 예전 명단을 지우고 새 파일로 채우기, <strong className="text-rose-200/90">이어 붙이기</strong>는 기존 뒤에 줄을 더합니다.
           </p>
+          <div className="space-y-3">
+            <label className="block text-xs font-semibold text-slate-300">
+              캠페인 찾기 (이름·주문번호·이메일)
+              <input
+                type="search"
+                value={importCampaignFilter}
+                onChange={(e) => setImportCampaignFilter(e.target.value)}
+                className="mt-1 w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white placeholder-slate-500"
+                placeholder="예: Farmskin, 말랑두부, BS-2026…"
+              />
+            </label>
+            <label className="block text-xs font-semibold text-slate-300">
+              명단을 붙일 캠페인
+              <select
+                value={importCampaignId}
+                onChange={(e) => setImportCampaignId(e.target.value)}
+                className="mt-1 w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white max-w-full"
+              >
+                <option value="">— 캠페인을 선택하세요 —</option>
+                {campaignsForImportSelect.map((c) => {
+                  const label = formatCampaignDeliveryLabel(c);
+                  return (
+                    <option key={c.id} value={c.id} title={label}>
+                      {label}
+                    </option>
+                  );
+                })}
+              </select>
+            </label>
+            <p className="text-[10px] text-slate-600 leading-relaxed">
+              표시 형식: <span className="text-slate-500">브랜드 / 제품명 · 주문번호</span> (제품명이 길어도 목록에서 전체가 보이도록 제목 툴팁을 씁니다.)
+            </p>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <label className="text-[10px] text-slate-500 uppercase tracking-widest">
-              list_slug
+            <label className="text-xs font-semibold text-slate-300">
+              옛날 방식 묶음 이름 (위에서 캠페인을 골랐다면 비워도 됨)
               <input
                 value={listSlug}
                 onChange={(e) => setListSlug(e.target.value)}
@@ -4330,15 +4450,15 @@ function AdminDeliveryExcelImportPanel() {
                 placeholder="BS-US-FARMSKIN"
               />
             </label>
-            <label className="text-[10px] text-slate-500 uppercase tracking-widest">
-              모드
+            <label className="text-xs font-semibold text-slate-300">
+              반영 방식
               <select
                 value={mode}
                 onChange={(e) => setMode(e.target.value)}
                 className="mt-1 w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white"
               >
-                <option value="replace">replace (slug 전체 교체)</option>
-                <option value="append">append (기존 + 추가)</option>
+                <option value="replace">전체 갈아끼우기 (같은 캠페인·같은 옛 묶음이면 기존 삭제 후 새로)</option>
+                <option value="append">이어 붙이기 (기존 뒤에 추가)</option>
               </select>
             </label>
           </div>
@@ -4349,7 +4469,7 @@ function AdminDeliveryExcelImportPanel() {
               onChange={(e) => setOmitVisitDate(e.target.checked)}
               className="rounded border-white/20"
             />
-            visit_date 컬럼 없이 삽입 (DB에 visit_date 마이그레이션 전)
+            방문 일정 열 없이 올리기 (시스템에 방문일 칸이 아직 없을 때만 체크)
           </label>
           <input
             type="file"
@@ -4375,12 +4495,17 @@ function AdminDeliveryExcelImportPanel() {
               type="button"
               disabled={busy}
               onClick={() => {
-                if (!window.confirm(`정말 Supabase에 반영할까요? (${mode === 'replace' ? '기존 동일 slug 행은 삭제됩니다' : '기존 행 뒤에 추가됩니다'})`)) return;
+                if (
+                  !window.confirm(
+                    `정말 시스템에 반영할까요? (${mode === 'replace' ? '같은 캠페인(또는 같은 옛 묶음 이름)의 기존 명단은 지워집니다' : '기존 명단 뒤에 이어 붙습니다'})`,
+                  )
+                )
+                  return;
                 postImport(false);
               }}
               className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-sm font-bold text-white disabled:opacity-50"
             >
-              {busy ? '처리 중…' : 'Supabase 반영'}
+              {busy ? '처리 중…' : '시스템에 반영'}
             </button>
           </div>
           {err && <p className="text-red-400 text-sm">{err}</p>}
@@ -4475,7 +4600,7 @@ const AdminCampaignQuickEditor = ({ campaign, onSaved }) => {
         return;
       }
       onSaved?.(campaign.id, data.campaign || payload);
-      setMsg('저장 완료: Supabase와 동기화되었습니다.');
+      setMsg('저장했습니다. 새로고침 없이 반영됩니다.');
     } catch (e) {
       setMsg(`저장 실패: ${e?.message || e}`);
     } finally {
@@ -4484,10 +4609,13 @@ const AdminCampaignQuickEditor = ({ campaign, onSaved }) => {
   };
 
   return (
-    <div className="mb-10 p-6 bg-white/[0.03] border border-cyan-500/20 rounded-2xl">
-      <div className="flex items-center justify-between gap-3 mb-4">
-        <h3 className="text-sm font-black tracking-widest uppercase text-cyan-300">관리자 전용 · 캠페인 편집</h3>
-        <span className="text-[10px] text-slate-500 font-mono">{campaign.order_number || campaign.id}</span>
+    <div className="mb-10 p-6 md:p-8 rounded-2xl border border-cyan-500/25 bg-gradient-to-br from-slate-900/90 to-slate-950/95 shadow-lg">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-5">
+        <div>
+          <h3 className="text-lg font-black text-white">지금 고른 캠페인 정보 수정</h3>
+          <p className="text-xs text-slate-400 mt-1">왼쪽 목록에서 캠페인을 고른 뒤 여기서 이름·금액·진행 단계를 바꿀 수 있습니다.</p>
+        </div>
+        <span className="text-xs text-slate-400 shrink-0">주문번호 {campaign.order_number || '—'}</span>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <input value={fields.brand_name} onChange={(e) => setField('brand_name', e.target.value)} placeholder="브랜드명" className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white" />
@@ -4495,26 +4623,28 @@ const AdminCampaignQuickEditor = ({ campaign, onSaved }) => {
         <input value={fields.plan} onChange={(e) => setField('plan', e.target.value)} placeholder="플랜명" className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white" />
         <select value={fields.status} onChange={(e) => setField('status', e.target.value)} className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white">
           {Object.values(CampaignStatus).map((s) => (
-            <option key={s} value={s} className="bg-slate-900">{s}</option>
+            <option key={s} value={s} className="bg-slate-900">
+              {CAMPAIGN_STATUS_KO[s] || s}
+            </option>
           ))}
         </select>
         <input value={fields.customer_name} onChange={(e) => setField('customer_name', e.target.value)} placeholder="고객 담당자명" className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white" />
         <input value={fields.customer_email} onChange={(e) => setField('customer_email', e.target.value)} placeholder="고객 이메일" className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white" />
         <input value={fields.customer_phone} onChange={(e) => setField('customer_phone', e.target.value)} placeholder="고객 연락처" className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white" />
-        <input value={fields.start_date || ''} onChange={(e) => setField('start_date', e.target.value)} placeholder="시작일 YYYY-MM-DD" className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white" />
+        <input value={fields.start_date || ''} onChange={(e) => setField('start_date', e.target.value)} placeholder="시작일 (2026-04-13 형식)" className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white" />
         <input value={fields.target_creators} onChange={(e) => setField('target_creators', e.target.value)} placeholder="목표 인원" className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white" />
         <input value={fields.matched_creators} onChange={(e) => setField('matched_creators', e.target.value)} placeholder="매칭 인원" className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white" />
-        <input value={fields.plan_price} onChange={(e) => setField('plan_price', e.target.value)} placeholder="플랜 금액" className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white md:col-span-2" />
+        <input value={fields.plan_price} onChange={(e) => setField('plan_price', e.target.value)} placeholder="계약 금액(숫자만, 원)" className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white md:col-span-2" />
       </div>
       <div className="mt-4 flex items-center justify-between gap-3">
-        <p className={`text-xs ${msg.includes('실패') ? 'text-red-400' : 'text-slate-400'}`}>{msg || '캠페인 기본정보를 수정하면 즉시 DB에 반영됩니다.'}</p>
+        <p className={`text-xs ${msg.includes('실패') ? 'text-red-400' : 'text-slate-400'}`}>{msg || '저장을 누르면 바로 고객 화면에도 반영됩니다.'}</p>
         <button
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest bg-cyan-600 hover:bg-cyan-500 border border-cyan-400/40 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-6 py-3 rounded-xl text-sm font-bold bg-cyan-600 hover:bg-cyan-500 border border-cyan-400/40 text-white disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {saving ? '저장 중...' : '캠페인 저장'}
+          {saving ? '저장 중…' : '이 내용으로 저장'}
         </button>
       </div>
     </div>
@@ -4591,16 +4721,19 @@ const AdminCampaignRuntimeSettingsEditor = ({ campaign, onSaved }) => {
   };
 
   return (
-    <div className="mb-10 p-6 bg-white/[0.03] border border-emerald-500/20 rounded-2xl">
-      <div className="flex items-center justify-between gap-3 mb-4">
-        <h3 className="text-sm font-black tracking-widest uppercase text-emerald-300">관리자 전용 · 런타임 설정</h3>
-        <span className="text-[10px] text-slate-500 font-mono">{campaign.order_number || campaign.id}</span>
+    <div className="mb-10 p-6 md:p-8 rounded-2xl border border-emerald-500/25 bg-gradient-to-br from-slate-900/90 to-slate-950/95 shadow-lg">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-5">
+        <div>
+          <h3 className="text-lg font-black text-white">가이드 링크·납품 예외 설정</h3>
+          <p className="text-xs text-slate-400 mt-1">콘텐츠 가이드 주소나, 예전 방식으로 묶인 납품 이름 등을 여기서 바꿉니다.</p>
+        </div>
+        <span className="text-xs text-slate-400 shrink-0">주문번호 {campaign.order_number || '—'}</span>
       </div>
       <div className="grid grid-cols-1 gap-3">
         <input
           value={fields.linked_list_slug}
           onChange={(e) => setField('linked_list_slug', e.target.value)}
-          placeholder="납품 list_slug (예: BS-US-FARMSKIN)"
+          placeholder="옛날 방식 납품 묶음 이름 (예: BS-US-FARMSKIN). 보통은 비워 두고, 납품은 아래 ‘엑셀 올리기’에서 캠페인 이름으로 올리면 됩니다"
           className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white"
         />
         <input
@@ -4629,12 +4762,12 @@ const AdminCampaignRuntimeSettingsEditor = ({ campaign, onSaved }) => {
             onChange={(e) => setField('force_drop_complete_message', e.target.checked)}
             className="w-4 h-4 rounded border-white/10 bg-white/5 text-emerald-500"
           />
-          이 캠페인을 "드랍 완료 · 최종 리스트 확정" 상태로 고정
+          이 캠페인은 인플루언서 드랍을 마쳤고 최종 명단이 확정된 상태로 표시
         </label>
       </div>
       <div className="mt-4 flex items-center justify-between gap-3">
         <p className={`text-xs ${msg.includes('실패') ? 'text-red-400' : 'text-slate-400'}`}>
-          {msg || '코드를 재배포하지 않고 캠페인별 동작/링크를 즉시 바꿀 수 있습니다.'}
+          {msg || '저장 즉시 고객 화면에도 같은 내용이 반영됩니다.'}
         </p>
         <button
           type="button"
@@ -4642,7 +4775,7 @@ const AdminCampaignRuntimeSettingsEditor = ({ campaign, onSaved }) => {
           disabled={saving}
           className="px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest bg-emerald-600 hover:bg-emerald-500 border border-emerald-400/40 text-white disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {saving ? '저장 중...' : '런타임 설정 저장'}
+          {saving ? '저장 중…' : '이 설정 저장'}
         </button>
       </div>
     </div>
@@ -5141,6 +5274,7 @@ export default function Dashboard() {
         let setupByCampaignId = {};
         let settingsByCampaignId = {};
         let loadedFromAdminApi = false;
+        let creatorsByCampaignId = {};
 
         if (isAdminUser) {
           try {
@@ -5158,6 +5292,7 @@ export default function Dashboard() {
                 orderSummaryByNumber = adminData?.order_summary_by_number || {};
                 setupByCampaignId = adminData?.setup_by_campaign_id || {};
                 settingsByCampaignId = adminData?.settings_by_campaign_id || {};
+                creatorsByCampaignId = adminData?.creators_by_campaign_id || {};
                 loadedFromAdminApi = true;
               } else {
                 const errText = await res.text();
@@ -5205,12 +5340,32 @@ export default function Dashboard() {
           }
         }
 
+        const campaignIdsForDelivery = campaignList.map((c) => c.id).filter(Boolean);
+        if (!loadedFromAdminApi && campaignIdsForDelivery.length > 0) {
+          const { data: campScopedRows, error: cscErr } = await supabase
+            .from('admin_delivery_creators')
+            .select('*')
+            .in('campaign_id', campaignIdsForDelivery)
+            .order('created_at', { ascending: true });
+          if (!cscErr && campScopedRows?.length) {
+            for (const row of campScopedRows) {
+              const cid = row?.campaign_id;
+              if (!cid) continue;
+              if (!creatorsByCampaignId[cid]) creatorsByCampaignId[cid] = [];
+              creatorsByCampaignId[cid].push(row);
+            }
+          }
+        }
+
         campaignList = campaignList.map((c) => ({ ...c, admin_runtime_settings: settingsByCampaignId[c.id] || null }));
 
-        const linkedCampaignRows = campaignList.filter((c) => campaignMatchesLinkedDeliveryList(c, user));
+        const linkedCampaignRows = campaignList.filter(
+          (c) => (creatorsByCampaignId[c.id]?.length ?? 0) > 0 || resolveLinkedDeliveryListSlug(c, user) != null,
+        );
         const linkedSlugs = [...new Set(linkedCampaignRows.map((c) => resolveLinkedDeliveryListSlug(c, user)).filter(Boolean))];
+
+        const creatorsBySlug = {};
         if (linkedSlugs.length > 0) {
-          const creatorsBySlug = {};
           for (const slug of linkedSlugs) {
             let linkedCreators = linkedCreatorsRawBySlug?.[slug] || [];
             if (!loadedFromAdminApi) {
@@ -5228,16 +5383,25 @@ export default function Dashboard() {
                   ? []
                   : testInfluencers.map((c, i) => testInfluencerToDisplayCreator(c, i));
           }
-          campaignList = campaignList.map((c) => {
-            const slug = resolveLinkedDeliveryListSlug(c, user);
-            if (!slug) return c;
-            let list = creatorsBySlug[slug] || [];
-            if (slug === LINKED_LIST_SLUG_FARMSKIN && isTroublessPdrnSunscreenCampaign(c)) {
+        }
+
+        campaignList = campaignList.map((c) => {
+          const directRaw = creatorsByCampaignId[c.id];
+          if (directRaw?.length > 0) {
+            let list = directRaw.map((r, i) => toDisplayCreator(r, i));
+            if (isTroublessPdrnSunscreenCampaign(c)) {
               list = finalizeTroublessPdrnScale50DisplayCreators(list);
             }
             return { ...c, linked_delivery_candidates: list };
-          });
-        }
+          }
+          const slug = resolveLinkedDeliveryListSlug(c, user);
+          if (!slug) return c;
+          let list = creatorsBySlug[slug] || [];
+          if (slug === LINKED_LIST_SLUG_FARMSKIN && isTroublessPdrnSunscreenCampaign(c)) {
+            list = finalizeTroublessPdrnScale50DisplayCreators(list);
+          }
+          return { ...c, linked_delivery_candidates: list };
+        });
 
         const orderNumbers = [...new Set(campaignList.map((c) => c.order_number).filter(Boolean))];
         if (orderNumbers.length > 0 && !loadedFromAdminApi) {
@@ -5475,7 +5639,7 @@ export default function Dashboard() {
     } catch (e) {
       console.error(e);
       const msg = e?.message || String(e);
-      alert(`링크 생성 중 오류: ${msg.includes('fetch') || msg.includes('Failed') ? '네트워크 오류 또는 API 미배포' : msg}`);
+      alert(`링크 생성 중 오류: ${msg.includes('fetch') || msg.includes('Failed') ? '인터넷 연결을 확인하거나 잠시 후 다시 시도해 주세요.' : msg}`);
     } finally {
       setImpersonateLoading(false);
     }
@@ -5686,237 +5850,333 @@ export default function Dashboard() {
         )}
 
         {isAdminUser && (
-            <div className="mb-10 p-5 bg-cyan-500/10 border border-cyan-500/30 rounded-3xl text-cyan-100 text-sm animate-fade-in-down">
-                <div className="flex items-center gap-3 mb-3">
-                    <UserCheck size={18} className="text-cyan-300 shrink-0" />
-                    <span className="font-black tracking-widest uppercase text-cyan-200">관리자 전용 납품 현황 대시보드</span>
-                </div>
-                <p className="font-light tracking-tight text-cyan-100/90">
-                    현재 로그인에서는 전체 캠페인을 조회합니다. 모든 고객 캠페인의 상태 확인, 필터링, 세팅 검토, 캠페인 수정까지 이 화면에서 관리할 수 있습니다.
+          <section className="mb-12 rounded-[2rem] border border-slate-600/50 bg-gradient-to-b from-slate-900/95 to-slate-950 shadow-[0_20px_60px_rgba(0,0,0,0.35)] overflow-hidden">
+            <div className="px-6 py-7 sm:px-10 sm:py-9 border-b border-white/10 bg-slate-800/50">
+              <p className="text-xs font-bold text-indigo-300 mb-2">운영팀 전용 화면</p>
+              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">캠페인 운영 센터</h2>
+              <p className="mt-3 text-sm text-slate-300 leading-relaxed max-w-3xl">
+                여기서 <strong className="text-white">전체 고객 캠페인</strong>을 한눈에 보고, 표를 눌러 왼쪽 목록만 좁힌 뒤 아래에서 상세 작업을 하면 됩니다. 숫자·표·도구 설명은 모두 일상 용어만 씁니다.
+              </p>
+              <ol className="mt-5 grid gap-3 sm:grid-cols-3 text-sm text-slate-200">
+                <li className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 leading-snug">
+                  <span className="text-indigo-300 font-black mr-1">1.</span>
+                  요약 숫자와 두 개의 표로 고객·세팅 현황을 확인합니다.
+                </li>
+                <li className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 leading-snug">
+                  <span className="text-indigo-300 font-black mr-1">2.</span>
+                  왼쪽에서 캠페인을 고른 다음, 맨 아래 큰 카드에서 진행 상황을 봅니다.
+                </li>
+                <li className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 leading-snug">
+                  <span className="text-indigo-300 font-black mr-1">3.</span>
+                  결제·명단·회원 점검은 이 섹션 아래 도구 상자를 이용합니다.
+                </li>
+              </ol>
+              <div className="mt-5 flex flex-wrap gap-2">
+                {adminFilterCustomer !== 'all' && (
+                  <span className="text-xs px-3 py-1.5 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-100">
+                    고객 메일: {adminFilterCustomer}
+                  </span>
+                )}
+                {adminFilterBrand !== 'all' && (
+                  <span className="text-xs px-3 py-1.5 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-100">
+                    브랜드: {adminFilterBrand}
+                  </span>
+                )}
+                {adminFilterPlan !== 'all' && (
+                  <span className="text-xs px-3 py-1.5 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-100">
+                    상품 유형: {adminFilterPlan}
+                  </span>
+                )}
+                {adminFilterStatus !== 'all' && (
+                  <span className="text-xs px-3 py-1.5 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-100">
+                    진행 단계: {adminFilterStatus}
+                  </span>
+                )}
+                {adminFilterDelivery !== 'all' && (
+                  <span className="text-xs px-3 py-1.5 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-100">
+                    {adminFilterDelivery === 'linked' ? '인플루언서 명단이 있는 캠페인만' : '명단이 있고 인원 수도 채워진 캠페인만'}
+                  </span>
+                )}
+                {adminSearch.trim() && (
+                  <span className="text-xs px-3 py-1.5 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-100">
+                    검색어: {adminSearch.trim()}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="px-6 py-6 sm:px-10 grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-950/40">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-4">
+                <p className="text-xs text-slate-400 font-medium">등록된 캠페인 전체</p>
+                <p className="text-3xl font-black text-white mt-1 tabular-nums">{campaigns.length}</p>
+                <p className="text-[11px] text-slate-500 mt-2">고객사와 관계없이 시스템에 올라온 캠페인 수입니다.</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-4">
+                <p className="text-xs text-slate-400 font-medium">인플루언서 명단이 붙은 캠페인</p>
+                <p className="text-3xl font-black text-cyan-200 mt-1 tabular-nums">{adminLinkedCampaigns.length}</p>
+                <p className="text-[11px] text-slate-500 mt-2">납품 리스트를 불러와 쓸 수 있는 캠페인 수입니다.</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-4">
+                <p className="text-xs text-slate-400 font-medium">붙어 있는 인플루언서 수 합계</p>
+                <p className="text-3xl font-black text-emerald-200 mt-1 tabular-nums">
+                  {adminLinkedCampaigns.reduce((sum, c) => sum + ((c.linked_delivery_candidates || []).length || 0), 0)}
                 </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                    {adminFilterCustomer !== 'all' && <span className="text-[10px] px-2 py-1 rounded-lg bg-cyan-900/40 border border-cyan-400/30">고객: {adminFilterCustomer}</span>}
-                    {adminFilterBrand !== 'all' && <span className="text-[10px] px-2 py-1 rounded-lg bg-cyan-900/40 border border-cyan-400/30">브랜드: {adminFilterBrand}</span>}
-                    {adminFilterPlan !== 'all' && <span className="text-[10px] px-2 py-1 rounded-lg bg-cyan-900/40 border border-cyan-400/30">플랜: {adminFilterPlan}</span>}
-                    {adminFilterStatus !== 'all' && <span className="text-[10px] px-2 py-1 rounded-lg bg-cyan-900/40 border border-cyan-400/30">상태: {adminFilterStatus}</span>}
-                    {adminFilterDelivery !== 'all' && <span className="text-[10px] px-2 py-1 rounded-lg bg-cyan-900/40 border border-cyan-400/30">{adminFilterDelivery === 'linked' ? '납품 연동만' : '연동+인원 보유'}</span>}
-                    {adminSearch.trim() && <span className="text-[10px] px-2 py-1 rounded-lg bg-cyan-900/40 border border-cyan-400/30">검색: {adminSearch.trim()}</span>}
-                </div>
-                <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="rounded-2xl border border-cyan-400/20 bg-cyan-900/20 px-4 py-3">
-                        <p className="text-[10px] uppercase tracking-widest text-cyan-300/80 font-black">전체 캠페인</p>
-                        <p className="text-xl font-black text-white mt-1">{campaigns.length}</p>
-                    </div>
-                    <div className="rounded-2xl border border-cyan-400/20 bg-cyan-900/20 px-4 py-3">
-                        <p className="text-[10px] uppercase tracking-widest text-cyan-300/80 font-black">납품 연동 캠페인</p>
-                        <p className="text-xl font-black text-white mt-1">{adminLinkedCampaigns.length}</p>
-                    </div>
-                    <div className="rounded-2xl border border-cyan-400/20 bg-cyan-900/20 px-4 py-3">
-                        <p className="text-[10px] uppercase tracking-widest text-cyan-300/80 font-black">연동 인원 합계</p>
-                        <p className="text-xl font-black text-white mt-1">{adminLinkedCampaigns.reduce((sum, c) => sum + ((c.linked_delivery_candidates || []).length || 0), 0)}</p>
-                    </div>
-                </div>
-                {adminOverviewBySlug.length > 0 && (
-                    <div className="mt-4 flex flex-wrap gap-2">
-                        {adminOverviewBySlug.map((item) => (
-                            <span key={item.slug} className="text-[10px] font-black tracking-wider uppercase px-3 py-1.5 rounded-full border border-cyan-400/25 bg-cyan-900/20 text-cyan-200">
-                                {item.slug} · 캠페인 {item.campaigns} · 인원 {item.creators}
-                            </span>
-                        ))}
-                    </div>
-                )}
+                <p className="text-[11px] text-slate-500 mt-2">위 캠페인들에 올라와 있는 명단 인원을 모두 더한 값입니다.</p>
+              </div>
             </div>
-        )}
 
-        {isAdminUser && (
-            <div className="mb-10 grid grid-cols-1 xl:grid-cols-2 gap-6">
-                <div className="bg-white/[0.03] border border-cyan-500/20 rounded-2xl overflow-hidden">
-                    <div className="px-5 py-4 border-b border-white/10 bg-cyan-500/[0.08]">
-                        <h3 className="text-sm font-black tracking-widest uppercase text-cyan-200">고객사별 집계</h3>
-                        <p className="text-xs text-slate-400 mt-1">캠페인 수 / 납품 연동 수 / 연동 인원 / 최근 업데이트</p>
-                    </div>
-                    <div className="max-h-[360px] overflow-auto">
-                        <table className="w-full text-xs">
-                            <thead className="sticky top-0 bg-[#0b1327] text-slate-400 border-b border-white/10">
-                                <tr>
-                                    <th className="text-left px-4 py-3">고객사</th>
-                                    <th className="text-right px-4 py-3">캠페인</th>
-                                    <th className="text-right px-4 py-3">연동</th>
-                                    <th className="text-right px-4 py-3">인원</th>
-                                    <th className="text-right px-4 py-3">최근 업데이트</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-white/5">
-                                {adminCustomerOverviewRows.map((row) => (
-                                    <tr
-                                        key={row.customer}
-                                        onClick={() => handleAdminDrilldownCustomer(row.customer)}
-                                        className={`cursor-pointer transition-colors ${
-                                          adminFilterCustomer === row.customer ? 'bg-cyan-500/15' : 'hover:bg-white/[0.03]'
-                                        }`}
-                                        title={adminFilterCustomer === row.customer ? '클릭하면 고객 필터 해제' : `${row.customer} 고객 캠페인만 보기`}
-                                    >
-                                        <td className="px-4 py-3 text-slate-200">{row.customer}</td>
-                                        <td className="px-4 py-3 text-right">
-                                            <button
-                                              type="button"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleAdminDrilldownMetric(row.customer, 'campaign_count');
-                                              }}
-                                              className="text-white font-bold underline decoration-dotted underline-offset-4 hover:text-cyan-200"
-                                              title="이 고객의 전체 캠페인만 보기"
-                                            >
-                                              {row.campaign_count}
-                                            </button>
-                                        </td>
-                                        <td className="px-4 py-3 text-right">
-                                            <button
-                                              type="button"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleAdminDrilldownMetric(row.customer, 'linked_count');
-                                              }}
-                                              className="text-cyan-300 font-bold underline decoration-dotted underline-offset-4 hover:text-cyan-200"
-                                              title="이 고객의 납품 연동 캠페인만 보기"
-                                            >
-                                              {row.linked_count}
-                                            </button>
-                                        </td>
-                                        <td className="px-4 py-3 text-right">
-                                            <button
-                                              type="button"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleAdminDrilldownMetric(row.customer, 'linked_creators');
-                                              }}
-                                              className="text-cyan-200 underline decoration-dotted underline-offset-4 hover:text-cyan-100"
-                                              title="이 고객의 연동+인원 보유 캠페인만 보기"
-                                            >
-                                              {row.linked_creators}
-                                            </button>
-                                        </td>
-                                        <td className="px-4 py-3 text-right text-slate-400">{row.latest_at ? new Date(row.latest_at).toLocaleString('ko-KR') : '-'}</td>
-                                    </tr>
-                                ))}
-                                {adminCustomerOverviewRows.length === 0 && (
-                                    <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-500">표시할 고객 집계가 없습니다.</td></tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                <div className="bg-white/[0.03] border border-cyan-500/20 rounded-2xl overflow-hidden">
-                    <div className="px-5 py-4 border-b border-white/10 bg-cyan-500/[0.08]">
-                        <h3 className="text-sm font-black tracking-widest uppercase text-cyan-200">고객 입력 세팅 요약</h3>
-                        <p className="text-xs text-slate-400 mt-1">캠페인 세팅 폼 최신 제출값 기준</p>
-                    </div>
-                    <div className="max-h-[360px] overflow-auto">
-                        <table className="w-full text-xs">
-                            <thead className="sticky top-0 bg-[#0b1327] text-slate-400 border-b border-white/10">
-                                <tr>
-                                    <th className="text-left px-4 py-3">주문/고객</th>
-                                    <th className="text-left px-4 py-3">브랜드/플랜</th>
-                                    <th className="text-left px-4 py-3">세팅 입력 요약</th>
-                                    <th className="text-right px-4 py-3">제출시각</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-white/5">
-                                {adminSetupOverviewRows.map((row) => (
-                                    <tr
-                                        key={row.id}
-                                        onClick={() => handleAdminDrilldownCampaign(row.id)}
-                                        className={`cursor-pointer transition-colors ${
-                                          selectedCampaignId === row.id ? 'bg-cyan-500/15' : 'hover:bg-white/[0.03]'
-                                        }`}
-                                        title="클릭하면 해당 캠페인으로 이동 및 필터 적용"
-                                    >
-                                        <td className="px-4 py-3 align-top">
-                                            <p className="text-slate-200 font-mono">{row.order_number}</p>
-                                            <p className="text-slate-500 mt-1">{row.customer_email}</p>
-                                        </td>
-                                        <td className="px-4 py-3 align-top">
-                                            <p className="text-white font-semibold">{row.brand_name}</p>
-                                            <p className="text-slate-500 mt-1">{row.plan}</p>
-                                        </td>
-                                        <td className="px-4 py-3 align-top text-slate-300 leading-relaxed">
-                                            <p>회사명: <span className="text-slate-100">{row.company_name}</span></p>
-                                            <p>담당자: <span className="text-slate-100">{row.contact_name}</span> / {row.contact_email}</p>
-                                            <p>제품명: <span className="text-slate-100">{row.product_name_input}</span></p>
-                                            <p>타겟국가: <span className="text-slate-100">{row.target_country}</span></p>
-                                            <p>행사명: <span className="text-slate-100">{row.event_name}</span> · 가이드라인: <span className="text-slate-100">{row.guideline_status}</span></p>
-                                            {Array.isArray(row.product_photo_urls) && row.product_photo_urls.length > 0 && (
-                                              <div className="mt-2 flex items-center gap-2">
-                                                <img
-                                                  src={ensureAbsoluteUrl(row.product_photo_urls[0])}
-                                                  alt="setup-photo-preview"
-                                                  className="w-10 h-10 rounded-md object-cover border border-white/15"
-                                                  loading="lazy"
-                                                />
-                                                <span className="text-slate-400 text-[11px]">사진 {row.product_photo_urls.length}개 첨부</span>
-                                              </div>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-3 align-top text-right text-slate-400">{row.setup_created_at ? new Date(row.setup_created_at).toLocaleString('ko-KR') : '-'}</td>
-                                    </tr>
-                                ))}
-                                {adminSetupOverviewRows.length === 0 && (
-                                    <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-500">캠페인 세팅 입력 데이터가 없습니다.</td></tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {isAdminUser && (
-            <div className="mb-10 p-5 bg-slate-800/50 border border-slate-600/30 rounded-3xl animate-fade-in-down">
-                <button
-                    onClick={() => setImpersonateExpanded(!impersonateExpanded)}
-                    className="w-full flex items-center justify-between text-left"
-                >
-                    <span className="font-bold text-slate-300 flex items-center gap-2">
-                        <UserCheck size={18} className="text-cyan-400" /> 고객 화면으로 로그인 (관리자 전용)
+            {adminOverviewBySlug.length > 0 && (
+              <div className="px-6 sm:px-10 pb-4">
+                <p className="text-xs font-bold text-slate-400 mb-2">명단이 이렇게 묶여 있습니다</p>
+                <div className="flex flex-wrap gap-2">
+                  {adminOverviewBySlug.map((item) => (
+                    <span
+                      key={item.slug}
+                      className="text-xs px-3 py-2 rounded-xl border border-cyan-500/25 bg-cyan-500/10 text-cyan-100 leading-snug max-w-full"
+                      title={`${formatAdminDeliveryGroupLabel(item.slug)} — 캠페인 ${item.campaigns}건, 인플루언서 ${item.creators}명`}
+                    >
+                      {formatAdminDeliveryGroupLabel(item.slug)} — 캠페인 {item.campaigns}건 · 인원 {item.creators}명
                     </span>
-                    <ChevronRight size={18} className={`text-slate-500 transition-transform ${impersonateExpanded ? 'rotate-90' : ''}`} />
-                </button>
-                {impersonateExpanded && (
-                    <div className="mt-4 pt-4 border-t border-slate-600/30 space-y-3">
-                        <p className="text-slate-500 text-sm">고객 이메일만 입력하면 비밀번호 없이 해당 고객 화면으로 진입할 수 있습니다. (Supabase에 등록된 이메일)</p>
-                        <div className="flex flex-wrap gap-3">
-                            <input
-                                type="email"
-                                placeholder="customer@example.com"
-                                value={impersonateEmail}
-                                onChange={(e) => setImpersonateEmail(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleImpersonateLogin()}
-                                className="flex-1 min-w-[200px] px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 text-sm"
-                            />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="px-6 pb-8 sm:px-10 grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <div className="rounded-2xl border border-white/10 bg-slate-900/60 overflow-hidden shadow-inner">
+                <div className="px-5 py-4 border-b border-white/10 bg-white/[0.04]">
+                  <h3 className="text-base font-bold text-white">고객사별로 묶어 보기</h3>
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                    이메일 한 줄이 한 고객사입니다. 숫자를 누르면 왼쪽 캠페인 목록만 그 조건으로 줄어듭니다. 행 전체를 누르면 그 고객만 보기입니다.
+                  </p>
+                </div>
+                <div className="max-h-[380px] overflow-auto">
+                  <table className="w-full text-xs">
+                    <thead className="sticky top-0 bg-[#0c1422] text-slate-400 border-b border-white/10 z-[1]">
+                      <tr>
+                        <th className="text-left px-4 py-3 font-semibold">고객 이메일</th>
+                        <th className="text-right px-4 py-3 font-semibold">캠페인 수</th>
+                        <th className="text-right px-4 py-3 font-semibold">명단 있는 캠페인</th>
+                        <th className="text-right px-4 py-3 font-semibold">인플루언서 수</th>
+                        <th className="text-right px-4 py-3 font-semibold">가장 최근 활동</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {adminCustomerOverviewRows.map((row) => (
+                        <tr
+                          key={row.customer}
+                          onClick={() => handleAdminDrilldownCustomer(row.customer)}
+                          className={`cursor-pointer transition-colors ${
+                            adminFilterCustomer === row.customer ? 'bg-cyan-500/15' : 'hover:bg-white/[0.04]'
+                          }`}
+                          title={adminFilterCustomer === row.customer ? '다시 누르면 이 고객만 보기가 풀립니다' : `${row.customer} 님 캠페인만 보기`}
+                        >
+                          <td className="px-4 py-3 text-slate-100">{row.customer}</td>
+                          <td className="px-4 py-3 text-right">
                             <button
-                                onClick={handleImpersonateLogin}
-                                disabled={impersonateLoading}
-                                className="px-5 py-2.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 rounded-xl font-bold text-sm text-white transition-all flex items-center gap-2"
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAdminDrilldownMetric(row.customer, 'campaign_count');
+                              }}
+                              className="text-white font-bold underline decoration-dotted underline-offset-4 hover:text-cyan-200"
+                              title="이 고객의 캠페인만 왼쪽에 보이게 하기"
                             >
-                                {impersonateLoading ? <RefreshCw size={16} className="animate-spin" /> : null}
-                                새 탭에서 고객으로 열기
+                              {row.campaign_count}
                             </button>
-                        </div>
-                    </div>
-                )}
-                <AdminCampaignScheduleByIdPanel />
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAdminDrilldownMetric(row.customer, 'linked_count');
+                              }}
+                              className="text-cyan-300 font-bold underline decoration-dotted underline-offset-4 hover:text-cyan-200"
+                              title="인플루언서 명단이 붙은 캠페인만 보기"
+                            >
+                              {row.linked_count}
+                            </button>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAdminDrilldownMetric(row.customer, 'linked_creators');
+                              }}
+                              className="text-cyan-200 underline decoration-dotted underline-offset-4 hover:text-cyan-100"
+                              title="명단이 있고 인원 수도 채워진 캠페인만 보기"
+                            >
+                              {row.linked_creators}
+                            </button>
+                          </td>
+                          <td className="px-4 py-3 text-right text-slate-400 whitespace-nowrap">
+                            {row.latest_at ? new Date(row.latest_at).toLocaleString('ko-KR') : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                      {adminCustomerOverviewRows.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="px-4 py-10 text-center text-slate-500 text-sm">
+                            아직 집계할 캠페인이 없습니다.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-slate-900/60 overflow-hidden shadow-inner">
+                <div className="px-5 py-4 border-b border-white/10 bg-white/[0.04]">
+                  <h3 className="text-base font-bold text-white">고객이 적어 넣은 세팅 요약</h3>
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                    캠페인 시작 전 고객이 제출한 폼의 <strong className="text-slate-200">가장 최근 내용</strong>입니다. 한 줄을 누르면 그 캠페인이 왼쪽에서 선택됩니다.
+                  </p>
+                </div>
+                <div className="max-h-[380px] overflow-auto">
+                  <table className="w-full text-xs">
+                    <thead className="sticky top-0 bg-[#0c1422] text-slate-400 border-b border-white/10 z-[1]">
+                      <tr>
+                        <th className="text-left px-4 py-3 font-semibold">주문번호 · 고객</th>
+                        <th className="text-left px-4 py-3 font-semibold">브랜드 · 상품 유형</th>
+                        <th className="text-left px-4 py-3 font-semibold">폼에 적힌 내용</th>
+                        <th className="text-right px-4 py-3 font-semibold">보낸 시각</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {adminSetupOverviewRows.map((row) => (
+                        <tr
+                          key={row.id}
+                          onClick={() => handleAdminDrilldownCampaign(row.id)}
+                          className={`cursor-pointer transition-colors ${
+                            selectedCampaignId === row.id ? 'bg-cyan-500/15' : 'hover:bg-white/[0.04]'
+                          }`}
+                          title="눌러서 이 캠페인으로 이동"
+                        >
+                          <td className="px-4 py-3 align-top">
+                            <p className="text-slate-100 font-medium">{row.order_number}</p>
+                            <p className="text-slate-500 mt-1">{row.customer_email}</p>
+                          </td>
+                          <td className="px-4 py-3 align-top">
+                            <p className="text-white font-semibold">{row.brand_name}</p>
+                            <p className="text-slate-500 mt-1">{row.plan}</p>
+                          </td>
+                          <td className="px-4 py-3 align-top text-slate-300 leading-relaxed">
+                            <p>
+                              회사: <span className="text-slate-100">{row.company_name}</span>
+                            </p>
+                            <p>
+                              담당자: <span className="text-slate-100">{row.contact_name}</span> · {row.contact_email}
+                            </p>
+                            <p>
+                              제품: <span className="text-slate-100">{row.product_name_input}</span>
+                            </p>
+                            <p>
+                              국가: <span className="text-slate-100">{row.target_country}</span>
+                            </p>
+                            <p>
+                              행사: <span className="text-slate-100">{row.event_name}</span> · 가이드 진행:{' '}
+                              <span className="text-slate-100">{row.guideline_status}</span>
+                            </p>
+                            {Array.isArray(row.product_photo_urls) && row.product_photo_urls.length > 0 && (
+                              <div className="mt-2 flex items-center gap-2">
+                                <img
+                                  src={ensureAbsoluteUrl(row.product_photo_urls[0])}
+                                  alt=""
+                                  className="w-10 h-10 rounded-md object-cover border border-white/15"
+                                  loading="lazy"
+                                />
+                                <span className="text-slate-400 text-[11px]">참고 사진 {row.product_photo_urls.length}장</span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 align-top text-right text-slate-400 whitespace-nowrap">
+                            {row.setup_created_at ? new Date(row.setup_created_at).toLocaleString('ko-KR') : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                      {adminSetupOverviewRows.length === 0 && (
+                        <tr>
+                          <td colSpan={4} className="px-4 py-10 text-center text-slate-500 text-sm">
+                            고객이 제출한 세팅 폼이 아직 없습니다.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
+          </section>
         )}
 
         {isAdminUser && (
-          <>
-            <div className="mb-10 grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <div className="mb-10 rounded-2xl border border-slate-600/40 bg-slate-900/70 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setImpersonateExpanded(!impersonateExpanded)}
+              className="w-full px-6 py-4 flex items-center justify-between text-left bg-slate-800/80 hover:bg-slate-800 transition-colors"
+            >
+              <span className="font-bold text-white flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500/15 border border-cyan-500/30">
+                  <UserCheck size={20} className="text-cyan-300" />
+                </span>
+                <span>
+                  <span className="block text-base">고객 화면 그대로 보기</span>
+                  <span className="block text-xs font-normal text-slate-400 mt-0.5">비밀번호 없이, 고객이 보는 화면만 새 탭에서 엽니다.</span>
+                </span>
+              </span>
+              <ChevronRight size={20} className={`text-slate-500 transition-transform shrink-0 ${impersonateExpanded ? 'rotate-90' : ''}`} />
+            </button>
+            {impersonateExpanded && (
+              <div className="px-6 pb-6 pt-2 border-t border-white/10 space-y-4 bg-slate-950/40">
+                <p className="text-sm text-slate-400 leading-relaxed">
+                  고객이 로그인할 때 쓰는 <strong className="text-slate-200">이메일 주소</strong>를 넣으면 됩니다. 우리 쪽에 가입되어 있는 이메일이어야 합니다.
+                </p>
+                <div className="flex flex-wrap gap-3 items-stretch">
+                  <input
+                    type="email"
+                    placeholder="예: heather@example.com"
+                    value={impersonateEmail}
+                    onChange={(e) => setImpersonateEmail(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleImpersonateLogin()}
+                    className="flex-1 min-w-[220px] px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleImpersonateLogin}
+                    disabled={impersonateLoading}
+                    className="px-6 py-3 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 rounded-xl font-bold text-sm text-white transition-all flex items-center justify-center gap-2"
+                  >
+                    {impersonateLoading ? <RefreshCw size={16} className="animate-spin" /> : null}
+                    새 탭에서 열기
+                  </button>
+                </div>
+              </div>
+            )}
+            <div className="border-t border-white/10 px-6 py-5 bg-slate-900/80">
+              <AdminCampaignScheduleByIdPanel />
+            </div>
+          </div>
+        )}
+
+        {isAdminUser && (
+          <section className="mb-12">
+            <div className="mb-5">
+              <h2 className="text-xl font-black text-white">자주 쓰는 운영 도구</h2>
+              <p className="text-sm text-slate-400 mt-1">아래 상자를 펼치면 각각의 설명과 입력란이 나옵니다. 순서는 자유입니다.</p>
+            </div>
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
               <AdminSignupOnlyUsersPanel />
               <AdminCustomPaymentOffersPanel />
             </div>
             <AdminOpsToolsPanel onFocusOrderNumber={handleAdminFocusOrderNumber} />
-            <AdminDeliveryExcelImportPanel />
-          </>
+            <div className="mt-6">
+              <AdminDeliveryExcelImportPanel campaigns={campaigns} />
+            </div>
+          </section>
         )}
 
         {user && !user?.user_metadata?.password_set && (
@@ -5937,17 +6197,25 @@ export default function Dashboard() {
 
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-12 gap-8 relative z-10">
             <div>
-                <h1 className="text-4xl md:text-5xl font-black text-white tracking-tighter mb-3 leading-none uppercase">
-                    {user ? `${user.email.split('@')[0]}'s Dashboard` : `Management Dashboard`}
+                <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight mb-3 leading-tight">
+                    {user
+                      ? isAdminUser
+                        ? '캠페인 운영 대시보드'
+                        : `${user.email.split('@')[0]}님의 대시보드`
+                      : '대시보드'}
                 </h1>
-                <p className="text-slate-500 font-light text-lg tracking-tight">전체 캠페인 진행 상태 및 성과 지표를 실시간으로 모니터링합니다.</p>
+                <p className="text-slate-400 font-light text-base md:text-lg tracking-tight max-w-2xl">
+                  {isAdminUser
+                    ? '위쪽 운영 센터에서 숫자와 표를 보고, 왼쪽에서 캠페인을 고른 뒤 이 아래에서 진행 상황을 확인하면 됩니다.'
+                    : '캠페인 진행 단계와 결과를 한곳에서 확인할 수 있습니다.'}
+                </p>
             </div>
             {user && (
                 <button 
                     onClick={() => setIsPasswordMode(!isPasswordMode)}
-                    className="flex items-center gap-3 px-6 py-3 bg-white/5 border border-white/10 rounded-2xl text-xs font-black tracking-widest uppercase hover:bg-white/10 transition-all shadow-xl text-slate-300"
+                    className="flex items-center gap-3 px-6 py-3 bg-white/5 border border-white/10 rounded-2xl text-xs font-bold hover:bg-white/10 transition-all shadow-xl text-slate-200"
                 >
-                    <Settings size={18} className="text-slate-500 group-hover:rotate-45 transition-transform" /> Account Settings
+                    <Settings size={18} className="text-slate-400" /> 비밀번호·계정 설정
                 </button>
             )}
         </div>
@@ -6041,41 +6309,42 @@ export default function Dashboard() {
             <div className="w-full lg:w-1/4 space-y-10 sticky top-40">
                 <div className="space-y-6">
                     <div className="flex items-center justify-between px-2">
-                        <h2 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em]">Campaign Library</h2>
-                        <span className="text-[10px] font-black bg-white/5 text-slate-400 px-3 py-1 rounded-full border border-white/5">
-                          {isAdminUser ? `${filteredCampaigns.length}/${campaigns.length}` : campaigns.length}
+                        <h2 className="text-sm font-bold text-slate-300">캠페인 목록</h2>
+                        <span className="text-xs font-semibold bg-white/5 text-slate-300 px-3 py-1 rounded-full border border-white/10">
+                          {isAdminUser ? `보이는 ${filteredCampaigns.length}개 / 전체 ${campaigns.length}개` : `${campaigns.length}개`}
                         </span>
                     </div>
                     {isAdminUser && (
-                        <div className="p-4 rounded-2xl border border-cyan-500/20 bg-cyan-500/[0.04] space-y-3">
-                            <p className="text-[10px] font-black tracking-widest uppercase text-cyan-300">관리자 필터</p>
+                        <div className="p-4 rounded-2xl border border-cyan-500/25 bg-cyan-500/[0.06] space-y-3">
+                            <p className="text-xs font-bold text-cyan-100">목록만 좁히기</p>
+                            <p className="text-[11px] text-slate-400 leading-relaxed">위 운영 센터 표를 눌러도 같은 필터가 걸립니다. 여기서 직접 고를 수도 있습니다.</p>
                             <input
                                 value={adminSearch}
                                 onChange={(e) => setAdminSearch(e.target.value)}
-                                placeholder="주문번호/브랜드/이메일 검색"
-                                className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder-slate-500"
+                                placeholder="주문번호, 브랜드, 이메일 중 아무거나 입력"
+                                className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder-slate-500"
                             />
                             <div className="grid grid-cols-1 gap-2">
                                 <select value={adminFilterCustomer} onChange={(e) => setAdminFilterCustomer(e.target.value)} className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white">
-                                    <option value="all" className="bg-white text-slate-900">고객사 전체</option>
+                                    <option value="all" className="bg-white text-slate-900">고객 이메일 — 전체</option>
                                     {adminCustomerOptions.map((v) => <option key={v} value={v} className="bg-white text-slate-900">{v}</option>)}
                                 </select>
                                 <select value={adminFilterBrand} onChange={(e) => setAdminFilterBrand(e.target.value)} className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white">
-                                    <option value="all" className="bg-white text-slate-900">브랜드 전체</option>
+                                    <option value="all" className="bg-white text-slate-900">브랜드 — 전체</option>
                                     {adminBrandOptions.map((v) => <option key={v} value={v} className="bg-white text-slate-900">{v}</option>)}
                                 </select>
                                 <select value={adminFilterPlan} onChange={(e) => setAdminFilterPlan(e.target.value)} className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white">
-                                    <option value="all" className="bg-white text-slate-900">플랜 전체</option>
+                                    <option value="all" className="bg-white text-slate-900">상품 유형 — 전체</option>
                                     {adminPlanOptions.map((v) => <option key={v} value={v} className="bg-white text-slate-900">{v}</option>)}
                                 </select>
                                 <select value={adminFilterStatus} onChange={(e) => setAdminFilterStatus(e.target.value)} className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white">
-                                    <option value="all" className="bg-white text-slate-900">상태 전체</option>
+                                    <option value="all" className="bg-white text-slate-900">진행 단계 — 전체</option>
                                     {adminStatusOptions.map((v) => <option key={v} value={v} className="bg-white text-slate-900">{v}</option>)}
                                 </select>
                                 <select value={adminFilterDelivery} onChange={(e) => setAdminFilterDelivery(e.target.value)} className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white">
-                                    <option value="all" className="bg-white text-slate-900">납품 연동 조건 전체</option>
-                                    <option value="linked" className="bg-white text-slate-900">납품 연동 캠페인만</option>
-                                    <option value="with_creators" className="bg-white text-slate-900">연동 + 인원 보유만</option>
+                                    <option value="all" className="bg-white text-slate-900">인플루언서 명단 — 조건 없음</option>
+                                    <option value="linked" className="bg-white text-slate-900">명단이 붙은 캠페인만</option>
+                                    <option value="with_creators" className="bg-white text-slate-900">명단에 사람이 있는 캠페인만</option>
                                 </select>
                             </div>
                             <button
@@ -6088,9 +6357,9 @@ export default function Dashboard() {
                                     setAdminFilterDelivery('all');
                                     setAdminSearch('');
                                 }}
-                                className="w-full px-3 py-2 rounded-xl text-[10px] font-black tracking-widest uppercase bg-white/10 border border-white/15 text-slate-300 hover:bg-white/15 transition-all"
+                                className="w-full px-3 py-2.5 rounded-xl text-xs font-bold bg-white/10 border border-white/15 text-slate-200 hover:bg-white/15 transition-all"
                             >
-                                필터 초기화
+                                모두 풀고 처음부터
                             </button>
                         </div>
                     )}
@@ -6112,7 +6381,7 @@ export default function Dashboard() {
                     </div>
                 </div>
                 
-                {/* Performance Boosting Section */}
+                {!isAdminUser && (
                 <div className="space-y-4 pt-10 border-t border-white/5">
                     <h2 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] px-2">Performance Boost</h2>
                     
@@ -6134,6 +6403,7 @@ export default function Dashboard() {
                         </div>
                     ))}
                 </div>
+                )}
             </div>
 
             {/* Main Content Area */}
@@ -6169,8 +6439,7 @@ export default function Dashboard() {
                                 </div>
                                 <p className="text-slate-500 text-lg font-light flex items-center gap-3 tracking-tight">
                                     <span className={`w-3 h-3 rounded-full ${selectedCampaign?.status === CampaignStatus.COMPLETED ? 'bg-slate-700 shadow-none' : 'bg-cyan-400 animate-pulse shadow-[0_0_10px_rgba(34,211,238,0.8)]'}`}></span>
-                                    {selectedCampaign?.status === CampaignStatus.COMPLETED ? 'FINAL REPORT GENERATED' : 
-                                     selectedCampaign?.status === CampaignStatus.PAYMENT_PENDING ? 'WAITING FOR CONFIRMATION' : selectedCampaign?.status === CampaignStatus.KICKOFF ? 'KICKOFF - ONBOARDING' : 'ANALYTIC ENGINE ACTIVE - MONITORING LIVE FEED'}
+                                    {getCampaignProgressSubtitle(selectedCampaign?.status)}
                                 </p>
                             </div>
                             <StatusBadge status={selectedCampaign?.status} />

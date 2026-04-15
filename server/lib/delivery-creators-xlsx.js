@@ -101,8 +101,11 @@ export function parseDeliveryCreatorsWorkbook(buffer, opts = {}) {
 
 /**
  * DB insert 행 (list_slug 주입 전)
+ * @param {string} listSlug DB NOT NULL 대응용 풀 키(레거시·캠페인 모드 모두)
+ * @param {{ campaignId?: string }} [opts] campaign_id 가 있으면 해당 캠페인에만 귀속
  */
-export function toDbInsertRows(parsedRows, listSlug) {
+export function toDbInsertRows(parsedRows, listSlug, opts = {}) {
+  const { campaignId } = opts;
   return parsedRows.map((r) => {
     const base = {
       list_slug: listSlug,
@@ -113,6 +116,7 @@ export function toDbInsertRows(parsedRows, listSlug) {
       instagram_url: r.instagram_url,
       instagram_follower: r.instagram_follower,
     };
+    if (campaignId) base.campaign_id = campaignId;
     if (r.visit_date != null && String(r.visit_date).trim() !== '') {
       base.visit_date = r.visit_date;
     }
