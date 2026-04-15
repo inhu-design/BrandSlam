@@ -6,7 +6,7 @@
  * - Authorization: Bearer <Supabase JWT>, ADMIN_EMAILS에 등록된 계정만
  */
 import { createClient } from '@supabase/supabase-js';
-import { supabase as supabaseAdmin } from '../../server/lib/supabase-server.js';
+import { supabase as supabaseAdmin } from '../lib/supabase-server.js';
 
 const supabaseUrl = process.env.SUPABASE_URL || 'https://grlayjybcxrcaufnwysb.supabase.co';
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;

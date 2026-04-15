@@ -4,7 +4,7 @@
  * Body: { order_number, status?, plan_price? }
  */
 import { createClient } from '@supabase/supabase-js';
-import { supabase as supabaseAdmin } from '../../server/lib/supabase-server.js';
+import { supabase as supabaseAdmin } from '../lib/supabase-server.js';
 
 const supabaseUrl = process.env.SUPABASE_URL || '';
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
