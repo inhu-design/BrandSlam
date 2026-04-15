@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { 
   Package, Clock, Truck, UserCheck, AlertCircle, 
   Lock, Settings, BarChart3, Users, PlayCircle, Eye, Heart, MessageCircle, Share2, 
@@ -5919,13 +5919,21 @@ export default function Dashboard() {
                   </p>
                 </div>
                 {user && (
-                  <button
-                    type="button"
-                    onClick={() => setIsPasswordMode(!isPasswordMode)}
-                    className="shrink-0 flex items-center gap-2 px-5 py-3 bg-white/5 border border-white/10 rounded-xl text-xs font-bold hover:bg-white/10 text-slate-200"
-                  >
-                    <Settings size={16} className="text-slate-400" /> 비밀번호·계정 설정
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <Link
+                      to="/admin/support"
+                      className="flex items-center gap-2 px-5 py-3 bg-cyan-500/15 border border-cyan-400/35 rounded-xl text-xs font-bold hover:bg-cyan-500/25 text-cyan-100"
+                    >
+                      <MessageCircle size={16} className="text-cyan-300" /> 고객 1:1 문의
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => setIsPasswordMode(!isPasswordMode)}
+                      className="flex items-center gap-2 px-5 py-3 bg-white/5 border border-white/10 rounded-xl text-xs font-bold hover:bg-white/10 text-slate-200"
+                    >
+                      <Settings size={16} className="text-slate-400" /> 비밀번호·계정 설정
+                    </button>
+                  </div>
                 )}
               </div>
               <div className="px-5 sm:px-8 py-4 grid grid-cols-2 lg:grid-cols-4 gap-3 bg-slate-950/40">
