@@ -117,6 +117,12 @@ const handleMagicLogin = async (e) => {
                 이메일만 있으면 즉시 시작할 수 있습니다.<br/>
                 설문이나 견적을 제출하지 않았어도 이용 가능합니다.
             </p>
+            {location.state?.landingCampaignIntent ? (
+              <div className="mt-4 rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3 text-left text-sm text-cyan-950 shadow-sm">
+                <p className="text-[11px] font-black uppercase tracking-wider text-cyan-700">랜딩(/landing-new)에서 남긴 메모</p>
+                <p className="mt-1.5 font-medium leading-snug">{location.state.landingCampaignIntent}</p>
+              </div>
+            ) : null}
         </div>
 
         {/* 탭 전환 버튼 */}

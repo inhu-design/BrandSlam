@@ -1,288 +1,372 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import {
+  ArrowDown,
   ArrowRight,
   BarChart3,
-  Database,
-  LayoutDashboard,
-  LineChart,
-  Megaphone,
+  Calculator,
+  Copy,
+  FileText,
+  Hash,
+  Loader2,
   Sparkles,
+  Zap,
 } from 'lucide-react';
 
-/**
- * slam-global 리뉴얼 랜딩 (와이어프레임 수준 UI)
- *
- * 이 파일만 삭제하면 실험을 되돌릴 수 있습니다. 기존 라우트를 바꾸지 않으려면
- * App.jsx에 아래 한 줄을 추가해 미리보기 경로를 열 수 있습니다.
- *
- * import SlamGlobalLandingNew from './pages/SlamGlobalLandingNew';
- * <Route path="/landing-new" element={<SlamGlobalLandingNew />} />
- */
+const LANDING_INTENT_KEY = 'bs_landing_campaign_intent_v1';
 
-const steps = [
-  {
-    id: 1,
-    title: '데이터 등록',
-    desc: '연동 또는 입력으로 소스를 연결합니다.',
-    icon: Database,
-    mock: (
-      <div className="space-y-2 rounded-xl border border-white/10 bg-white/5 p-4">
-        <div className="h-2 w-24 rounded bg-white/20" />
-        <div className="flex gap-2">
-          <div className="h-2 flex-1 rounded bg-violet-500/40" />
-          <div className="h-2 flex-1 rounded bg-white/10" />
-        </div>
-        <div className="mt-3 flex gap-2">
-          <div className="h-8 flex-1 rounded-lg border border-dashed border-white/20 bg-white/[0.03]" />
-          <div className="h-8 w-20 rounded-lg bg-gradient-to-r from-violet-500 to-cyan-400/80" />
-        </div>
-      </div>
-    ),
-  },
-  {
-    id: 2,
-    title: '추적',
-    desc: '시스템이 자동으로 모니터링합니다.',
-    icon: LayoutDashboard,
-    mock: (
-      <div className="relative overflow-hidden rounded-xl border border-white/10 bg-slate-950/80 p-4">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(139,92,246,0.15),transparent_50%)]" />
-        <div className="relative flex gap-2">
-          {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="h-16 flex-1 rounded-lg bg-white/[0.06] ring-1 ring-white/10"
-              style={{
-                animation: `pulse 2.4s ease-in-out ${i * 0.2}s infinite`,
-              }}
-            />
-          ))}
-        </div>
-        <div className="relative mt-3 flex items-end gap-1">
-          {[40, 55, 35, 70, 50, 85, 65].map((h, i) => (
-            <div
-              key={i}
-              className="flex-1 rounded-t bg-gradient-to-t from-cyan-500/50 to-violet-500/60"
-              style={{ height: `${h}%`, minHeight: '28px' }}
-            />
-          ))}
-        </div>
-        <style>{`
-          @keyframes pulse {
-            0%, 100% { opacity: 0.6; transform: scaleY(1); }
-            50% { opacity: 1; transform: scaleY(1.02); }
-          }
-        `}</style>
-      </div>
-    ),
-  },
-  {
-    id: 3,
-    title: '광고',
-    desc: '타겟과 소재를 설정해 집행합니다.',
-    icon: Megaphone,
-    mock: (
-      <div className="space-y-3 rounded-xl border border-white/10 bg-white/5 p-4">
-        <div className="flex gap-2">
-          <span className="rounded-full bg-violet-500/20 px-2 py-0.5 text-[10px] font-medium text-violet-200">
-            Audience
-          </span>
-          <span className="rounded-full bg-cyan-500/15 px-2 py-0.5 text-[10px] font-medium text-cyan-200">
-            Creative
-          </span>
-        </div>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          <div className="h-2 rounded bg-white/15" />
-          <div className="h-2 rounded bg-white/10" />
-          <div className="h-2 rounded bg-white/10" />
-          <div className="h-2 rounded bg-white/15" />
-        </div>
-        <div className="flex items-center justify-between rounded-lg border border-white/10 bg-black/20 px-3 py-2">
-          <span className="text-[10px] text-white/50">Campaign</span>
-          <span className="text-[10px] font-medium text-violet-200">Launch</span>
-        </div>
-      </div>
-    ),
-  },
-  {
-    id: 4,
-    title: '매출',
-    desc: '성과가 누적되는 흐름을 확인합니다.',
-    icon: LineChart,
-    mock: (
-      <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-        <div className="mb-2 flex items-center gap-2 text-[10px] text-emerald-300/90">
-          <BarChart3 className="h-3.5 w-3.5" />
-          Revenue trend
-        </div>
-        <div className="mt-2 flex items-end gap-0.5">
-          {[20, 28, 24, 35, 42, 48, 55, 62, 68, 74, 82, 90].map((h, i) => (
-            <div
-              key={i}
-              className="flex-1 rounded-t bg-gradient-to-t from-emerald-500/20 to-emerald-400/80"
-              style={{ height: `${h}px` }}
-            />
-          ))}
-        </div>
-        <div className="mt-3 flex items-center gap-2 text-[10px] text-white/40">
-          <span className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-2 py-0.5 text-emerald-200">
-            <ArrowRight className="h-3 w-3 rotate-[-45deg]" />
-            +24%
-          </span>
-          <span>vs last period</span>
-        </div>
-      </div>
-    ),
-  },
+const ESTIMATE_TIERS = [
+  { creators: 10, price: 590_000 },
+  { creators: 20, price: 990_000 },
+  { creators: 50, price: 2_390_000 },
+];
+
+function estimatePriceForCreators(n) {
+  const x = Math.min(50, Math.max(10, Math.round(n)));
+  if (x <= 20) {
+    const a = ESTIMATE_TIERS[0];
+    const b = ESTIMATE_TIERS[1];
+    return Math.round(a.price + ((x - a.creators) / (b.creators - a.creators)) * (b.price - a.price));
+  }
+  const b = ESTIMATE_TIERS[1];
+  const c = ESTIMATE_TIERS[2];
+  return Math.round(b.price + ((x - b.creators) / (c.creators - b.creators)) * (c.price - b.price));
+}
+
+function runLocalEstimate(raw) {
+  const q = (raw || '').trim();
+  const n = q.match(/\d+/) ? Math.min(50, Math.max(10, parseInt(q.match(/\d+/)[0], 10))) : 20;
+  const p = estimatePriceForCreators(n);
+  const vat = Math.round(p * 1.1);
+  return [
+    '규모·견적 스케치 (메인 플랜 구간 보간, 참고용)',
+    '',
+    `• 목표 규모(명): ${n}`,
+    `• 참고 계약가: ${p.toLocaleString('ko-KR')}원 (VAT 별도)`,
+    `• VAT 포함 시 약: ${vat.toLocaleString('ko-KR')}원`,
+    '',
+    '숫자만 입력해도 됩니다. 예: 25',
+  ].join('\n');
+}
+
+const MODES = [
+  { id: 'copy', label: '캠페인 카피', icon: Sparkles, hint: '브랜드·제품·캠페인을 한 줄로 적어 주세요.', ai: true },
+  { id: 'hook', label: '숏폼 훅', icon: Zap, hint: '틱톡·릴스 첫 3초에 쓸 주제나 제품명.', ai: true },
+  { id: 'brief', label: '캠페인 브리프', icon: FileText, hint: '무엇을 파는지, 어디서 돌릴지 — 짧게라도 구체적으로.', ai: true },
+  { id: 'tags', label: '해시태그', icon: Hash, hint: '키워드를 띄어쓰기나 쉼표로. 비우면 AI가 주제만으로 제안합니다.', ai: true },
+  { id: 'estimate', label: '규모·견적', icon: Calculator, hint: '인원 수 숫자만 (10~50). 비우면 20명 기준.', ai: false },
 ];
 
 export default function SlamGlobalLandingNew() {
-  const [campaignHint, setCampaignHint] = useState('');
+  const navigate = useNavigate();
+  const [mode, setMode] = useState('copy');
+  const [input, setInput] = useState('');
+  const [output, setOutput] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [toast, setToast] = useState('');
+
+  const activeMode = useMemo(() => MODES.find((m) => m.id === mode) || MODES[0], [mode]);
+
+  useEffect(() => {
+    document.title = 'slam-global — 당신이 잠든 사이에도';
+  }, []);
+
+  const persistAndLogin = useCallback(() => {
+    const hint = input.trim();
+    if (hint) {
+      try {
+        sessionStorage.setItem(LANDING_INTENT_KEY, hint);
+      } catch {
+        /* ignore */
+      }
+    }
+    navigate('/login', {
+      state: { from: '/dashboard', landingCampaignIntent: hint || undefined },
+    });
+  }, [input, navigate]);
+
+  const scrollToLab = useCallback(() => {
+    document.getElementById('slam-lab')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
+
+  const run = useCallback(async () => {
+    setBusy(true);
+    setOutput('');
+    setError('');
+
+    if (mode === 'estimate') {
+      await new Promise((r) => window.setTimeout(r, 120));
+      setOutput(runLocalEstimate(input));
+      setBusy(false);
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/gemini-playground', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode, input }),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        const parts = [data.error, data.hint, data.detail].filter(Boolean);
+        setError(parts.join('\n\n') || `요청 실패 (${res.status})`);
+        return;
+      }
+
+      if (typeof data.text === 'string' && data.text.trim()) {
+        setOutput(data.text.trim());
+      } else {
+        setError('응답 형식을 해석하지 못했습니다.');
+      }
+    } catch (e) {
+      setError(
+        `연결에 실패했습니다. 로컬에서는 보통 \`vercel dev\`로 API를 띄운 뒤 Vite와 함께 쓰면 됩니다.\n\n${String(e?.message || e)}`,
+      );
+    } finally {
+      setBusy(false);
+    }
+  }, [mode, input]);
+
+  const copyOut = useCallback(async () => {
+    if (!output) return;
+    try {
+      await navigator.clipboard.writeText(output);
+      setToast('복사했습니다');
+    } catch {
+      setToast('복사 실패 — 직접 선택해 주세요');
+    }
+    window.setTimeout(() => setToast(''), 2000);
+  }, [output]);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        void run();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [run]);
 
   return (
-    <div className="min-h-screen bg-[#05070f] text-slate-100 antialiased">
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -left-40 top-20 h-[420px] w-[420px] rounded-full bg-violet-600/20 blur-[120px]" />
-        <div className="absolute -right-32 top-1/3 h-[380px] w-[380px] rounded-full bg-cyan-500/15 blur-[100px]" />
-        <div className="absolute bottom-0 left-1/2 h-[280px] w-[min(90%,720px)] -translate-x-1/2 rounded-full bg-indigo-500/10 blur-[90px]" />
+    <div className="min-h-screen bg-[#07080f] text-slate-100 antialiased">
+      <div className="pointer-events-none fixed inset-0">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(120,119,198,0.22),transparent)]" />
+        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-violet-500/30 to-transparent" />
       </div>
 
-      <header className="relative z-10 border-b border-white/[0.06] bg-[#05070f]/80 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-          <Link to="/" className="flex items-center gap-2 text-sm font-semibold tracking-tight text-white">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-cyan-400 text-white shadow-lg shadow-violet-500/25">
-              <Sparkles className="h-4 w-4" />
+      <header className="relative z-20 border-b border-white/[0.06] bg-[#07080f]/75 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3.5 sm:px-6">
+          <Link to="/" className="flex items-center gap-2 text-sm font-semibold text-white">
+            <span className="rounded-lg bg-gradient-to-br from-violet-500 to-cyan-400 px-2 py-1 text-[10px] font-black tracking-widest text-white shadow-lg shadow-violet-500/20">
+              SLAM
             </span>
-            slam-global
+            <span className="text-white/80">global</span>
           </Link>
-          <div className="flex items-center gap-2 sm:gap-3">
-            <Link
-              to="/login"
-              className="rounded-full px-3 py-1.5 text-sm font-medium text-white/80 transition hover:bg-white/5 hover:text-white"
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={scrollToLab}
+              className="hidden rounded-lg px-3 py-2 text-xs font-medium text-white/55 transition hover:bg-white/5 hover:text-white md:inline"
             >
+              AI 체험
+            </button>
+            <Link to="/login" className="rounded-lg px-3 py-2 text-xs font-semibold text-white/70 hover:bg-white/5">
               로그인
             </Link>
-            <Link
-              to="/login"
-              className="rounded-full bg-gradient-to-r from-violet-600 to-cyan-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-violet-600/30 transition hover:brightness-110"
+            <button
+              type="button"
+              onClick={persistAndLogin}
+              className="rounded-lg bg-gradient-to-r from-violet-600 to-cyan-500 px-4 py-2 text-xs font-bold text-white shadow-md shadow-violet-600/25 hover:brightness-110"
             >
               시작하기
-            </Link>
+            </button>
           </div>
         </div>
       </header>
 
+      {toast ? (
+        <p
+          className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-white/10 bg-slate-900/95 px-5 py-2 text-xs text-white shadow-xl"
+          role="status"
+        >
+          {toast}
+        </p>
+      ) : null}
+
       <main className="relative z-10">
-        {/* Hero */}
-        <section className="mx-auto max-w-5xl px-4 pb-20 pt-16 text-center sm:px-6 sm:pt-24 lg:px-8">
-          <p className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.2em] text-violet-200/90">
-            AI SaaS
-          </p>
-          <h1 className="mx-auto max-w-4xl font-sans text-3xl font-bold leading-[1.15] tracking-tight text-white sm:text-4xl md:text-5xl lg:text-[2.75rem] lg:leading-[1.12]">
+        <section className="mx-auto flex min-h-[min(78vh,720px)] max-w-4xl flex-col items-center justify-center px-4 pb-16 pt-12 text-center sm:px-6 sm:pb-20 sm:pt-16">
+          <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-violet-300/75">Miro 메인 슬로건</p>
+          <h1 className="mt-5 text-[1.65rem] font-bold leading-[1.18] tracking-tight text-white sm:text-4xl sm:leading-[1.12] lg:text-[2.65rem]">
             <span className="bg-gradient-to-r from-[#e0e7ff] via-[#a5b4fc] to-[#22d3ee] bg-clip-text text-transparent">
               당신이 잠든 사이에도 시스템은 콘텐츠를 추적하고 성과를 쌓고 있습니다.
             </span>
           </h1>
-
-          <div className="mx-auto mt-12 max-w-2xl">
-            <label
-              htmlFor="campaign-intent"
-              className="mb-2 block text-left text-sm font-medium text-white/70"
+          <p className="mx-auto mt-6 max-w-md text-sm leading-relaxed text-white/45">
+            아래에서 <span className="text-violet-200/90">Gemini</span>로 카피·훅·브리프를 바로 만들어 보세요. 키는 서버에만 둡니다.
+          </p>
+          <div className="mt-10 flex flex-col items-stretch gap-3 sm:flex-row sm:justify-center">
+            <button
+              type="button"
+              onClick={persistAndLogin}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-7 py-3.5 text-sm font-black text-slate-900 shadow-xl transition hover:bg-slate-100"
             >
-              어떤 캠페인을 만들고 싶으신가요?
-            </label>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
-              <input
-                id="campaign-intent"
-                type="text"
-                value={campaignHint}
-                onChange={(e) => setCampaignHint(e.target.value)}
-                placeholder="예: 브랜드 인지도, 신제품 런칭, 리타겟팅"
-                className="min-h-[52px] flex-1 rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none ring-0 transition focus:border-violet-400/50 focus:bg-white/[0.08]"
-              />
-              <Link
-                to="/login"
-                className="inline-flex min-h-[52px] shrink-0 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-cyan-500 px-6 text-sm font-semibold text-white shadow-xl shadow-violet-600/25 transition hover:brightness-110"
-              >
-                내 캠페인 바로 만들기
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            </div>
+              캠페인 시작하기
+              <ArrowRight className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={scrollToLab}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/[0.04] px-7 py-3.5 text-sm font-semibold text-white/85 backdrop-blur-sm transition hover:border-white/25 hover:bg-white/[0.07]"
+            >
+              AI로 시험해 보기
+              <ArrowDown className="h-4 w-4 opacity-70" />
+            </button>
           </div>
         </section>
 
-        {/* How it works */}
-        <section className="border-t border-white/[0.06] bg-[#05070f]/50 py-20">
-          <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-            <div className="mb-12 text-center">
-              <h2 className="text-lg font-semibold text-white sm:text-xl">작동 방식</h2>
-              <p className="mt-2 text-sm text-white/45">등록 → 추적 → 광고 → 매출까지 한 흐름</p>
+        <section id="slam-lab" className="scroll-mt-20 border-t border-white/[0.06] bg-[#0a0c14]/95 py-14 sm:py-20">
+          <div className="relative mx-auto max-w-3xl px-4 sm:px-6">
+            <div className="mb-8 flex flex-col items-center gap-2 text-center sm:mb-10">
+              <BarChart3 className="h-7 w-7 text-violet-400/90" aria-hidden />
+              <h2 className="text-xl font-bold text-white sm:text-2xl">SLAM Lab</h2>
+              <p className="max-w-lg text-sm text-white/45">
+                채팅형 입력창에 적고 실행하면, 서버의 Gemini가 결과를 돌려줍니다. (규모·견적만 이 브라우저에서 계산)
+              </p>
             </div>
 
-            {/* Desktop: horizontal stepper */}
-            <div className="hidden lg:block">
-              <div className="flex items-center justify-between gap-4">
-                {steps.map((step, i) => {
-                  const Icon = step.icon;
-                  return (
-                    <React.Fragment key={step.id}>
-                      <div className="flex min-w-0 flex-1 flex-col items-center text-center">
-                        <div className="relative mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-violet-200 shadow-inner">
-                          <Icon className="h-6 w-6" />
-                          <span className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-violet-600 text-[10px] font-bold text-white">
-                            {step.id}
-                          </span>
-                        </div>
-                        <h3 className="text-sm font-semibold text-white">{step.title}</h3>
-                        <p className="mt-1 text-xs text-white/45">{step.desc}</p>
-                        <div className="mt-4 w-full">{step.mock}</div>
-                      </div>
-                      {i < steps.length - 1 && (
-                        <div className="flex shrink-0 items-center pb-32 text-white/20">
-                          <ArrowRight className="h-5 w-5" />
-                        </div>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
+            <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0e1018] shadow-2xl shadow-black/50">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.06] bg-black/25 px-4 py-3 sm:px-5">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-white/90">새 대화</span>
+                  <span className="rounded-md bg-violet-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-200/90">
+                    Gemini
+                  </span>
+                </div>
+                <span className="text-[10px] text-white/35">⌘/Ctrl + Enter 로 실행</span>
+              </div>
+
+              <div className="border-b border-white/[0.06] px-3 py-3 sm:px-4">
+                <div className="flex flex-wrap gap-1.5">
+                  {MODES.map((m) => {
+                    const Icon = m.icon;
+                    const on = mode === m.id;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => {
+                          setMode(m.id);
+                          setOutput('');
+                          setError('');
+                        }}
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                          on
+                            ? 'border-violet-400/45 bg-violet-500/20 text-white'
+                            : 'border-white/10 bg-transparent text-white/45 hover:border-white/18 hover:text-white/75'
+                        }`}
+                      >
+                        <Icon className="h-3.5 w-3.5 opacity-90" />
+                        {m.label}
+                        {m.ai ? (
+                          <span className="ml-0.5 text-[9px] font-bold uppercase text-cyan-300/70">api</span>
+                        ) : (
+                          <span className="ml-0.5 text-[9px] font-bold uppercase text-white/30">local</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="px-4 py-4 sm:px-5 sm:py-5">
+                <label className="block">
+                  <span className="text-xs font-medium text-white/50">{activeMode.hint}</span>
+                  <textarea
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    rows={mode === 'brief' ? 5 : 4}
+                    className="mt-2 w-full resize-y rounded-xl border border-white/10 bg-[#12141c] px-4 py-3.5 text-sm leading-relaxed text-white placeholder:text-white/22 outline-none transition focus:border-violet-400/35 focus:ring-1 focus:ring-violet-400/15"
+                    placeholder={
+                      mode === 'estimate'
+                        ? '예: 25 (10~50명)'
+                        : '예: 비건 선크림 — 미국 Z세대 시딩, 틱톡 중심…'
+                    }
+                    maxLength={4000}
+                  />
+                </label>
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => void run()}
+                    disabled={busy}
+                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-6 py-3 text-sm font-bold text-white shadow-lg transition hover:brightness-110 disabled:opacity-60 sm:flex-none"
+                  >
+                    {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    실행
+                  </button>
+                  <Link to="/#pricing" className="text-xs font-semibold text-cyan-300/85 hover:underline">
+                    요금제 보기 →
+                  </Link>
+                </div>
+              </div>
+
+              <div className="border-t border-white/[0.06] bg-[#080a10] px-4 py-4 sm:px-5 sm:py-5">
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-white/35">응답</span>
+                  {output ? (
+                    <button
+                      type="button"
+                      onClick={() => void copyOut()}
+                      className="inline-flex items-center gap-1 rounded-lg bg-white/6 px-2.5 py-1 text-[11px] font-semibold text-white/75 hover:bg-white/10"
+                    >
+                      <Copy className="h-3 w-3" />
+                      복사
+                    </button>
+                  ) : null}
+                </div>
+
+                {busy ? (
+                  <div className="flex items-center gap-2 text-sm text-white/45">
+                    <Loader2 className="h-4 w-4 animate-spin text-violet-400" />
+                    생성 중…
+                  </div>
+                ) : error ? (
+                  <pre className="max-h-[min(50vh,380px)] overflow-auto whitespace-pre-wrap break-words rounded-lg border border-red-500/20 bg-red-500/[0.07] p-4 text-sm leading-relaxed text-red-100/95">
+                    {error}
+                  </pre>
+                ) : output ? (
+                  <div className="rounded-xl border border-white/[0.06] bg-[#12141c] p-4">
+                    <pre className="max-h-[min(50vh,380px)] overflow-auto whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-200/95">
+                      {output}
+                    </pre>
+                  </div>
+                ) : (
+                  <p className="text-sm text-white/38">
+                    모드를 고른 뒤 <strong className="text-white/55">실행</strong>하면 여기에 결과가 표시됩니다.
+                  </p>
+                )}
               </div>
             </div>
-
-            {/* Mobile / tablet: vertical flow */}
-            <div className="space-y-10 lg:hidden">
-              {steps.map((step, i) => {
-                const Icon = step.icon;
-                return (
-                  <div key={step.id} className="relative">
-                    {i < steps.length - 1 && (
-                      <div
-                        aria-hidden
-                        className="absolute left-[1.4rem] top-14 bottom-0 w-px bg-gradient-to-b from-violet-500/40 to-transparent"
-                      />
-                    )}
-                    <div className="flex gap-4">
-                      <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-violet-200">
-                        <Icon className="h-5 w-5" />
-                        <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-violet-600 text-[9px] font-bold text-white">
-                          {step.id}
-                        </span>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h3 className="text-base font-semibold text-white">{step.title}</h3>
-                        <p className="mt-0.5 text-sm text-white/45">{step.desc}</p>
-                        <div className="mt-4">{step.mock}</div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
           </div>
         </section>
 
-        <footer className="border-t border-white/[0.06] py-8 text-center text-xs text-white/35">
-          <p>slam-global — 리뉴얼 프리뷰 페이지</p>
+        <footer className="border-t border-white/[0.06] py-10 text-center">
+          <div className="mx-auto flex max-w-6xl flex-wrap justify-center gap-x-8 gap-y-2 px-4 text-xs text-white/40">
+            <Link to="/consulting" className="hover:text-cyan-300">
+              1:1 문의
+            </Link>
+            <Link to="/#pricing" className="hover:text-white/70">
+              요금제
+            </Link>
+            <a href="https://www.slam-global.com" className="hover:text-white/70" target="_blank" rel="noreferrer">
+              slam-global.com
+            </a>
+          </div>
         </footer>
       </main>
     </div>
