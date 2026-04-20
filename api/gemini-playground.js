@@ -3,7 +3,8 @@
  * POST /api/gemini-playground
  * Body: { mode: 'copy'|'hook'|'brief'|'tags', input: string }
  *
- * 환경 변수: GEMINI_API_KEY (필수), GEMINI_MODEL (선택, 기본 gemini-1.5-flash)
+ * 환경 변수: GEMINI_API_KEY (필수), GEMINI_MODEL (선택, 기본 gemini-2.0-flash)
+ * 참고: AI Studio 키는 gemini-1.5-flash(무접미사)가 v1beta에서 안 잡히는 경우가 많음 → 2.0 또는 -latest/-001 접미사 모델 사용.
  */
 function buildPrompt(mode, input) {
   const topic = (input || '').trim() || '(주제를 구체적으로 적어 주세요. 예: 비건 선크림 미국 시딩)';
@@ -68,7 +69,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Invalid mode' });
   }
 
-  const model = (process.env.GEMINI_MODEL || 'gemini-1.5-flash').trim();
+  const model = (process.env.GEMINI_MODEL || 'gemini-2.0-flash').trim();
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   try {
@@ -91,7 +92,8 @@ export default async function handler(req, res) {
       return res.status(502).json({
         error: 'Gemini API 오류',
         detail: msg,
-        hint: '모델 ID가 계정에서 지원되는지 확인하세요. GEMINI_MODEL을 gemini-1.5-flash 등으로 바꿔 보세요.',
+        hint:
+          'Vercel 환경 변수 GEMINI_MODEL을 바꿔 보세요. 예: gemini-2.0-flash, gemini-2.0-flash-001, gemini-1.5-flash-latest (AI Studio → 사용 가능 모델 목록과 동일한 ID)',
       });
     }
 
