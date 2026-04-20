@@ -26,12 +26,14 @@ import SetPassword from './pages/SetPassword';
 import Impersonate from './pages/Impersonate';
 import SlamGlobalLandingNew from './pages/SlamGlobalLandingNew';
 import SupportChatPortal from './components/support/SupportChatPortal';
+import DashboardChunkWarmup from './components/DashboardChunkWarmup';
 
 function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <SupportStaffUnreadProvider>
+        <DashboardChunkWarmup />
         <SupportChatPortal />
         <Routes>
           <Route path="/" element={<Home />} />

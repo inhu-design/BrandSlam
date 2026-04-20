@@ -11,31 +11,10 @@ import {
   requestSupportChatNotificationPermission,
   stripUnreadTitlePrefix,
 } from '../../lib/supportChatNotify';
+import { FLOAT_RIGHT_CLASS, floatingChatPanelBottomStyle, floatingChatWrapperBottomStyle } from '../../lib/floatingSupportStack';
 
 const MAX_LEN = 8000;
 const READ_PREFIX = 'bs_support_last_read_';
-
-/** 카카오(Footer FloatingConsultButton: fixed bottom-10 right-10, img w-16 h-16)과 동일 너비·우측선 정렬, 그 위에 쌓음 */
-const FAB_SIZE = '4rem'; /* = tailwind w-16 h-16, 카카오 이미지와 동일 */
-const KAKAO_BOTTOM = '2.5rem'; /* bottom-10 */
-const GAP = '0.75rem';
-const FAB_BOTTOM = `calc(${KAKAO_BOTTOM} + ${FAB_SIZE} + ${GAP})`; /* 카카오 상단 + 간격 */
-const PANEL_BOTTOM = `calc(${FAB_BOTTOM} + ${FAB_SIZE} + ${GAP})`;
-
-const FAB_FIXED_STYLE = {
-  position: 'fixed',
-  left: 'auto',
-  right: '2.5rem',
-  bottom: FAB_BOTTOM,
-  zIndex: 9999,
-};
-const PANEL_FIXED_STYLE = {
-  position: 'fixed',
-  left: 'auto',
-  right: '2.5rem',
-  bottom: PANEL_BOTTOM,
-  zIndex: 9999,
-};
 
 export default function SupportChatWidget() {
   const { user } = useAuth();
@@ -228,7 +207,10 @@ export default function SupportChatWidget() {
 
   const floatingUi = (
     <>
-      <div style={FAB_FIXED_STYLE} className="pointer-events-none flex flex-col items-end">
+      <div
+        className={`pointer-events-none fixed z-[9999] flex flex-col items-end ${FLOAT_RIGHT_CLASS}`}
+        style={floatingChatWrapperBottomStyle()}
+      >
         <button
           type="button"
           aria-expanded={open}
@@ -260,8 +242,8 @@ export default function SupportChatWidget() {
       {open && (
         <div
           id="support-chat-panel"
-          style={PANEL_FIXED_STYLE}
-          className="flex w-[min(100vw-2.5rem,24rem)] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border-2 border-cyan-500/35 bg-slate-950/98 shadow-2xl shadow-cyan-950/40 backdrop-blur-md"
+          className={`fixed z-[9999] flex w-[min(100vw-2.5rem,24rem)] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border-2 border-cyan-500/35 bg-slate-950/98 shadow-2xl shadow-cyan-950/40 backdrop-blur-md ${FLOAT_RIGHT_CLASS}`}
+          style={floatingChatPanelBottomStyle()}
           role="dialog"
           aria-label="실시간 1:1 문의 — SLAM GLOBAL 운영팀"
           aria-modal="false"

@@ -16,16 +16,18 @@ function getStaffReadMs(conversationId) {
 }
 
 /**
- * 관리자: 고객이 보낸 미읽음 메시지 수(대화별 last-read 기준 합산).
+ * 관리자: 대화별 미읽음(고객 메시지) 건수 + 합계.
+ * @returns {{ total: number, items: { conversationId: string, customerEmail: string, count: number }[] }}
  */
-async function computeStaffUnreadTotal(adminUserId) {
-  if (!adminUserId) return 0;
+async function computeStaffUnreadDetail(adminUserId) {
+  if (!adminUserId) return { total: 0, items: [] };
   const { rows, error } = await fetchStaffConversations();
-  if (error || !rows?.length) return 0;
-  const results = await Promise.all(
+  if (error || !rows?.length) return { total: 0, items: [] };
+
+  const perConv = await Promise.all(
     rows.map(async (r) => {
       const id = r?.id;
-      if (!id) return 0;
+      if (!id) return null;
       const readMs = getStaffReadMs(id);
       const iso = new Date(readMs).toISOString();
       const { count, error: cErr } = await supabase
@@ -34,11 +36,18 @@ async function computeStaffUnreadTotal(adminUserId) {
         .eq('conversation_id', id)
         .neq('sender_id', adminUserId)
         .gt('created_at', iso);
-      if (cErr) return 0;
-      return count || 0;
+      if (cErr) return null;
+      const n = count || 0;
+      if (n === 0) return null;
+      const email = (r.customer_email || '').trim();
+      const customerEmail = email || (r.customer_user_id ? String(r.customer_user_id).slice(0, 8) + '…' : '고객');
+      return { conversationId: id, customerEmail, count: n };
     }),
   );
-  return results.reduce((a, b) => a + b, 0);
+
+  const items = perConv.filter(Boolean);
+  const total = items.reduce((a, b) => a + b.count, 0);
+  return { total, items };
 }
 
 /**
@@ -48,21 +57,25 @@ async function computeStaffUnreadTotal(adminUserId) {
  */
 export function useStaffSupportUnread(adminUserId, isAdmin, adminLoading) {
   const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadItems, setUnreadItems] = useState([]);
   const debounceRef = useRef(null);
   const channelRef = useRef(null);
 
   const refresh = useCallback(async () => {
     if (!adminUserId || !isAdmin) {
       setUnreadCount(0);
+      setUnreadItems([]);
       return;
     }
-    const n = await computeStaffUnreadTotal(adminUserId);
-    setUnreadCount(n);
+    const { total, items } = await computeStaffUnreadDetail(adminUserId);
+    setUnreadCount(total);
+    setUnreadItems(items);
   }, [adminUserId, isAdmin]);
 
   useEffect(() => {
     if (adminLoading || !isAdmin || !adminUserId) {
       setUnreadCount(0);
+      setUnreadItems([]);
       return undefined;
     }
     queueMicrotask(() => {
@@ -134,5 +147,5 @@ export function useStaffSupportUnread(adminUserId, isAdmin, adminLoading) {
     [refresh],
   );
 
-  return { unreadCount, refresh, markConversationRead };
+  return { unreadCount, unreadItems, refresh, markConversationRead };
 }

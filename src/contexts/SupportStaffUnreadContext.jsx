@@ -5,6 +5,7 @@ import { useStaffSupportUnread } from '../hooks/useStaffSupportUnread';
 
 const SupportStaffUnreadContext = createContext({
   unreadCount: 0,
+  unreadItems: [],
   refresh: () => {},
   markConversationRead: () => {},
 });
@@ -12,10 +13,14 @@ const SupportStaffUnreadContext = createContext({
 export function SupportStaffUnreadProvider({ children }) {
   const { user } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdminSession();
-  const { unreadCount, refresh, markConversationRead } = useStaffSupportUnread(user?.id, isAdmin, adminLoading);
+  const { unreadCount, unreadItems, refresh, markConversationRead } = useStaffSupportUnread(
+    user?.id,
+    isAdmin,
+    adminLoading,
+  );
 
   return (
-    <SupportStaffUnreadContext.Provider value={{ unreadCount, refresh, markConversationRead }}>
+    <SupportStaffUnreadContext.Provider value={{ unreadCount, unreadItems, refresh, markConversationRead }}>
       {children}
     </SupportStaffUnreadContext.Provider>
   );

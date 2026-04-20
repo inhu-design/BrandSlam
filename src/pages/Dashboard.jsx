@@ -25,6 +25,42 @@ import {
 } from '../lib/customOffers';
 import { computeDbOfferTotals } from '../lib/customPaymentOffers';
 
+const CUSTOMER_DASH_CACHE_KEY = (uid) => `bs_dash_c_v1_${uid}`;
+const CUSTOMER_DASH_CACHE_TTL_MS = 90_000;
+
+function readCustomerDashboardCache(uid) {
+  try {
+    if (!uid) return null;
+    const raw = sessionStorage.getItem(CUSTOMER_DASH_CACHE_KEY(uid));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const { ts, payload } = parsed || {};
+    if (!Array.isArray(payload) || payload.length === 0) return null;
+    if (typeof ts !== 'number' || Date.now() - ts > CUSTOMER_DASH_CACHE_TTL_MS) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+function writeCustomerDashboardCache(uid, payload) {
+  try {
+    if (!uid || !Array.isArray(payload) || payload.length === 0) return;
+    sessionStorage.setItem(CUSTOMER_DASH_CACHE_KEY(uid), JSON.stringify({ ts: Date.now(), payload }));
+  } catch {
+    /* quota */
+  }
+}
+
+function clearCustomerDashboardCache(uid) {
+  try {
+    if (!uid) return;
+    sessionStorage.removeItem(CUSTOMER_DASH_CACHE_KEY(uid));
+  } catch {
+    /* ignore */
+  }
+}
+
 /** The Frameless: DB orders.plan_price 와 무관하게 화면은 `customOffers` 확정 계약가와 통일 */
 function displayPaidOrderPlanPriceForViewer(order, viewerEmail) {
   const em = String(viewerEmail || '').toLowerCase().trim();
@@ -5441,7 +5477,7 @@ async function enrichNonAdminDashboardCampaigns(rows, user) {
 export default function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { unreadCount: staffSupportUnread } = useSupportStaffUnread();
+  const { unreadCount: staffSupportUnread, unreadItems: staffUnreadByCustomer } = useSupportStaffUnread();
   // Navbar '요금제'와 동일: / 로 이동 후 #pricing 섹션으로 스크롤
   const goToPricing = () => {
     const scrollToPricing = () => {
@@ -5588,20 +5624,38 @@ export default function Dashboard() {
             order_summary: null,
             setup_submission_summary: null,
           }));
-          if (quick.length > 0) {
-            setCampaigns(quick);
-            setSelectedCampaignId(quick[0].id);
-          } else {
-            setCampaigns([]);
-            setSelectedCampaignId(null);
+          const cachedList = readCustomerDashboardCache(user.id);
+          const hasCache = Array.isArray(cachedList) && cachedList.length > 0;
+
+          if (hasCache) {
+            setCampaigns(cachedList);
+            setSelectedCampaignId(cachedList[0].id);
+            setIsDemoMode(false);
+            setLoading(false);
           }
-          setIsDemoMode(false);
-          setLoading(false);
+
+          if (!hasCache) {
+            if (quick.length > 0) {
+              setCampaigns(quick);
+              setSelectedCampaignId(quick[0].id);
+            } else {
+              setCampaigns([]);
+              setSelectedCampaignId(null);
+            }
+            setIsDemoMode(false);
+            setLoading(false);
+          }
 
           void enrichNonAdminDashboardCampaigns(baseRows, user)
             .then((enriched) => {
-              if (Array.isArray(enriched) && enriched.length > 0) {
+              if (!Array.isArray(enriched)) return;
+              if (enriched.length > 0) {
                 setCampaigns(enriched);
+                writeCustomerDashboardCache(user.id, enriched);
+              } else {
+                setCampaigns([]);
+                setSelectedCampaignId(null);
+                clearCustomerDashboardCache(user.id);
               }
             })
             .catch((err) => {
@@ -6422,10 +6476,19 @@ export default function Dashboard() {
                   const Icon = item.icon;
                   const on = adminPanel === item.id;
                   const supportBadge = item.id === 'support_inbox' && staffSupportUnread > 0;
+                  const supportSubText =
+                    item.id === 'support_inbox' && staffUnreadByCustomer?.length > 0
+                      ? staffUnreadByCustomer.map((x) => `${x.customerEmail} (${x.count})`).join(' · ')
+                      : item.sub;
+                  const supportTitle =
+                    item.id === 'support_inbox' && staffUnreadByCustomer?.length > 0
+                      ? `미읽음 ${staffSupportUnread}건 — ${staffUnreadByCustomer.map((x) => `${x.customerEmail} ${x.count}건`).join(', ')}`
+                      : undefined;
                   return (
                     <button
                       key={item.id}
                       type="button"
+                      title={supportTitle}
                       onClick={() => setAdminPanel(item.id)}
                       className={`flex shrink-0 lg:w-full items-center gap-3 text-left rounded-xl px-3 py-3 transition-colors min-w-[200px] lg:min-w-0 ${
                         on ? 'bg-cyan-500/20 border border-cyan-400/40 text-white' : 'border border-transparent text-slate-400 hover:bg-white/[0.06] hover:text-slate-200'
@@ -6441,7 +6504,15 @@ export default function Dashboard() {
                       </span>
                       <span className="min-w-0">
                         <span className="block text-xs font-bold leading-tight">{item.label}</span>
-                        <span className="block text-[10px] text-slate-500 mt-0.5 leading-snug">{item.sub}</span>
+                        <span
+                          className={`block text-[10px] mt-0.5 leading-snug ${
+                            item.id === 'support_inbox' && staffUnreadByCustomer?.length > 0
+                              ? 'text-amber-200/95 line-clamp-2'
+                              : 'text-slate-500'
+                          }`}
+                        >
+                          {supportSubText}
+                        </span>
                       </span>
                     </button>
                   );

@@ -673,8 +673,24 @@ export default function Checkout() {
   const payWindowMonitorRef = useRef(null);
 
   const restorePageScroll = () => {
-    document.body.style.overflow = '';
-    document.documentElement.style.overflow = '';
+    const body = document.body;
+    const html = document.documentElement;
+    body.classList.remove('modal-open');
+    body.style.overflow = '';
+    body.style.paddingRight = '';
+    html.style.overflow = '';
+    document.querySelectorAll('.modal-backdrop').forEach((el) => el.remove());
+  };
+
+  const cleanupInicisPayUi = () => {
+    try {
+      if (window.INIStdPay && typeof window.INIStdPay.popupClose === 'function') {
+        window.INIStdPay.popupClose();
+      }
+    } catch {
+      /* 이니시스 내부 정리 실패 시에도 스크롤 복구는 진행 */
+    }
+    restorePageScroll();
   };
 
   useEffect(() => {
@@ -736,7 +752,7 @@ export default function Checkout() {
       if (e.data?.type === 'INICIS_PAYMENT_SUCCESS' && e.data?.order_number) {
         paymentInProgressRef.current = false;
         setSubmitting(false);
-        restorePageScroll();
+        cleanupInicisPayUi();
         if (payWindowMonitorRef.current) {
           window.clearInterval(payWindowMonitorRef.current);
           payWindowMonitorRef.current = null;
@@ -757,7 +773,7 @@ export default function Checkout() {
         window.clearInterval(payWindowMonitorRef.current);
         payWindowMonitorRef.current = null;
       }
-      restorePageScroll();
+      cleanupInicisPayUi();
     };
   }, []);
 
@@ -1013,7 +1029,7 @@ export default function Checkout() {
             payWindowRef.current = null;
             paymentInProgressRef.current = false;
             setSubmitting(false);
-            restorePageScroll();
+            cleanupInicisPayUi();
             setCurrentStep((s) => (s === 5 ? 5 : Math.max(s, 4)));
           }
         }, 400);
@@ -1021,7 +1037,7 @@ export default function Checkout() {
         window.setTimeout(() => {
           if (!payWindowRef.current) {
             paymentInProgressRef.current = false;
-            restorePageScroll();
+            cleanupInicisPayUi();
           }
         }, 1200);
         setTimeout(() => { window.open = originalOpen; }, 5000);
@@ -1041,7 +1057,7 @@ export default function Checkout() {
       await rollbackOrder(orderNum);
       paymentInProgressRef.current = false;
       setSubmitting(false);
-      restorePageScroll();
+      cleanupInicisPayUi();
       alert('결제창을 여는 도중 문제가 발생했습니다. 다른 결제 수단을 이용해 주시거나 잠시 후 다시 시도해 주세요.');
     }
   };
