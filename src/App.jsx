@@ -1,14 +1,21 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 
 import { AuthProvider } from './contexts/AuthProvider';
+import { SupportStaffUnreadProvider } from './contexts/SupportStaffUnreadContext';
 
 // --- Pages Import ---
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Consulting from './pages/Consulting';
-import Dashboard from './pages/Dashboard';
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+
+const dashboardFallback = (
+  <div className="min-h-screen flex items-center justify-center bg-[#020617]">
+    <div className="w-12 h-12 border-4 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin" />
+  </div>
+);
 import About from './pages/About';
 import Management from './pages/Management';
 import Diagnosis from './pages/Diagnosis';
@@ -17,8 +24,6 @@ import CheckoutResult from './pages/CheckoutResult';
 import CampaignSetup from './pages/CampaignSetup';
 import SetPassword from './pages/SetPassword';
 import Impersonate from './pages/Impersonate';
-import SupportInboxPage from './pages/SupportInboxPage';
-import AdminInvoicesPage from './pages/AdminInvoicesPage';
 import SlamGlobalLandingNew from './pages/SlamGlobalLandingNew';
 import SupportChatPortal from './components/support/SupportChatPortal';
 
@@ -26,12 +31,20 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <SupportStaffUnreadProvider>
         <SupportChatPortal />
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />    
           <Route path="/consulting" element={<Consulting />} />
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route
+            path="/dashboard"
+            element={(
+              <Suspense fallback={dashboardFallback}>
+                <Dashboard />
+              </Suspense>
+            )}
+          />
           <Route path="/campaign-setup/:campaignId" element={<CampaignSetup />} />
           <Route path="/about" element={<About />} />
           <Route path="/management" element={<Management />} />
@@ -40,12 +53,19 @@ function App() {
           <Route path="/checkout/result" element={<CheckoutResult />} />
           <Route path="/set-password" element={<SetPassword />} />
           <Route path="/auth/impersonate" element={<Impersonate />} />
-          <Route path="/admin/support" element={<SupportInboxPage />} />
-          <Route path="/admin/invoices" element={<AdminInvoicesPage />} />
+          <Route
+            path="/admin/support"
+            element={<Navigate to="/dashboard" replace state={{ adminPanel: 'support_inbox' }} />}
+          />
+          <Route
+            path="/admin/invoices"
+            element={<Navigate to="/dashboard" replace state={{ adminPanel: 'all_invoices' }} />}
+          />
           <Route path="/landing-new" element={<SlamGlobalLandingNew />} />
           {/* 매직 링크 등으로 잘못된 경로 진입 시 대시보드로 (SPA 폴백) */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </SupportStaffUnreadProvider>
       </AuthProvider>
     </BrowserRouter>
   );

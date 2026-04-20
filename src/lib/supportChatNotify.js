@@ -11,6 +11,27 @@ export function applyUnreadTabTitle(unreadCount) {
   document.title = unreadCount > 0 ? `(${Math.min(unreadCount, 99)}) ${base}` : base;
 }
 
+/** 관리자 탭: 고객이 보낸 새 메시지 */
+export function notifyInboundCustomerMessage({ body, tag = 'support-in' }) {
+  if (typeof window === 'undefined' || !('Notification' in window)) return;
+  if (Notification.permission !== 'granted') return;
+  const text = String(body || '').trim().slice(0, 120) || '고객 메시지가 도착했습니다.';
+  try {
+    const n = new Notification('SLAM GLOBAL · 고객 문의', {
+      body: text,
+      tag,
+      renotify: true,
+      silent: false,
+    });
+    n.onclick = () => {
+      window.focus();
+      n.close();
+    };
+  } catch {
+    /* ignore */
+  }
+}
+
 export function notifyStaffMessage({ body, tag = 'support-chat' }) {
   if (typeof window === 'undefined' || !('Notification' in window)) return;
   if (Notification.permission !== 'granted') return;

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { fetchAdminSessionIsAdmin } from '../lib/adminSessionFetch';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Package, Clock, Truck, UserCheck, AlertCircle, 
   Lock, Settings, BarChart3, Users, PlayCircle, Eye, Heart, MessageCircle, Share2, 
@@ -12,6 +12,9 @@ import {
 } from 'lucide-react';
 import Navbar from '../components/layout/Navbar'; 
 import Footer from '../components/layout/Footer';
+import AdminSupportInboxPanel from '../components/admin/AdminSupportInboxPanel';
+import AdminAllInvoicesPanel from '../components/admin/AdminAllInvoicesPanel';
+import { useSupportStaffUnread } from '../contexts/SupportStaffUnreadContext';
 import sealImg from '../assets/seal.jpg';
 import testInfluencers from '../data/test-influencers.json';
 import {
@@ -2611,7 +2614,7 @@ const OngoingCampaign = ({ campaign }) => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
-                            {campaign.creators.map((creator, idx) => (
+                            {(campaign.creators || []).map((creator, idx) => (
                                 <tr key={creator.id} className="hover:bg-white/5 transition-all">
                                     <td className="px-8 py-5 font-black text-slate-700 w-16">{idx + 1}</td>
                                     <td className="px-8 py-5">
@@ -2650,7 +2653,7 @@ const OngoingCampaign = ({ campaign }) => {
                     <PlayCircle size={24} className="text-purple-400"/> Content Gallery (Auto-Feed)
                 </h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                    {campaign.contents.map((content, idx) => (
+                    {(campaign.contents || []).map((content, idx) => (
                         <div key={idx} className="relative aspect-[9/16] rounded-2xl overflow-hidden bg-white/5 group cursor-pointer border border-white/10 shadow-xl transition-all hover:scale-[1.05]">
                             {content.thumbnail_url ? (
                                 <img src={content.thumbnail_url} alt="Thumbnail" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
@@ -5292,10 +5295,153 @@ const CampaignDetail = ({ campaign, isDemoMode, user, isAdminUser = false, onCam
   return <OngoingCampaign campaign={campaign} />;
 };
 
+/**
+ * 고객 계정: campaigns 행( select('*') )만 받아 설정·명단·주문 요약을 붙인다.
+ * My Campaign 첫 페인트 후 백그라운드에서 호출해 로딩 체감을 줄인다.
+ */
+async function enrichNonAdminDashboardCampaigns(rows, user) {
+  let campaignList = Array.isArray(rows) ? [...rows] : [];
+  if (campaignList.length === 0) return [];
+
+  const loadedFromAdminApi = false;
+  let linkedCreatorsRawBySlug = {};
+  let orderSummaryByNumber = {};
+  const setupByCampaignId = {};
+  let settingsByCampaignId = {};
+  let creatorsByCampaignId = {};
+
+  const campaignIds = campaignList.map((c) => c.id).filter(Boolean);
+  if (campaignIds.length > 0) {
+    const [settingsRes, scopedDeliveryRes] = await Promise.all([
+      supabase
+        .from('campaign_admin_settings')
+        .select(
+          'campaign_id, linked_list_slug, notion_guideline_url, notion_guideline_title, notion_guideline_description, force_drop_complete_message, updated_at',
+        )
+        .in('campaign_id', campaignIds),
+      supabase
+        .from('admin_delivery_creators')
+        .select('*')
+        .in('campaign_id', campaignIds)
+        .order('created_at', { ascending: true }),
+    ]);
+    const runtimeRows = settingsRes?.data;
+    settingsByCampaignId = Object.fromEntries(
+      (runtimeRows || [])
+        .filter((r) => r?.campaign_id)
+        .map((r) => [
+          r.campaign_id,
+          {
+            linked_list_slug: r.linked_list_slug || null,
+            notion_guideline_url: r.notion_guideline_url || null,
+            notion_guideline_title: r.notion_guideline_title || null,
+            notion_guideline_description: r.notion_guideline_description || null,
+            force_drop_complete_message: !!r.force_drop_complete_message,
+            updated_at: r.updated_at || null,
+          },
+        ]),
+    );
+    const { data: campScopedRows, error: cscErr } = scopedDeliveryRes || {};
+    if (!cscErr && campScopedRows?.length) {
+      for (const row of campScopedRows) {
+        const cid = row?.campaign_id;
+        if (!cid) continue;
+        if (!creatorsByCampaignId[cid]) creatorsByCampaignId[cid] = [];
+        creatorsByCampaignId[cid].push(row);
+      }
+    }
+  }
+
+  campaignList = campaignList.map((c) => ({ ...c, admin_runtime_settings: settingsByCampaignId[c.id] || null }));
+
+  const linkedCampaignRows = campaignList.filter(
+    (c) => (creatorsByCampaignId[c.id]?.length ?? 0) > 0 || resolveLinkedDeliveryListSlug(c, user) != null,
+  );
+  const linkedSlugs = [...new Set(linkedCampaignRows.map((c) => resolveLinkedDeliveryListSlug(c, user)).filter(Boolean))];
+
+  const orderNumbersForSummary = [...new Set(campaignList.map((c) => c.order_number).filter(Boolean))];
+
+  const [creatorsBySlug, orderRowsForSummary] = await Promise.all([
+    (async () => {
+      const bySlug = {};
+      if (linkedSlugs.length === 0) return bySlug;
+      const slugRows = await Promise.all(
+        linkedSlugs.map(async (slug) => {
+          let linkedCreators = linkedCreatorsRawBySlug?.[slug] || [];
+          if (!loadedFromAdminApi) {
+            const { data: queryRows } = await supabase
+              .from('admin_delivery_creators')
+              .select('*')
+              .eq('list_slug', slug)
+              .order('created_at', { ascending: true });
+            linkedCreators = queryRows || [];
+          }
+          const list =
+            linkedCreators?.length > 0
+              ? linkedCreators.map((r, i) => toDisplayCreator(r, i))
+              : LINKED_DELIVERY_SLUGS_NO_TEST_FALLBACK.has(slug)
+                ? []
+                : testInfluencers.map((c, i) => testInfluencerToDisplayCreator(c, i));
+          return { slug, list };
+        }),
+      );
+      for (const { slug, list } of slugRows) {
+        bySlug[slug] = list;
+      }
+      return bySlug;
+    })(),
+    (async () => {
+      if (orderNumbersForSummary.length > 0 && !loadedFromAdminApi) {
+        const { data: orderRows } = await supabase
+          .from('orders')
+          .select('order_number, plan_name, plan_price, order_items, content_count')
+          .in('order_number', orderNumbersForSummary);
+        return orderRows || [];
+      }
+      return null;
+    })(),
+  ]);
+
+  if (orderRowsForSummary?.length) {
+    orderSummaryByNumber = Object.fromEntries(orderRowsForSummary.map((o) => [o.order_number, o]));
+  }
+
+  campaignList = campaignList.map((c) => {
+    const directRaw = creatorsByCampaignId[c.id];
+    if (directRaw?.length > 0) {
+      let list = directRaw.map((r, i) => toDisplayCreator(r, i));
+      if (isTroublessPdrnSunscreenCampaign(c)) {
+        list = finalizeTroublessPdrnScale50DisplayCreators(list);
+      }
+      return { ...c, linked_delivery_candidates: list };
+    }
+    const slug = resolveLinkedDeliveryListSlug(c, user);
+    if (!slug) return c;
+    let list = creatorsBySlug[slug] || [];
+    if (slug === LINKED_LIST_SLUG_FARMSKIN && isTroublessPdrnSunscreenCampaign(c)) {
+      list = finalizeTroublessPdrnScale50DisplayCreators(list);
+    }
+    return { ...c, linked_delivery_candidates: list };
+  });
+  campaignList = campaignList.map((c) =>
+    c.order_number && orderSummaryByNumber[c.order_number]
+      ? { ...c, order_summary: orderSummaryByNumber[c.order_number], setup_submission_summary: setupByCampaignId[c.id] || null }
+      : { ...c, setup_submission_summary: setupByCampaignId[c.id] || null },
+  );
+
+  return campaignList.map((c) => ({
+    ...c,
+    creators: Array.isArray(c.creators) ? c.creators : [],
+    contents: Array.isArray(c.contents) ? c.contents : [],
+  }));
+}
+
 // --- Main Dashboard ---
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { unreadCount: staffSupportUnread } = useSupportStaffUnread();
   // Navbar '요금제'와 동일: / 로 이동 후 #pricing 섹션으로 스크롤
   const goToPricing = () => {
     const scrollToPricing = () => {
@@ -5334,6 +5480,7 @@ export default function Dashboard() {
   const [adminSearch, setAdminSearch] = useState('');
   /** 서버 `/api/admin/admin-session` 기준 — 클라이언트 VITE_ADMIN_EMAILS 는 신뢰하지 않음 */
   const [isAdminUser, setIsAdminUser] = useState(false);
+  const customerCreatorsJoinRequestedRef = useRef(new Set());
 
   const handleCampaignScheduleUpdated = (campaignId, schedule) => {
     if (!campaignId || !schedule) return;
@@ -5341,8 +5488,54 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
+    const p = location.state?.adminPanel;
+    if (p !== 'support_inbox' && p !== 'all_invoices') return;
+    if (!isAdminUser) return;
+    setAdminPanel(p);
+    navigate('/dashboard', { replace: true, state: {} });
+  }, [location.state, isAdminUser, navigate]);
+
+  useEffect(() => {
     setAdminCampaignProgressTab('progress');
   }, [selectedCampaignId]);
+
+  /** 고객: 목록은 select('*')만 쓰고, 선택 캠페인의 creators/contents는 지연 로드 */
+  useEffect(() => {
+    if (!user?.id || !selectedCampaignId || isAdminUser) return undefined;
+    const row = campaigns.find((c) => c.id === selectedCampaignId);
+    if (!row) return undefined;
+    const hasCreators = Array.isArray(row.creators) && row.creators.length > 0;
+    const hasContents = Array.isArray(row.contents) && row.contents.length > 0;
+    if (hasCreators && hasContents) return undefined;
+    if (customerCreatorsJoinRequestedRef.current.has(selectedCampaignId)) return undefined;
+    customerCreatorsJoinRequestedRef.current.add(selectedCampaignId);
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('campaigns')
+        .select('creators (*), contents (*)')
+        .eq('id', selectedCampaignId)
+        .maybeSingle();
+      if (cancelled || error || !data) {
+        customerCreatorsJoinRequestedRef.current.delete(selectedCampaignId);
+        return;
+      }
+      setCampaigns((prev) =>
+        prev.map((c) =>
+          c.id === selectedCampaignId
+            ? {
+                ...c,
+                creators: Array.isArray(data.creators) && data.creators.length > 0 ? data.creators : c.creators || [],
+                contents: Array.isArray(data.contents) && data.contents.length > 0 ? data.contents : c.contents || [],
+              }
+            : c,
+        ),
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCampaignId, user?.id, isAdminUser, campaigns]);
 
   useEffect(() => {
     if (!isPasswordMode) return undefined;
@@ -5356,25 +5549,92 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { session: sess0 } } = await supabase.auth.getSession();
+      let user = sess0?.user ?? null;
+      let token0 = sess0?.access_token ?? null;
+      if (!user) {
+        const { data: gu } = await supabase.auth.getUser();
+        user = gu?.user ?? null;
+        if (user) {
+          const { data: s2 } = await supabase.auth.getSession();
+          token0 = s2?.session?.access_token ?? null;
+        }
+      }
       setUser(user);
 
       if (user) {
-        const { data: { session: sess0 } } = await supabase.auth.getSession();
-        const token0 = sess0?.access_token;
-
-        const customerCampaignsPromise = supabase
-          .from('campaigns')
-          .select(`*, creators (*), contents (*)`)
-          .order('created_at', { ascending: false })
-          .eq('user_id', user.id);
-
-        const [isAdmin, customerCampaignsRes] = await Promise.all([
+        const [isAdmin, parallelCampaignsRes] = await Promise.all([
           fetchAdminSessionIsAdmin(token0),
-          customerCampaignsPromise,
+          supabase
+            .from('campaigns')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .eq('user_id', user.id),
         ]);
         setIsAdminUser(!!isAdmin);
 
+        if (!isAdmin) {
+          const raw = parallelCampaignsRes?.data || [];
+          if (parallelCampaignsRes?.error) {
+            console.warn('[Dashboard] campaigns', parallelCampaignsRes.error);
+          }
+          const baseRows = parallelCampaignsRes?.error ? [] : raw;
+          const quick = baseRows.map((c) => ({
+            ...c,
+            creators: [],
+            contents: [],
+            linked_delivery_candidates: [],
+            admin_runtime_settings: null,
+            order_summary: null,
+            setup_submission_summary: null,
+          }));
+          if (quick.length > 0) {
+            setCampaigns(quick);
+            setSelectedCampaignId(quick[0].id);
+          } else {
+            setCampaigns([]);
+            setSelectedCampaignId(null);
+          }
+          setIsDemoMode(false);
+          setLoading(false);
+
+          void enrichNonAdminDashboardCampaigns(baseRows, user)
+            .then((enriched) => {
+              if (Array.isArray(enriched) && enriched.length > 0) {
+                setCampaigns(enriched);
+              }
+            })
+            .catch((err) => {
+              console.error('[Dashboard] enrich campaigns', err);
+            });
+
+          const [ordersDataRes, offersRes] = await Promise.all([
+            supabase
+              .from('orders')
+              .select('order_number, plan_name, plan_price, status, created_at')
+              .eq('email', user.email)
+              .eq('status', 'paid')
+              .order('created_at', { ascending: false })
+              .limit(20),
+            token0
+              ? fetch(`${window.location.origin}/api/my-custom-payment-offers`, {
+                  headers: { Authorization: `Bearer ${token0}` },
+                }).catch(() => null)
+              : Promise.resolve(null),
+          ]);
+          setPaidOrders(ordersDataRes?.data || []);
+
+          try {
+            if (offersRes?.ok) {
+              const j = await offersRes.json();
+              setMyCustomPaymentOffers(Array.isArray(j.offers) ? j.offers : []);
+            } else {
+              setMyCustomPaymentOffers([]);
+            }
+          } catch {
+            setMyCustomPaymentOffers([]);
+          }
+        } else {
         let campaignList = [];
         let linkedCreatorsRawBySlug = {};
         let orderSummaryByNumber = {};
@@ -5410,22 +5670,14 @@ export default function Dashboard() {
         }
 
         if (!loadedFromAdminApi) {
-          if (!isAdmin) {
-            campaignList = customerCampaignsRes?.data || [];
-            if (customerCampaignsRes?.error) {
-              console.warn('[Dashboard] campaigns', customerCampaignsRes.error);
-              campaignList = [];
-            }
-          } else {
             const { data: adminFallbackData, error: adminCampErr } = await supabase
               .from('campaigns')
-              .select(`*, creators (*), contents (*)`)
+              .select('*')
               .order('created_at', { ascending: false });
             if (adminCampErr) {
               console.warn('[Dashboard] admin fallback campaigns', adminCampErr);
             }
             campaignList = adminFallbackData || [];
-          }
           const campaignIds = campaignList.map((c) => c.id).filter(Boolean);
           if (campaignIds.length > 0) {
             const [settingsRes, scopedDeliveryRes] = await Promise.all([
@@ -5547,7 +5799,13 @@ export default function Dashboard() {
         );
 
         if (campaignList.length > 0) {
-          setCampaigns(campaignList);
+          setCampaigns(
+            campaignList.map((c) => ({
+              ...c,
+              creators: Array.isArray(c.creators) ? c.creators : [],
+              contents: Array.isArray(c.contents) ? c.contents : [],
+            })),
+          );
           setSelectedCampaignId(campaignList[0].id);
           setIsDemoMode(false);
         } else {
@@ -5555,6 +5813,8 @@ export default function Dashboard() {
           setSelectedCampaignId(null);
           setIsDemoMode(false); 
         }
+
+        setLoading(false);
 
         const [ordersDataRes, offersRes] = await Promise.all([
           supabase
@@ -5581,6 +5841,7 @@ export default function Dashboard() {
           }
         } catch {
           setMyCustomPaymentOffers([]);
+        }
         }
       } else {
         setIsAdminUser(false);
@@ -6155,29 +6416,12 @@ export default function Dashboard() {
                   { id: 'ops_tools', label: '최근 주문 한눈에 보기', sub: '입금·환불·취소 수정', icon: ClipboardList },
                   { id: 'excel_delivery', label: '엑셀로 명단 납품하기', sub: '파일 올려 반영', icon: FileSpreadsheet },
                   { id: 'campaign_quick_edit', label: '캠페인 정보 수정', sub: '기본 정보·일정·가이드', icon: FileText },
-                  { id: 'support_inbox', label: '고객 1:1 문의', sub: '사이트 내 문의·답장', icon: MessageCircle, to: '/admin/support' },
-                  { id: 'all_invoices', label: '진행 캠페인 인보이스', sub: '주문별 목록·PDF', icon: Receipt, to: '/admin/invoices' },
+                  { id: 'support_inbox', label: '고객 1:1 문의', sub: '사이트 내 문의·답장', icon: MessageCircle },
+                  { id: 'all_invoices', label: '진행 캠페인 인보이스', sub: '주문별 목록·PDF', icon: Receipt },
                 ].map((item) => {
                   const Icon = item.icon;
                   const on = adminPanel === item.id;
-                  if (item.to) {
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => navigate(item.to)}
-                        className="flex shrink-0 lg:w-full items-center gap-3 text-left rounded-xl px-3 py-3 transition-colors min-w-[200px] lg:min-w-0 border border-transparent text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"
-                      >
-                        <span className="flex h-9 w-9 items-center justify-center rounded-lg shrink-0 bg-white/5 text-cyan-400">
-                          <Icon size={18} />
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block text-xs font-bold leading-tight text-slate-200">{item.label}</span>
-                          <span className="block text-[10px] text-slate-500 mt-0.5 leading-snug">{item.sub}</span>
-                        </span>
-                      </button>
-                    );
-                  }
+                  const supportBadge = item.id === 'support_inbox' && staffSupportUnread > 0;
                   return (
                     <button
                       key={item.id}
@@ -6187,8 +6431,13 @@ export default function Dashboard() {
                         on ? 'bg-cyan-500/20 border border-cyan-400/40 text-white' : 'border border-transparent text-slate-400 hover:bg-white/[0.06] hover:text-slate-200'
                       }`}
                     >
-                      <span className={`flex h-9 w-9 items-center justify-center rounded-lg shrink-0 ${on ? 'bg-cyan-500/25 text-cyan-200' : 'bg-white/5 text-slate-500'}`}>
+                      <span className={`relative flex h-9 w-9 items-center justify-center rounded-lg shrink-0 ${on ? 'bg-cyan-500/25 text-cyan-200' : 'bg-white/5 text-slate-500'}`}>
                         <Icon size={18} />
+                        {supportBadge ? (
+                          <span className="absolute -right-1.5 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-[#0b1220] bg-rose-500 px-0.5 text-[9px] font-black text-white tabular-nums">
+                            {staffSupportUnread > 99 ? '99+' : staffSupportUnread}
+                          </span>
+                        ) : null}
                       </span>
                       <span className="min-w-0">
                         <span className="block text-xs font-bold leading-tight">{item.label}</span>
@@ -6644,6 +6893,23 @@ export default function Dashboard() {
                         </div>
                       </>
                     )}
+                  </div>
+                )}
+
+                {adminPanel === 'support_inbox' && (
+                  <div>
+                    <AdminSupportInboxPanel />
+                  </div>
+                )}
+
+                {adminPanel === 'all_invoices' && (
+                  <div>
+                    <AdminAllInvoicesPanel
+                      embedded
+                      campaigns={campaigns}
+                      campaignsLoading={loading}
+                      onCampaignsReplaced={setCampaigns}
+                    />
                   </div>
                 )}
               </div>

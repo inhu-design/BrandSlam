@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Menu, X, ArrowRight, LogOut} from 'lucide-react';
 import logoImg from '../../assets/logo.png';
 import { supabase } from '../../lib/supabase';
+import { preloadDashboardRoute } from '../../lib/preloadDashboardRoute';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -139,6 +140,8 @@ const Navbar = () => {
               <div className="flex items-center gap-6">
                 <Link 
                   to="/dashboard" 
+                  onMouseEnter={preloadDashboardRoute}
+                  onFocus={preloadDashboardRoute}
                   // [변경] text-xs -> text-sm
                   className="text-sm font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-800 transition-colors"
                 >
@@ -157,6 +160,8 @@ const Navbar = () => {
               <div className="flex items-center gap-8">
                 <Link 
                   to="/dashboard" 
+                  onMouseEnter={preloadDashboardRoute}
+                  onFocus={preloadDashboardRoute}
                   // [변경] text-xs -> text-sm
                   className="text-sm font-black uppercase tracking-widest text-slate-400 hover:text-indigo-600 transition-colors"
                 >
@@ -226,6 +231,8 @@ const Navbar = () => {
                 </div>
                 <Link 
                   to="/dashboard"
+                  onMouseEnter={preloadDashboardRoute}
+                  onFocus={preloadDashboardRoute}
                   onClick={() => setIsOpen(false)}
                   // [변경] text-xs -> text-sm
                   className="w-full text-center py-4 text-sm font-black uppercase tracking-[0.2em] text-indigo-600 bg-indigo-50 rounded-2xl"
@@ -244,6 +251,8 @@ const Navbar = () => {
               <>
                 <Link 
                   to="/dashboard"
+                  onMouseEnter={preloadDashboardRoute}
+                  onFocus={preloadDashboardRoute}
                   onClick={() => setIsOpen(false)}
                   // [변경] text-xs -> text-sm
                   className="w-full text-center py-4 text-sm font-black uppercase tracking-[0.2em] text-indigo-600 bg-indigo-50 rounded-2xl"
