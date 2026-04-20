@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { X } from 'lucide-react';
 import logoImg from '../../assets/logo.png';
-import kakaoLogo from '../../assets/kakaotalk.png'; // 카카오 로고 이미지 추가
 
 // --- 법적 고지 데이터 ---
 const LEGAL_CONTENTS = {
@@ -224,25 +223,6 @@ const LegalModal = ({ isOpen, onClose, title, content }) => {
   );
 };
 
-// --- [추가] 플로팅 상담 버튼 컴포넌트 ---
-const FloatingConsultButton = () => (
-  <a 
-      href="http://pf.kakao.com/_VxmWxon/chat" 
-      target="_blank" 
-      rel="noopener noreferrer"
-      className="fixed bottom-10 right-10 z-[100] group"
-  >
-      <img
-          src={kakaoLogo}
-          alt="카카오톡"
-          className="w-16 h-16 drop-shadow-[0_8px_24px_rgba(0,0,0,0.25)] group-hover:rotate-12 transition-transform duration-500"
-      />
-      <div className="absolute right-full mr-4 top-1/2 -translate-y-1/2 bg-slate-900/80 backdrop-blur-md text-white text-[10px] font-black py-2 px-4 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-500 whitespace-nowrap border border-white/10 tracking-[0.2em]">
-          실시간 톡상담
-      </div>
-  </a>
-);
-
 const Footer = () => {
   const [activeModal, setActiveModal] = useState(null);
   const navigate = useNavigate();
@@ -415,9 +395,6 @@ const Footer = () => {
           </div>
         </div>
       </footer>
-
-      {/* 모든 페이지 공통 플로팅 버튼 */}
-      <FloatingConsultButton />
 
       <LegalModal 
         isOpen={!!activeModal}

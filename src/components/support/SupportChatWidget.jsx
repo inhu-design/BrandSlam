@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { MessageCircle, Send, X, Loader2, Bell, BellOff } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAdminSession } from '../../hooks/useAdminSession';
@@ -11,7 +10,7 @@ import {
   requestSupportChatNotificationPermission,
   stripUnreadTitlePrefix,
 } from '../../lib/supportChatNotify';
-import { FLOAT_RIGHT_CLASS, floatingChatPanelBottomStyle, floatingChatWrapperBottomStyle } from '../../lib/floatingSupportStack';
+import { FLOAT_RIGHT_CLASS, floatingChatPanelBottomStyle } from '../../lib/floatingSupportStack';
 
 const MAX_LEN = 8000;
 const READ_PREFIX = 'bs_support_last_read_';
@@ -207,17 +206,14 @@ export default function SupportChatWidget() {
 
   const floatingUi = (
     <>
-      <div
-        className={`pointer-events-none fixed z-[9999] flex flex-col items-end ${FLOAT_RIGHT_CLASS}`}
-        style={floatingChatWrapperBottomStyle()}
-      >
+      <div className="pointer-events-auto flex flex-col items-center">
         <button
           type="button"
           aria-expanded={open}
           aria-controls="support-chat-panel"
           title={open ? '채팅창 닫기' : '실시간 1:1 문의 열기 — 운영팀과 바로 연결'}
           onClick={() => setOpen((v) => !v)}
-          className="pointer-events-auto relative flex min-h-[3.25rem] shrink-0 items-center gap-2 rounded-full border-2 border-cyan-300/70 bg-gradient-to-r from-cyan-600 to-sky-600 px-4 py-2.5 pr-5 text-white shadow-[0_10px_40px_rgba(6,182,212,0.45)] transition hover:from-cyan-500 hover:to-sky-500 hover:shadow-[0_12px_44px_rgba(6,182,212,0.55)] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 data-[alert=1]:ring-2 data-[alert=1]:ring-amber-300/90"
+          className="relative flex h-14 min-h-[3.5rem] shrink-0 items-center justify-center gap-2 rounded-full border-2 border-cyan-300/70 bg-gradient-to-r from-cyan-600 to-sky-600 px-5 py-2.5 text-white shadow-[0_10px_40px_rgba(6,182,212,0.45)] transition hover:from-cyan-500 hover:to-sky-500 hover:shadow-[0_12px_44px_rgba(6,182,212,0.55)] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 data-[alert=1]:ring-2 data-[alert=1]:ring-amber-300/90"
           data-alert={!open && unreadCount > 0 ? 1 : undefined}
         >
           {!open && unreadCount > 0 ? (
@@ -377,6 +373,5 @@ export default function SupportChatWidget() {
     </>
   );
 
-  if (typeof document === 'undefined') return null;
-  return createPortal(floatingUi, document.body);
+  return floatingUi;
 }

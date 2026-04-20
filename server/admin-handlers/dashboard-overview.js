@@ -66,7 +66,13 @@ const resolveLinkedDeliveryListSlug = (campaign, settingsByCampaignId = null) =>
 const pickSetupSummary = (row) => {
   const fd = row?.form_data || {};
   const photos = Array.isArray(fd.productPhotoUrls)
-    ? fd.productPhotoUrls.filter((u) => typeof u === 'string' && u.trim() !== '')
+    ? fd.productPhotoUrls
+        .map((u) => {
+          if (typeof u === 'string' && u.trim()) return u.trim();
+          if (u && typeof u.url === 'string' && u.url.trim()) return u.url.trim();
+          return null;
+        })
+        .filter(Boolean)
     : [];
   return {
     created_at: row?.created_at || null,
@@ -84,6 +90,8 @@ const pickSetupSummary = (row) => {
     requested_shipping_date: fd.requestedShippingDate || null,
     guideline_status: fd.guidelineStatus || null,
     product_photo_urls: photos,
+    /** 고객 캠페인 세팅 화면(KickoffView)과 동일한 요약을 위해 전체 폼 페이로드 포함 */
+    form_data: row?.form_data ?? null,
   };
 };
 

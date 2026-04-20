@@ -8,7 +8,7 @@ import {
   ChevronLeft, ChevronRight, Calendar, ExternalLink, Zap, Trash2, CheckCircle2, MoreHorizontal,
   Plane, Gift, TrendingUp, BarChart2, Trophy, RefreshCw, AlertTriangle, Download,
   FileText, CreditCard, Printer, Video, ShieldCheck, X, Rocket, ArrowRight, Building2, Info, UserX, RotateCcw,
-  ClipboardList, Upload, LayoutDashboard, Table2, FileSpreadsheet, PlusCircle, Receipt,
+  ClipboardList, Upload, LayoutDashboard, Table2, FileSpreadsheet, PlusCircle, Receipt, ListChecks,
 } from 'lucide-react';
 import Navbar from '../components/layout/Navbar'; 
 import Footer from '../components/layout/Footer';
@@ -2901,6 +2901,53 @@ const KickoffSummaryRow = ({ label, value }) => (
   </div>
 );
 
+const normalizeKickoffProductPhotoEntries = (fd) => {
+  const raw = fd?.productPhotoUrls;
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (typeof item === 'string' && item.trim()) return { url: item.trim(), name: null };
+      if (item && typeof item.url === 'string' && item.url.trim()) {
+        return { url: item.url.trim(), name: item.name || null };
+      }
+      return null;
+    })
+    .filter(Boolean);
+};
+
+const formatKickoffSetupDateTime = (iso) => {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return String(iso);
+    return d.toLocaleString('ko-KR', { dateStyle: 'medium', timeStyle: 'short' });
+  } catch {
+    return String(iso);
+  }
+};
+
+const formatKickoffFileSize = (bytes) => {
+  if (bytes == null || Number.isNaN(Number(bytes))) return '—';
+  const n = Number(bytes);
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+};
+
+/** CampaignSetup.jsx AGREEMENT_ITEMS 와 동일한 key — 라벨만 요약 */
+const CAMPAIGN_SETUP_AGREEMENT_LABELS = {
+  koc: 'KOC(마이크로) 캠페인 안내',
+  kpi: 'KPI는 총 업로드 수량',
+  strategy: '확산형 마케팅 전략',
+  channels: 'TikTok·Instagram 믹스',
+  no_review: '업로드 전 개별 검수 불가',
+  guide: '가이드 방향성·자율 영역',
+  no_edit: '업로드 후 수정 원칙적 불가',
+  replace_30: '리스트 교체(최대 30%)',
+  no_replace_after: '확정 후 추가 교체 불가',
+  final: '전체 내용 이해·동의',
+};
+
 function EventScheduleCalendar({ dates = [] }) {
   const [cursor, setCursor] = useState(() => {
     const first = (dates || []).find((d) => d);
@@ -4892,30 +4939,56 @@ const AdminCampaignRuntimeSettingsEditor = ({ campaign, onSaved }) => {
 
 const KickoffView = ({ campaign, user, isAdminUser = false, onCampaignScheduleUpdated }) => {
   const navigate = useNavigate();
-  const [submission, setSubmission] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const submissionFromAdminApi = useMemo(() => {
+    if (!campaign?.id) return null;
+    const summary = campaign?.setup_submission_summary;
+    const prefetchedFd = summary?.form_data;
+    if (prefetchedFd != null && typeof prefetchedFd === 'object') {
+      return { form_data: prefetchedFd, created_at: summary?.created_at || null };
+    }
+    return null;
+  }, [campaign?.id, campaign?.setup_submission_summary]);
+
+  /** 고객 계정: RLS 허용 SELECT. forId !== campaign.id 이면 아직 이 캠페인에 대한 fetch 미완료 */
+  const [customerSetupFetch, setCustomerSetupFetch] = useState({ forId: null, row: null });
   const [deliveryListOpen, setDeliveryListOpen] = useState(false);
 
   useEffect(() => {
-    if (!campaign?.id) return;
+    if (!campaign?.id || submissionFromAdminApi) return;
+    const cid = campaign.id;
+    let cancelled = false;
     (async () => {
       const { data } = await supabase
         .from('campaign_setup_submissions')
         .select('form_data, created_at')
-        .eq('campaign_id', campaign.id)
+        .eq('campaign_id', cid)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
-      setSubmission(data);
-      setLoading(false);
+      if (!cancelled) {
+        setCustomerSetupFetch({ forId: cid, row: data ?? null });
+      }
     })();
-  }, [campaign?.id]);
+    return () => {
+      cancelled = true;
+    };
+  }, [campaign?.id, submissionFromAdminApi]);
 
+  const customerFetchedRow = customerSetupFetch.forId === campaign?.id ? customerSetupFetch.row : null;
+  const submission = submissionFromAdminApi || customerFetchedRow;
+  const loading =
+    !campaign?.id || (!submissionFromAdminApi && customerSetupFetch.forId !== campaign?.id);
   const fd = submission?.form_data || {};
-  const productPhotoUrls = Array.isArray(fd.productPhotoUrls)
-    ? fd.productPhotoUrls.filter((u) => typeof u === 'string' && u.trim() !== '')
-    : [];
+  const productPhotoEntries = normalizeKickoffProductPhotoEntries(fd);
   const isVisitPlan = campaign?.plan?.toLowerCase().includes('visit');
+  const agreementRows =
+    fd.agreements && typeof fd.agreements === 'object'
+      ? Object.entries(CAMPAIGN_SETUP_AGREEMENT_LABELS).map(([key, label]) => ({
+          key,
+          label,
+          agreed: !!fd.agreements[key],
+        }))
+      : [];
 
   const eventScheduleDates = Array.isArray(fd.eventSchedule)
     ? fd.eventSchedule
@@ -4972,18 +5045,25 @@ const KickoffView = ({ campaign, user, isAdminUser = false, onCampaignScheduleUp
         <div className="px-8 py-6 border-b border-white/5 bg-white/5 flex flex-wrap items-start justify-between gap-4">
           <div>
             <h3 className="font-black text-white flex items-center gap-3 tracking-tighter">
-              <Building2 size={20} className="text-cyan-400"/> 제출하신 캠페인 정보 요약
+              <Building2 size={20} className="text-cyan-400"/>
+              {isAdminUser ? '고객 제출 · 캠페인 세팅 전체' : '제출하신 캠페인 정보 요약'}
             </h3>
-            <p className="text-slate-500 text-sm mt-1 font-light">입력하신 내용이 정상적으로 전달되었습니다.</p>
+            <p className="text-slate-500 text-sm mt-1 font-light">
+              {isAdminUser
+                ? 'DB에 저장된 폼 원본과 동일합니다. USP·사진·약관 동의·서명·메타데이터까지 모두 확인할 수 있습니다.'
+                : '입력하신 내용이 정상적으로 전달되었습니다.'}
+            </p>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate(`/campaign-setup/${campaign.id}`)}
-            className="shrink-0 px-5 py-2.5 rounded-xl font-bold text-sm bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all flex items-center gap-2"
-          >
-            <Settings size={18} />
-            내 캠페인 정보 수정하기
-          </button>
+          {!isAdminUser && (
+            <button
+              type="button"
+              onClick={() => navigate(`/campaign-setup/${campaign.id}`)}
+              className="shrink-0 px-5 py-2.5 rounded-xl font-bold text-sm bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all flex items-center gap-2"
+            >
+              <Settings size={18} />
+              내 캠페인 정보 수정하기
+            </button>
+          )}
         </div>
         {loading ? (
           <div className="p-12 flex justify-center">
@@ -5014,6 +5094,19 @@ const KickoffView = ({ campaign, user, isAdminUser = false, onCampaignScheduleUp
                 ) : null}
                 {campaign.client_biz_reg_no ? (
                   <KickoffSummaryRow label="사업자등록번호" value={campaign.client_biz_reg_no} />
+                ) : null}
+                {submission ? (
+                  <>
+                    <KickoffSummaryRow label="담당자 서명 (제출 시)" value={fd.signature} />
+                    <KickoffSummaryRow label="작성일 (제출 시)" value={fd.writtenDate} />
+                    <KickoffSummaryRow
+                      label="폼 제출 일시"
+                      value={
+                        formatKickoffSetupDateTime(fd.submitted_at) ||
+                        formatKickoffSetupDateTime(submission?.created_at)
+                      }
+                    />
+                  </>
                 ) : null}
               </div>
               <div className="space-y-4">
@@ -5061,29 +5154,38 @@ const KickoffView = ({ campaign, user, isAdminUser = false, onCampaignScheduleUp
                 <KickoffSummaryRow
                   label="제품 사진"
                   value={
-                    productPhotoUrls.length > 0
-                      ? `${productPhotoUrls.length}개 업로드됨`
+                    productPhotoEntries.length > 0
+                      ? `${productPhotoEntries.length}개 업로드됨`
                       : '미첨부'
                   }
                 />
-                {productPhotoUrls.length > 0 && (
+                {productPhotoEntries.length > 0 && (
                   <div>
-                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">첨부 이미지 미리보기</p>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {productPhotoUrls.slice(0, 6).map((url, idx) => (
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
+                      첨부 이미지 ({productPhotoEntries.length}개){isAdminUser ? ' · 원본 링크·파일명' : ''}
+                    </p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                      {productPhotoEntries.map((ent, idx) => (
                         <a
-                          key={`${url}-${idx}`}
-                          href={ensureAbsoluteUrl(url)}
+                          key={`${ent.url}-${idx}`}
+                          href={ensureAbsoluteUrl(ent.url)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="block rounded-xl overflow-hidden border border-white/10 bg-white/5 hover:border-cyan-400/40 transition-colors"
+                          className="group block rounded-xl overflow-hidden border border-white/10 bg-white/5 hover:border-cyan-400/40 transition-colors"
                         >
                           <img
-                            src={ensureAbsoluteUrl(url)}
-                            alt={`product-photo-${idx + 1}`}
-                            className="w-full h-24 object-cover"
+                            src={ensureAbsoluteUrl(ent.url)}
+                            alt={ent.name || `product-photo-${idx + 1}`}
+                            className="w-full h-28 object-cover"
                             loading="lazy"
                           />
+                          {ent.name ? (
+                            <p className="text-[10px] text-slate-500 px-2 py-1.5 truncate group-hover:text-slate-300" title={ent.name}>
+                              {ent.name}
+                            </p>
+                          ) : (
+                            <p className="text-[10px] text-slate-600 px-2 py-1.5">이미지 {idx + 1}</p>
+                          )}
                         </a>
                       ))}
                     </div>
@@ -5091,14 +5193,81 @@ const KickoffView = ({ campaign, user, isAdminUser = false, onCampaignScheduleUp
                 )}
               </div>
             </div>
+            {submission && agreementRows.length > 0 ? (
+              <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6 space-y-3">
+                <p className="text-xs font-black text-white flex items-center gap-2 tracking-tight">
+                  <ListChecks size={16} className="text-violet-400" />
+                  캠페인 운영 정책 동의 (제출 시점)
+                </p>
+                <ul className="divide-y divide-white/5 text-sm">
+                  {agreementRows.map(({ key, label, agreed }) => (
+                    <li key={key} className="flex flex-wrap items-center justify-between gap-2 py-2.5 first:pt-0">
+                      <span className="text-slate-400 font-light">{label}</span>
+                      <span className={`shrink-0 font-bold text-xs ${agreed ? 'text-emerald-400' : 'text-slate-600'}`}>
+                        {agreed ? '동의' : '—'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </div>
         )}
-        {fd.uspAndLinks && (
+        {!loading && (
           <div className="px-8 pb-8">
             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">제품 USP · 링크 · 참고 숏폼</p>
-            <p className="text-slate-300 text-sm font-light whitespace-pre-wrap bg-white/5 rounded-xl p-4 border border-white/5">{fd.uspAndLinks}</p>
+            <p className="text-slate-300 text-sm font-light whitespace-pre-wrap bg-white/5 rounded-xl p-4 border border-white/5">
+              {String(fd.uspAndLinks || '').trim() || '-'}
+            </p>
           </div>
         )}
+        {!loading && isAdminUser && submission ? (
+          <div className="px-8 pb-8 border-t border-white/5 pt-6 space-y-4">
+            <h4 className="text-sm font-black text-white flex items-center gap-2 tracking-tight">
+              <ClipboardList size={18} className="text-amber-400" />
+              관리자 전용 · 제출 메타데이터
+            </h4>
+            <p className="text-xs text-slate-500">
+              제출 시점에 함께 저장된 파일 크기·MIME·내부 식별자입니다. 스토리지 URL은 위 이미지 카드와 동일합니다.
+            </p>
+            {Array.isArray(fd.productPhotos) && fd.productPhotos.length > 0 ? (
+              <div className="rounded-xl border border-white/10 overflow-hidden">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-white/5 text-slate-500 uppercase tracking-wider">
+                    <tr>
+                      <th className="px-4 py-2.5 font-bold">파일명</th>
+                      <th className="px-4 py-2.5 font-bold w-24">크기</th>
+                      <th className="px-4 py-2.5 font-bold w-32">타입</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-slate-300 divide-y divide-white/5">
+                    {fd.productPhotos.map((p, i) => (
+                      <tr key={`${p?.name}-${i}`} className="bg-transparent">
+                        <td className="px-4 py-2.5 font-mono text-[11px] break-all">{p?.name || '—'}</td>
+                        <td className="px-4 py-2.5 text-slate-400">{formatKickoffFileSize(p?.size)}</td>
+                        <td className="px-4 py-2.5 text-slate-500 truncate max-w-[8rem]" title={p?.type}>
+                          {p?.type || '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500">첨부 파일 메타데이터 행이 없습니다. (이미지만 URL로 저장된 경우 등)</p>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px] font-mono text-slate-500 bg-black/20 rounded-xl p-4 border border-white/5">
+              <p>
+                <span className="text-slate-600 block mb-1">form_data.user_id</span>
+                {fd.user_id || '—'}
+              </p>
+              <p>
+                <span className="text-slate-600 block mb-1">form_data.campaign_id</span>
+                {fd.campaign_id || '—'}
+              </p>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {/* 캠페인 세팅 이후 여정: 진행 일정 · 캘린더 · 가이드라인 */}
