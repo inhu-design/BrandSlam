@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { fetchAdminSessionIsAdmin } from '../lib/adminSessionFetch';
 
 /**
  * 서버 `/api/admin/admin-session` 기준 관리자 여부 (클라이언트 환경변수로 판별하지 않음)
@@ -32,12 +33,9 @@ export function useAdminSession() {
           }
           return;
         }
-        const res = await fetch(`${window.location.origin}/api/admin/admin-session`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const j = await res.json().catch(() => ({}));
+        const isAdmin = await fetchAdminSessionIsAdmin(token);
         if (!cancelled) {
-          setIsAdmin(!!(res.ok && j.is_admin));
+          setIsAdmin(!!isAdmin);
           setLoading(false);
         }
       } catch {

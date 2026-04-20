@@ -15,19 +15,25 @@ import {
 const MAX_LEN = 8000;
 const READ_PREFIX = 'bs_support_last_read_';
 
-/** 카카오(Footer: bottom-10 right-10, h-16) 위에 문의 FAB·패널을 쌓음. inset은 인라인으로 고정해 LTR/레이아웃 간섭 방지 */
+/** 카카오(Footer FloatingConsultButton: fixed bottom-10 right-10, img w-16 h-16)과 동일 너비·우측선 정렬, 그 위에 쌓음 */
+const FAB_SIZE = '4rem'; /* = tailwind w-16 h-16, 카카오 이미지와 동일 */
+const KAKAO_BOTTOM = '2.5rem'; /* bottom-10 */
+const GAP = '0.75rem';
+const FAB_BOTTOM = `calc(${KAKAO_BOTTOM} + ${FAB_SIZE} + ${GAP})`; /* 카카오 상단 + 간격 */
+const PANEL_BOTTOM = `calc(${FAB_BOTTOM} + ${FAB_SIZE} + ${GAP})`;
+
 const FAB_FIXED_STYLE = {
   position: 'fixed',
   left: 'auto',
   right: '2.5rem',
-  bottom: '7.25rem',
+  bottom: FAB_BOTTOM,
   zIndex: 9999,
 };
 const PANEL_FIXED_STYLE = {
   position: 'fixed',
   left: 'auto',
   right: '2.5rem',
-  bottom: '11.25rem',
+  bottom: PANEL_BOTTOM,
   zIndex: 9999,
 };
 
@@ -225,14 +231,14 @@ export default function SupportChatWidget() {
         aria-controls="support-chat-panel"
         onClick={() => setOpen((v) => !v)}
         style={FAB_FIXED_STYLE}
-        className="relative flex h-14 w-14 items-center justify-center rounded-full border border-white/15 bg-gradient-to-br from-slate-800 to-slate-900 text-cyan-300 shadow-lg shadow-black/40 transition hover:from-slate-700 hover:to-slate-800 hover:text-cyan-200"
+        className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-gradient-to-br from-slate-800 to-slate-900 text-cyan-300 shadow-[0_8px_24px_rgba(0,0,0,0.25)] transition hover:from-slate-700 hover:to-slate-800 hover:text-cyan-200"
       >
         {!open && unreadCount > 0 ? (
-          <span className="absolute -right-0.5 -top-0.5 flex h-[22px] min-w-[22px] items-center justify-center rounded-full border-2 border-slate-950 bg-rose-500 px-1 text-[10px] font-black text-white tabular-nums shadow-md">
+          <span className="absolute -right-1 -top-1 flex h-[22px] min-w-[22px] items-center justify-center rounded-full border-2 border-slate-950 bg-rose-500 px-1 text-[10px] font-black text-white tabular-nums shadow-md">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         ) : null}
-        {open ? <X className="h-6 w-6" aria-hidden /> : <MessageCircle className="h-6 w-6" aria-hidden />}
+        {open ? <X className="h-7 w-7" aria-hidden /> : <MessageCircle className="h-7 w-7" aria-hidden />}
         <span className="sr-only">{open ? '문의창 닫기' : '운영팀에게 문의하기'}</span>
       </button>
 
