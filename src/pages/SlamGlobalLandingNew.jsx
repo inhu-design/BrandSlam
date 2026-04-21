@@ -200,8 +200,7 @@ export default function SlamGlobalLandingNew() {
 
       <main className="relative z-10">
         <section className="mx-auto flex min-h-[min(78vh,720px)] max-w-4xl flex-col items-center justify-center px-4 pb-16 pt-12 text-center sm:px-6 sm:pb-20 sm:pt-16">
-          <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-violet-300/75">Miro 메인 슬로건</p>
-          <h1 className="mt-5 text-[1.65rem] font-bold leading-[1.18] tracking-tight text-white sm:text-4xl sm:leading-[1.12] lg:text-[2.65rem]">
+          <h1 className="text-[1.65rem] font-bold leading-[1.18] tracking-tight text-white sm:text-4xl sm:leading-[1.12] lg:text-[2.65rem]">
             <span className="bg-gradient-to-r from-[#e0e7ff] via-[#a5b4fc] to-[#22d3ee] bg-clip-text text-transparent">
               당신이 잠든 사이에도 시스템은 콘텐츠를 추적하고 성과를 쌓고 있습니다.
             </span>

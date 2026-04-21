@@ -15,7 +15,7 @@ const DEPRECATED_GEMINI_20_MODELS = new Set([
   'gemini-2.0-flash-001',
   'gemini-2.0-flash-lite',
   'gemini-2.0-flash-exp',
-]);
+]);  
 
 function resolveGeminiModel(raw) {
   const m = (raw || DEFAULT_GEMINI_MODEL).trim();
