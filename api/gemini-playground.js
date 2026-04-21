@@ -3,9 +3,29 @@
  * POST /api/gemini-playground
  * Body: { mode: 'copy'|'hook'|'brief'|'tags', input: string }
  *
- * 환경 변수: GEMINI_API_KEY (필수), GEMINI_MODEL (선택, 기본 gemini-2.0-flash)
- * 참고: AI Studio 키는 gemini-1.5-flash(무접미사)가 v1beta에서 안 잡히는 경우가 많음 → 2.0 또는 -latest/-001 접미사 모델 사용.
+ * 환경 변수: GEMINI_API_KEY (필수), GEMINI_MODEL (선택, 기본 gemini-2.5-flash)
+ * 참고: 신규 키는 2.0 Flash(-001 등)가 막히는 경우가 많음 → 2.5 Flash 계열 권장 (문서: ai.google.dev/gemini-api/docs/models).
  */
+
+const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
+
+/** Google이 신규 사용자에게 2.0 Flash 사용을 막은 경우가 있어 2.5로 올림 */
+const DEPRECATED_GEMINI_20_MODELS = new Set([
+  'gemini-2.0-flash',
+  'gemini-2.0-flash-001',
+  'gemini-2.0-flash-lite',
+  'gemini-2.0-flash-exp',
+]);
+
+function resolveGeminiModel(raw) {
+  const m = (raw || DEFAULT_GEMINI_MODEL).trim();
+  const lower = m.toLowerCase();
+  if (DEPRECATED_GEMINI_20_MODELS.has(lower) || lower.startsWith('gemini-2.0-flash')) {
+    return DEFAULT_GEMINI_MODEL;
+  }
+  return m;
+}
+
 function buildPrompt(mode, input) {
   const topic = (input || '').trim() || '(주제를 구체적으로 적어 주세요. 예: 비건 선크림 미국 시딩)';
   switch (mode) {
@@ -69,7 +89,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Invalid mode' });
   }
 
-  const model = (process.env.GEMINI_MODEL || 'gemini-2.0-flash').trim();
+  const model = resolveGeminiModel(process.env.GEMINI_MODEL);
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   try {
@@ -93,7 +113,7 @@ export default async function handler(req, res) {
         error: 'Gemini API 오류',
         detail: msg,
         hint:
-          'Vercel 환경 변수 GEMINI_MODEL을 바꿔 보세요. 예: gemini-2.0-flash, gemini-2.0-flash-001, gemini-1.5-flash-latest (AI Studio → 사용 가능 모델 목록과 동일한 ID)',
+          'Vercel의 GEMINI_MODEL을 gemini-2.5-flash 또는 gemini-2.5-flash-lite 로 맞추세요. 2.0 Flash(-001)는 신규 키에서 비활성인 경우가 많습니다. https://ai.google.dev/gemini-api/docs/models',
       });
     }
 
