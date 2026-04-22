@@ -24,7 +24,7 @@ import CheckoutResult from './pages/CheckoutResult';
 import CampaignSetup from './pages/CampaignSetup';
 import SetPassword from './pages/SetPassword';
 import Impersonate from './pages/Impersonate';
-import SlamGlobalLandingNew from './pages/SlamGlobalLandingNew';
+import SlamLab from './pages/SlamLab';
 import SupportChatPortal from './components/support/SupportChatPortal';
 import DashboardChunkWarmup from './components/DashboardChunkWarmup';
 
@@ -63,7 +63,8 @@ function App() {
             path="/admin/invoices"
             element={<Navigate to="/dashboard" replace state={{ adminPanel: 'all_invoices' }} />}
           />
-          <Route path="/landing-new" element={<SlamGlobalLandingNew />} />
+          <Route path="/slam-lab" element={<SlamLab />} />
+          <Route path="/landing-new" element={<Navigate to="/slam-lab" replace />} />
           {/* 매직 링크 등으로 잘못된 경로 진입 시 대시보드로 (SPA 폴백) */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
