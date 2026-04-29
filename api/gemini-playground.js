@@ -30,10 +30,14 @@ const ALL_MODES = new Set([
   'translate', 'product_desc', 'campaign_result', 'content_calendar', 'creator_faq',
 ]);
 
-function buildSystemInstruction(mode, lang) {
+function buildSystemInstruction(mode, lang, brandCtx) {
   const langNote = lang === 'en'
     ? '\n\nAll output must be in English.'
     : '\n\n모든 출력은 한국어로 작성하세요.';
+
+  const ctxNote = brandCtx
+    ? `\n\n[캠페인 컨텍스트: ${brandCtx}] — 위 컨텍스트를 모든 생성물에 일관되게 반영하세요.`
+    : '';
 
   const prompts = {
     copy: `역할: 글로벌 뷰티·라이프스타일 브랜드 퍼포먼스 마케터.
@@ -76,7 +80,7 @@ function buildSystemInstruction(mode, lang) {
 작업: 크리에이터가 협찬 진행 중 자주 묻는 질문에 대한 FAQ를 작성합니다. 성분·사용법·금지사항·반품 등 포함. 크리에이터에게 그대로 전달 가능한 수준으로 작성하세요.`,
   };
 
-  return (prompts[mode] || prompts['copy']) + langNote;
+  return (prompts[mode] || prompts['copy']) + langNote + ctxNote;
 }
 
 export default async function handler(req, res) {
@@ -106,6 +110,7 @@ export default async function handler(req, res) {
   const lang = body.lang === 'en' ? 'en' : 'ko';
   const doStream = body.stream === true;
   const messages = Array.isArray(body.messages) ? body.messages : [];
+  const brandCtx = String(body.brandContext || '').trim().slice(0, 300);
 
   if (!ALL_MODES.has(mode)) {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -117,7 +122,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'messages가 비어 있습니다.' });
   }
 
-  const systemInstruction = buildSystemInstruction(mode, lang);
+  const systemInstruction = buildSystemInstruction(mode, lang, brandCtx);
   const model = resolveGeminiModel(process.env.GEMINI_MODEL);
 
   const contents = messages.map((m) => ({
