@@ -24,34 +24,56 @@ import {
   isDbOfferForUser,
 } from '../lib/customPaymentOffers';
 
-const CHECKOUT_RESUME_KEY = 'checkout_resume_state_v1';
+const CHECKOUT_RESUME_KEY_LEGACY = 'checkout_resume_state_v1';
 
-const readCheckoutResume = () => {
-  if (typeof window === 'undefined') return null;
+function checkoutResumeKeyV2(userId) {
+  return `checkout_resume_state_v2:${userId}`;
+}
+
+/** @param {string | undefined} userId @param {string | undefined} userEmail */
+const readCheckoutResume = (userId, userEmail) => {
+  if (typeof window === 'undefined' || !userId) return null;
+  const norm = (userEmail || '').toLowerCase().trim();
   try {
-    const raw = window.sessionStorage.getItem(CHECKOUT_RESUME_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
+    const rawV2 = window.sessionStorage.getItem(checkoutResumeKeyV2(userId));
+    if (rawV2) {
+      const parsed = JSON.parse(rawV2);
+      if (parsed && typeof parsed === 'object') return parsed;
+    }
+    const rawLegacy = window.sessionStorage.getItem(CHECKOUT_RESUME_KEY_LEGACY);
+    if (!rawLegacy) return null;
+    const parsed = JSON.parse(rawLegacy);
     if (!parsed || typeof parsed !== 'object') return null;
-    return parsed;
+    const owner = (parsed.ownerEmail || '').toLowerCase().trim();
+    if (norm && owner && owner === norm) {
+      window.sessionStorage.setItem(checkoutResumeKeyV2(userId), rawLegacy);
+      window.sessionStorage.removeItem(CHECKOUT_RESUME_KEY_LEGACY);
+      return parsed;
+    }
+    return null;
   } catch {
     return null;
   }
 };
 
-const writeCheckoutResume = (data) => {
-  if (typeof window === 'undefined') return;
+/** @param {string | undefined} userId */
+const writeCheckoutResume = (userId, data) => {
+  if (typeof window === 'undefined' || !userId) return;
   try {
-    window.sessionStorage.setItem(CHECKOUT_RESUME_KEY, JSON.stringify(data));
+    const payload = JSON.stringify({ ...data, ownerUserId: userId });
+    window.sessionStorage.setItem(checkoutResumeKeyV2(userId), payload);
+    window.sessionStorage.removeItem(CHECKOUT_RESUME_KEY_LEGACY);
   } catch {
     // ignore session storage failures
   }
 };
 
-const clearCheckoutResume = () => {
+/** @param {string | undefined} userId */
+const clearCheckoutResume = (userId) => {
   if (typeof window === 'undefined') return;
   try {
-    window.sessionStorage.removeItem(CHECKOUT_RESUME_KEY);
+    if (userId) window.sessionStorage.removeItem(checkoutResumeKeyV2(userId));
+    window.sessionStorage.removeItem(CHECKOUT_RESUME_KEY_LEGACY);
   } catch {
     // ignore session storage failures
   }
@@ -422,7 +444,10 @@ export default function Checkout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const initialResume = useMemo(() => readCheckoutResume(), []);
+  const initialResume = useMemo(
+    () => (user?.id ? readCheckoutResume(user.id, user.email) : null),
+    [user?.id, user?.email],
+  );
 
   const queryPlan = new URLSearchParams(location.search).get('plan');
   const offerFromUrl = new URLSearchParams(location.search).get('offer');
@@ -441,9 +466,6 @@ export default function Checkout() {
   const [cart, setCart] = useState(() => {
     if (initialPlanId && PLANS[initialPlanId]) {
       return [{ planId: initialPlanId, qty: 1 }];
-    }
-    if (Array.isArray(initialResume?.cart) && initialResume.cart.length > 0) {
-      return initialResume.cart;
     }
     return [];
   });
@@ -511,11 +533,7 @@ export default function Checkout() {
       ? { name: lineItems.map((li) => `${li.plan.name} x ${li.qty}`).join(', '), count: lineItems.reduce((s, li) => s + li.count, 0), priceNum: supplyPrice, price: supplyPrice.toLocaleString(), isMulti: true }
       : null;
 
-  const [currentStep, setCurrentStep] = useState(() => {
-    const step = Number(initialResume?.currentStep);
-    if (Number.isInteger(step) && step >= 0 && step <= 5) return step;
-    return 0;
-  });
+  const [currentStep, setCurrentStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   /** 서버에서만 관리자 여부 확인 (VITE_ADMIN_EMAILS 미사용) */
   const [isAdminServer, setIsAdminServer] = useState(false);
@@ -644,26 +662,26 @@ export default function Checkout() {
   const [isSettingPassword, setIsSettingPassword] = useState(!hasExistingPassword);
 
   const [form, setForm] = useState({
-    email: initialResume?.form?.email || user?.email || '', password: '', passwordConfirm: '',
-    name: initialResume?.form?.name || '',
-    phone: initialResume?.form?.phone || '',
-    company: initialResume?.form?.company || '',
+    email: user?.email || '', password: '', passwordConfirm: '',
+    name: '',
+    phone: '',
+    company: '',
   });
   // 인보이스용 공급받는 자 정보 (결제 전 인보이스 확인 단계에서 입력)
   const [clientForm, setClientForm] = useState({
-    companyName: initialResume?.clientForm?.companyName || '',
-    address: initialResume?.clientForm?.address || '',
-    bizRegNo: initialResume?.clientForm?.bizRegNo || '',
+    companyName: '',
+    address: '',
+    bizRegNo: '',
   });
 
   const [agree, setAgree] = useState({
-    terms: !!initialResume?.agree?.terms,
-    refund: !!initialResume?.agree?.refund,
-    privacy: !!initialResume?.agree?.privacy,
+    terms: false,
+    refund: false,
+    privacy: false,
   });
   const [orderNumber, setOrderNumber] = useState('');
   const [legalModal, setLegalModal] = useState(null);
-  const [paymentMethod, setPaymentMethod] = useState(initialResume?.paymentMethod === 'card' ? 'card' : 'bank'); // 'bank' | 'card'
+  const [paymentMethod, setPaymentMethod] = useState('bank'); // 'bank' | 'card'
   const [bankOrderNumber, setBankOrderNumber] = useState(null); // 계좌이체: 입금 안내용 주문번호 (DB 미생성)
   const [bankOrderPayload, setBankOrderPayload] = useState(null); // 입금 확인 시 서버에 전달할 주문 본문
   const [verifyingPassword, setVerifyingPassword] = useState(false);
@@ -671,6 +689,54 @@ export default function Checkout() {
   const invoicePreviewRef = useRef(null);
   const payWindowRef = useRef(null);
   const payWindowMonitorRef = useRef(null);
+  const checkoutResumeHydratedForUserRef = useRef(null);
+
+  useLayoutEffect(() => {
+    if (!user?.id) return;
+    if (checkoutResumeHydratedForUserRef.current === user.id) return;
+    checkoutResumeHydratedForUserRef.current = user.id;
+
+    const snap = readCheckoutResume(user.id, user.email);
+    if (!snap) return;
+
+    const fromUrlOffer = !!(offerFromUrl || '').trim();
+    const fromStateOffer = !!(effectiveCheckoutState?.customPaymentOfferId || '').trim();
+    const frameless = effectiveCheckoutState?.customOfferId === CUSTOM_OFFER_FRAMELESS_ID;
+    const hasEntryPlan = !!(initialPlanId && PLANS[initialPlanId]);
+
+    if (!hasEntryPlan && Array.isArray(snap.cart) && snap.cart.length > 0) {
+      setCart(snap.cart);
+    }
+
+    if (!fromUrlOffer && !fromStateOffer && !frameless) {
+      const step = Number(snap.currentStep);
+      if (Number.isInteger(step) && step >= 0 && step <= 5) setCurrentStep(step);
+    }
+
+    setForm((prev) => ({
+      ...prev,
+      email: snap.form?.email || prev.email || user.email || '',
+      name: snap.form?.name ?? prev.name,
+      phone: snap.form?.phone ?? prev.phone,
+      company: snap.form?.company ?? prev.company,
+      password: prev.password,
+      passwordConfirm: prev.passwordConfirm,
+    }));
+    setClientForm((prev) => ({
+      ...prev,
+      companyName: snap.clientForm?.companyName ?? prev.companyName,
+      address: snap.clientForm?.address ?? prev.address,
+      bizRegNo: snap.clientForm?.bizRegNo ?? prev.bizRegNo,
+    }));
+    setAgree((prev) => ({
+      terms: snap.agree?.terms ?? prev.terms,
+      refund: snap.agree?.refund ?? prev.refund,
+      privacy: snap.agree?.privacy ?? prev.privacy,
+    }));
+    if (snap.paymentMethod === 'card' || snap.paymentMethod === 'bank') {
+      setPaymentMethod(snap.paymentMethod);
+    }
+  }, [user?.id, user?.email, offerFromUrl, effectiveCheckoutState?.customPaymentOfferId, effectiveCheckoutState?.customOfferId, initialPlanId]);
 
   const restorePageScroll = () => {
     const body = document.body;
@@ -715,8 +781,8 @@ export default function Checkout() {
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'smooth' }); }, [currentStep]);
 
   useEffect(() => {
-    if (!user?.email) return;
-    writeCheckoutResume({
+    if (!user?.email || !user?.id) return;
+    writeCheckoutResume(user.id, {
       ownerEmail: String(user.email).toLowerCase().trim(),
       currentStep,
       paymentMethod,
@@ -733,6 +799,7 @@ export default function Checkout() {
       agree,
     });
   }, [
+    user?.id,
     user?.email,
     currentStep,
     paymentMethod,
@@ -748,6 +815,7 @@ export default function Checkout() {
   ]);
 
   useEffect(() => {
+    const uid = user?.id;
     const onMessage = (e) => {
       if (e.data?.type === 'INICIS_PAYMENT_SUCCESS' && e.data?.order_number) {
         paymentInProgressRef.current = false;
@@ -758,14 +826,14 @@ export default function Checkout() {
           payWindowMonitorRef.current = null;
         }
         payWindowRef.current = null;
-        clearCheckoutResume();
+        clearCheckoutResume(uid);
         setOrderNumber(e.data.order_number);
         setCurrentStep(5);
       }
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     return () => {

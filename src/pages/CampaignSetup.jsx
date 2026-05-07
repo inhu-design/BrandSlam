@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Rocket, FileText, Upload, AlertCircle, Loader2,
   Building2, Package, Globe, PenLine, ChevronDown, MapPin,
-  ClipboardPaste, Save,
+  ClipboardPaste,
 } from 'lucide-react';
 import Navbar from '../components/layout/Navbar';
 import Footer from '../components/layout/Footer';
@@ -27,8 +27,6 @@ const DELIVERY_OPTIONS = [
   { value: 'other', label: '기타' },
 ];
 
-const LS_KEY_PREFIX = 'campaign-setup-draft:';
-
 const FORM_PERSIST_KEYS = [
   'companyName',
   'contactName',
@@ -48,10 +46,6 @@ const FORM_PERSIST_KEYS = [
   'eventVenue',
   'eventGift',
 ];
-
-function draftStorageKey(userId, cid) {
-  return `${LS_KEY_PREFIX}${userId}:${cid}`;
-}
 
 function pickFormFromPayload(src) {
   const next = {};
@@ -262,15 +256,24 @@ function CampaignSetupPage() {
   );
   const [submitting, setSubmitting] = useState(false);
   const [fileError, setFileError] = useState('');
-  const [lastSavedAt, setLastSavedAt] = useState(null);
   const [duplicateLoading, setDuplicateLoading] = useState(false);
   const [duplicateHint, setDuplicateHint] = useState(null);
-
-  const autosaveReadyRef = useRef(false);
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [campaignId]);
+
+  useEffect(() => {
+    try {
+      const prefix = 'campaign-setup-draft:';
+      for (let i = localStorage.length - 1; i >= 0; i -= 1) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(prefix)) localStorage.removeItem(k);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   useEffect(() => {
     const isReal = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(campaignId);
@@ -290,57 +293,10 @@ function CampaignSetupPage() {
     })();
   }, [campaignId, user?.id, user?.email]);
 
-  useLayoutEffect(() => {
-    if (!user?.id || !campaignId) return;
-    autosaveReadyRef.current = false;
-    try {
-      const raw = localStorage.getItem(draftStorageKey(user.id, campaignId));
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed.form && typeof parsed.form === 'object') {
-          const picked = pickFormFromPayload(parsed.form);
-          setForm((prev) => ({ ...prev, ...picked, productPhotos: [] }));
-        }
-        if (parsed.agreements && typeof parsed.agreements === 'object') {
-          setAgreements((prev) => ({ ...prev, ...parsed.agreements }));
-        }
-        if (typeof parsed.savedAt === 'number') setLastSavedAt(parsed.savedAt);
-      }
-    } catch {
-      /* ignore corrupt draft */
-    }
-    autosaveReadyRef.current = true;
-  }, [campaignId, user?.id]);
-
-  useEffect(() => {
-    if (!user?.id || !campaignId || !autosaveReadyRef.current) return;
-    const timer = setTimeout(() => {
-      try {
-        const { productPhotos, ...rest } = form;
-        void productPhotos;
-        const payload = {
-          form: { ...rest, productPhotos: [] },
-          agreements,
-          savedAt: Date.now(),
-        };
-        localStorage.setItem(draftStorageKey(user.id, campaignId), JSON.stringify(payload));
-        setLastSavedAt(payload.savedAt);
-      } catch {
-        /* quota or private mode */
-      }
-    }, 450);
-    return () => clearTimeout(timer);
-  }, [form, agreements, campaignId, user?.id]);
-
   const setupProgress = useMemo(
     () => computeSetupProgress(form, agreements, isVisitPlan),
     [form, agreements, isVisitPlan],
   );
-
-  const lastSavedLabel = useMemo(() => {
-    if (!lastSavedAt) return null;
-    return new Date(lastSavedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  }, [lastSavedAt]);
 
   const handleLoadPreviousSubmission = async () => {
     if (!user?.id || !campaignId) return;
@@ -464,11 +420,6 @@ function CampaignSetupPage() {
           ...(productName && { product_name: productName }),
         }).eq('id', campaignId).eq('user_id', user.id);
       }
-      try {
-        if (user?.id && campaignId) localStorage.removeItem(draftStorageKey(user.id, campaignId));
-      } catch {
-        /* ignore */
-      }
       navigate('/dashboard', { replace: true });
     } catch (err) {
       console.error(err);
@@ -534,23 +485,16 @@ function CampaignSetupPage() {
                 />
               </div>
             </div>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3">
               <button
                 type="button"
                 onClick={handleLoadPreviousSubmission}
                 disabled={duplicateLoading}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-purple-500/40 bg-purple-500/15 px-4 py-2.5 text-sm font-bold text-purple-200 hover:bg-purple-500/25 disabled:opacity-50 transition-colors"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-purple-500/40 bg-purple-500/15 px-4 py-2.5 text-sm font-bold text-purple-200 hover:bg-purple-500/25 disabled:opacity-50 transition-colors"
               >
                 {duplicateLoading ? <Loader2 size={18} className="animate-spin" /> : <ClipboardPaste size={18} />}
                 이전 캠페인 세팅 불러오기
               </button>
-              <div className="flex items-center gap-2 text-xs text-slate-500">
-                <Save size={14} className="text-slate-400 shrink-0" />
-                <span>
-                  입력 내용은 이 브라우저에 자동 저장됩니다.
-                  {lastSavedLabel ? ` (마지막 저장 ${lastSavedLabel})` : ''}
-                </span>
-              </div>
             </div>
             {duplicateHint ? (
               <p className="text-sm text-slate-400 px-1">{duplicateHint}</p>
