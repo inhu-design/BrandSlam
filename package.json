@@ -13,7 +13,9 @@
     "import:farmskin": "node scripts/import-farmskin-excel.js",
     "import:welcos": "node scripts/import-welcos-excel.js",
     "import:farmskin-phase2": "node scripts/farmskin-heather-phase2.js",
-    "import:troubless-pdrn-replace3": "node scripts/troubless-pdrn-final-replace-3.js"
+    "import:troubless-pdrn-replace3": "node scripts/troubless-pdrn-final-replace-3.js",
+    "create-auth-user": "node scripts/create-auth-user.mjs",
+    "migrate-auth-email": "node scripts/migrate-auth-email.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.87.1",

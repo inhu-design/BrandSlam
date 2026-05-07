@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, Rocket, FileText, CheckCircle2, Upload, AlertCircle, Loader2,
-  Building2, Package, Globe, PenLine, ChevronDown, MapPin
+  ArrowLeft, Rocket, FileText, Upload, AlertCircle, Loader2,
+  Building2, Package, Globe, PenLine, ChevronDown, MapPin,
+  ClipboardPaste, Save,
 } from 'lucide-react';
 import Navbar from '../components/layout/Navbar';
 import Footer from '../components/layout/Footer';
@@ -25,6 +26,78 @@ const DELIVERY_OPTIONS = [
   { value: '2w', label: '약 2주' },
   { value: 'other', label: '기타' },
 ];
+
+const LS_KEY_PREFIX = 'campaign-setup-draft:';
+
+const FORM_PERSIST_KEYS = [
+  'companyName',
+  'contactName',
+  'contactTitle',
+  'contactPhone',
+  'contactEmail',
+  'productName',
+  'uspAndLinks',
+  'countryRange',
+  'deliveryTime',
+  'deliveryOther',
+  'signature',
+  'writtenDate',
+  'targetAudienceCountry',
+  'eventName',
+  'eventSchedule',
+  'eventVenue',
+  'eventGift',
+];
+
+function draftStorageKey(userId, cid) {
+  return `${LS_KEY_PREFIX}${userId}:${cid}`;
+}
+
+function pickFormFromPayload(src) {
+  const next = {};
+  if (!src || typeof src !== 'object') return next;
+  for (const k of FORM_PERSIST_KEYS) {
+    if (src[k] === undefined || src[k] === null) continue;
+    if (k === 'eventSchedule' && !Array.isArray(src.eventSchedule)) continue;
+    next[k] = src[k];
+  }
+  return next;
+}
+
+function computeSetupProgress(form, agreements, isVisitPlan) {
+  let done = 0;
+  let total = 0;
+  const step = (ok) => {
+    total += 1;
+    if (ok) done += 1;
+  };
+
+  step(!!String(form.companyName || '').trim());
+  step(!!String(form.contactName || '').trim());
+  step(!!String(form.contactTitle || '').trim());
+  step(!!String(form.contactPhone || '').trim());
+  step(!!String(form.contactEmail || '').trim());
+  step(!!String(form.productName || '').trim());
+  step(!!String(form.uspAndLinks || '').trim());
+  step(!!String(form.signature || '').trim());
+  step(!!String(form.writtenDate || '').trim());
+
+  if (isVisitPlan) {
+    step(!!String(form.targetAudienceCountry || '').trim());
+    step(Array.isArray(form.eventSchedule) && form.eventSchedule.length > 0);
+    step(!!String(form.eventVenue || '').trim());
+  } else {
+    step(!!form.countryRange);
+    step(!!form.deliveryTime && (form.deliveryTime !== 'other' || !!String(form.deliveryOther || '').trim()));
+  }
+
+  for (const { key } of AGREEMENT_ITEMS) {
+    step(!!agreements[key]);
+  }
+
+  if (total === 0) return 0;
+  return Math.min(100, Math.round((done / total) * 100));
+}
 
 const AGREEMENT_ITEMS = [
   { key: 'koc', text: '본 캠페인은 KOC(마이크로 기반) 캠페인입니다.\nKOC(Knowledgeable Opinion Consumer)는 대형 인플루언서(KOL)와 달리, 전문성과 실제 사용 경험을 기반으로 콘텐츠를 제작하는 마이크로·니치 기반 소비자형 크리에이터를 의미합니다.\n평균 조회수나 팔로워 규모보다는 콘텐츠 수량 확산과 알고리즘 확률 확보를 통해 성과를 만들어냅니다.', highlight: true },
@@ -189,6 +262,11 @@ function CampaignSetupPage() {
   );
   const [submitting, setSubmitting] = useState(false);
   const [fileError, setFileError] = useState('');
+  const [lastSavedAt, setLastSavedAt] = useState(null);
+  const [duplicateLoading, setDuplicateLoading] = useState(false);
+  const [duplicateHint, setDuplicateHint] = useState(null);
+
+  const autosaveReadyRef = useRef(false);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -211,6 +289,88 @@ function CampaignSetupPage() {
       }
     })();
   }, [campaignId, user?.id, user?.email]);
+
+  useLayoutEffect(() => {
+    if (!user?.id || !campaignId) return;
+    autosaveReadyRef.current = false;
+    try {
+      const raw = localStorage.getItem(draftStorageKey(user.id, campaignId));
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.form && typeof parsed.form === 'object') {
+          const picked = pickFormFromPayload(parsed.form);
+          setForm((prev) => ({ ...prev, ...picked, productPhotos: [] }));
+        }
+        if (parsed.agreements && typeof parsed.agreements === 'object') {
+          setAgreements((prev) => ({ ...prev, ...parsed.agreements }));
+        }
+        if (typeof parsed.savedAt === 'number') setLastSavedAt(parsed.savedAt);
+      }
+    } catch {
+      /* ignore corrupt draft */
+    }
+    autosaveReadyRef.current = true;
+  }, [campaignId, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || !campaignId || !autosaveReadyRef.current) return;
+    const timer = setTimeout(() => {
+      try {
+        const { productPhotos, ...rest } = form;
+        void productPhotos;
+        const payload = {
+          form: { ...rest, productPhotos: [] },
+          agreements,
+          savedAt: Date.now(),
+        };
+        localStorage.setItem(draftStorageKey(user.id, campaignId), JSON.stringify(payload));
+        setLastSavedAt(payload.savedAt);
+      } catch {
+        /* quota or private mode */
+      }
+    }, 450);
+    return () => clearTimeout(timer);
+  }, [form, agreements, campaignId, user?.id]);
+
+  const setupProgress = useMemo(
+    () => computeSetupProgress(form, agreements, isVisitPlan),
+    [form, agreements, isVisitPlan],
+  );
+
+  const lastSavedLabel = useMemo(() => {
+    if (!lastSavedAt) return null;
+    return new Date(lastSavedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }, [lastSavedAt]);
+
+  const handleLoadPreviousSubmission = async () => {
+    if (!user?.id || !campaignId) return;
+    setDuplicateLoading(true);
+    setDuplicateHint(null);
+    try {
+      const isReal = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(campaignId);
+      let query = supabase
+        .from('campaign_setup_submissions')
+        .select('form_data, created_at, campaign_id')
+        .eq('user_id', user.id);
+      if (isReal) query = query.neq('campaign_id', campaignId);
+      const { data, error } = await query.order('created_at', { ascending: false }).limit(1).maybeSingle();
+      if (error) throw error;
+      if (!data?.form_data || typeof data.form_data !== 'object') {
+        setDuplicateHint('불러올 이전 캠페인 세팅 제출이 없습니다.');
+        return;
+      }
+      const picked = pickFormFromPayload(data.form_data);
+      setForm((prev) => ({ ...prev, ...picked, productPhotos: [] }));
+      if (data.form_data.agreements && typeof data.form_data.agreements === 'object') {
+        setAgreements(() => ({ ...AGREEMENT_ITEMS.reduce((acc, { key }) => ({ ...acc, [key]: false }), {}), ...data.form_data.agreements }));
+      }
+      setDuplicateHint('이전에 제출한 캠페인 세팅을 불러왔습니다. 이번 캠페인에 맞게 수정한 뒤 제출해 주세요.');
+    } catch (e) {
+      setDuplicateHint(e?.message || '불러오기에 실패했습니다.');
+    } finally {
+      setDuplicateLoading(false);
+    }
+  };
 
   const set = (field) => (e) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
@@ -304,6 +464,11 @@ function CampaignSetupPage() {
           ...(productName && { product_name: productName }),
         }).eq('id', campaignId).eq('user_id', user.id);
       }
+      try {
+        if (user?.id && campaignId) localStorage.removeItem(draftStorageKey(user.id, campaignId));
+      } catch {
+        /* ignore */
+      }
       navigate('/dashboard', { replace: true });
     } catch (err) {
       console.error(err);
@@ -354,6 +519,42 @@ function CampaignSetupPage() {
                 캠페인 진행을 위한 필수 정보를 입력해 주세요.  <span className="whitespace-pre-wrap"></span>    * 표시는 필수 항목입니다.
               </p>
             </div>
+          </div>
+
+          <div className="mb-6 space-y-3">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <span className="text-sm font-bold text-slate-200">작성 진행률</span>
+                <span className="text-sm font-black text-purple-300 tabular-nums">약 {setupProgress}% 완료</span>
+              </div>
+              <div className="h-2.5 rounded-full bg-white/10 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-purple-500 to-cyan-400 transition-[width] duration-500 ease-out"
+                  style={{ width: `${setupProgress}%` }}
+                />
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3">
+              <button
+                type="button"
+                onClick={handleLoadPreviousSubmission}
+                disabled={duplicateLoading}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-purple-500/40 bg-purple-500/15 px-4 py-2.5 text-sm font-bold text-purple-200 hover:bg-purple-500/25 disabled:opacity-50 transition-colors"
+              >
+                {duplicateLoading ? <Loader2 size={18} className="animate-spin" /> : <ClipboardPaste size={18} />}
+                이전 캠페인 세팅 불러오기
+              </button>
+              <div className="flex items-center gap-2 text-xs text-slate-500">
+                <Save size={14} className="text-slate-400 shrink-0" />
+                <span>
+                  입력 내용은 이 브라우저에 자동 저장됩니다.
+                  {lastSavedLabel ? ` (마지막 저장 ${lastSavedLabel})` : ''}
+                </span>
+              </div>
+            </div>
+            {duplicateHint ? (
+              <p className="text-sm text-slate-400 px-1">{duplicateHint}</p>
+            ) : null}
           </div>
 
           <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 mb-10 flex gap-3">
