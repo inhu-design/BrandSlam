@@ -327,35 +327,62 @@ const LegalModal = ({ isOpen, onClose, title, content }) => {
   );
 };
 
-const StepIndicator = ({ currentStep }) => (
-  <div className="flex items-center justify-between mb-12">
-    {STEP_META.map((s, i) => {
-      const stepForDisplay = Math.min(currentStep, STEP_META.length);
-      const done = stepForDisplay > i;
-      const active = stepForDisplay === i;
-      const Icon = s.icon;
-      return (
-        <React.Fragment key={i}>
-          <div className="flex items-center gap-2">
-            <div className={`w-9 h-9 rounded-full flex items-center justify-center transition-all text-sm font-bold ${
-              done ? 'bg-purple-500 text-white'
-              : active ? 'bg-purple-500/20 border-2 border-purple-500 text-purple-400'
+const StepIndicator = ({ currentStep, furthestStepReached, onStepClick }) => {
+  const isComplete = currentStep === 5;
+  return (
+    <div className="flex items-center justify-between mb-12">
+      {STEP_META.map((s, i) => {
+        const stepForDisplay = Math.min(currentStep, STEP_META.length);
+        const done = stepForDisplay > i;
+        const active = !isComplete && stepForDisplay === i;
+        const Icon = s.icon;
+        const canGoTo =
+          !isComplete
+          && onStepClick
+          && i !== currentStep
+          && i <= furthestStepReached;
+        const rowClass = `flex items-center gap-2 rounded-xl p-1 -m-1 transition-colors ${
+          canGoTo ? 'hover:bg-white/10 cursor-pointer md:hover:scale-[1.02]' : ''
+        }`;
+        const circleClass = `w-9 h-9 rounded-full flex items-center justify-center transition-all text-sm font-bold shrink-0 ${
+          done ? 'bg-purple-500 text-white'
+            : active ? 'bg-purple-500/20 border-2 border-purple-500 text-purple-400'
               : 'bg-white/5 border border-white/10 text-slate-600'
-            }`}>
+        }`;
+        const labelClass = `text-xs font-bold hidden md:inline transition-colors ${
+          done ? 'text-purple-400' : active ? 'text-white' : 'text-slate-600'
+        }${canGoTo ? ' group-hover:text-purple-200' : ''}`;
+        const inner = (
+          <>
+            <div className={circleClass}>
               {done ? <Check size={16} strokeWidth={3} /> : <Icon size={16} />}
             </div>
-            <span className={`text-xs font-bold hidden md:inline transition-colors ${
-              done ? 'text-purple-400' : active ? 'text-white' : 'text-slate-600'
-            }`}>{s.label}</span>
-          </div>
-          {i < STEP_META.length - 1 && (
-            <div className={`flex-1 h-px mx-3 transition-all ${done ? 'bg-purple-500' : 'bg-white/10'}`} />
-          )}
-        </React.Fragment>
-      );
-    })}
-  </div>
-);
+            <span className={labelClass}>{s.label}</span>
+          </>
+        );
+        return (
+          <React.Fragment key={i}>
+            {canGoTo ? (
+              <button
+                type="button"
+                aria-label={`${s.label} 단계로 이동`}
+                onClick={() => onStepClick(i)}
+                className={`${rowClass} group bg-transparent border-0 text-left`}
+              >
+                {inner}
+              </button>
+            ) : (
+              <div className={rowClass}>{inner}</div>
+            )}
+            {i < STEP_META.length - 1 && (
+              <div className={`flex-1 h-px mx-3 transition-all ${done ? 'bg-purple-500' : 'bg-white/10'}`} />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+};
 
 const PlanCard = ({ plan, selected, onClick, showChange, onChangeClick }) => (
   <button
@@ -534,6 +561,7 @@ export default function Checkout() {
       : null;
 
   const [currentStep, setCurrentStep] = useState(0);
+  const [furthestStepReached, setFurthestStepReached] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   /** 서버에서만 관리자 여부 확인 (VITE_ADMIN_EMAILS 미사용) */
   const [isAdminServer, setIsAdminServer] = useState(false);
@@ -566,6 +594,12 @@ export default function Checkout() {
       cancelled = true;
     };
   }, [user]);
+
+  useEffect(() => {
+    if (currentStep < 5) {
+      setFurthestStepReached((f) => Math.max(f, currentStep));
+    }
+  }, [currentStep]);
 
   const isCustomOfferActive = useMemo(
     () => (
@@ -690,6 +724,42 @@ export default function Checkout() {
   const payWindowRef = useRef(null);
   const payWindowMonitorRef = useRef(null);
   const checkoutResumeHydratedForUserRef = useRef(null);
+  const prevCheckoutUserIdRef = useRef(undefined);
+
+  useLayoutEffect(() => {
+    const next = user?.id;
+    const prev = prevCheckoutUserIdRef.current;
+    if (prev && next && prev !== next) {
+      checkoutResumeHydratedForUserRef.current = null;
+      clearCheckoutResume(prev);
+      dbOfferStepBootRef.current = null;
+      paymentInProgressRef.current = false;
+      setOrderNumber('');
+      setCurrentStep(0);
+      setSubmitting(false);
+      if (initialPlanId && PLANS[initialPlanId]) {
+        setCart([{ planId: initialPlanId, qty: 1 }]);
+      } else {
+        setCart([]);
+      }
+      setForm({
+        email: user?.email || '',
+        password: '',
+        passwordConfirm: '',
+        name: '',
+        phone: '',
+        company: '',
+      });
+      setClientForm({ companyName: '', address: '', bizRegNo: '' });
+      setAgree({ terms: false, refund: false, privacy: false });
+      setPaymentMethod('bank');
+      setBankOrderNumber(null);
+      setBankOrderPayload(null);
+      setIsSettingPassword(user?.user_metadata?.password_set !== true);
+      setFurthestStepReached(0);
+    }
+    prevCheckoutUserIdRef.current = next ?? undefined;
+  }, [user?.id, user?.email, user?.user_metadata?.password_set, initialPlanId]);
 
   useLayoutEffect(() => {
     if (!user?.id) return;
@@ -1370,6 +1440,15 @@ export default function Checkout() {
     setCurrentStep(1);
   };
 
+  const handleStepIndicatorClick = (idx) => {
+    if (currentStep === 5) return;
+    if (idx === currentStep) return;
+    if (idx > furthestStepReached) return;
+    if (idx >= 1 && !hasCartItems) return;
+    if (idx === 0 && (isCustomOfferActive || isDbCustomOfferActive)) return;
+    setCurrentStep(idx);
+  };
+
   return (
     <div className="font-sans antialiased text-white bg-[#020617] min-h-screen flex flex-col selection:bg-purple-500/30">
       <Navbar />
@@ -1401,7 +1480,11 @@ export default function Checkout() {
           </div>
 
           {/* Progress bar - always visible */}
-          <StepIndicator currentStep={currentStep} />
+          <StepIndicator
+            currentStep={currentStep}
+            furthestStepReached={furthestStepReached}
+            onStepClick={handleStepIndicatorClick}
+          />
 
           {/* Step 0: Plan selection */}
           {currentStep === 0 && (
@@ -1814,7 +1897,7 @@ export default function Checkout() {
                       </div>
                     </>
                   )}
-                  <div className="flex justify-between"><span className="text-slate-500">이메일</span><span className="font-medium text-slate-300">{form.email}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">이메일</span><span className="font-medium text-slate-300">{user?.email || form.email}</span></div>
                   <div className="flex justify-between"><span className="text-slate-500">이름</span><span className="font-medium text-slate-300">{form.name}</span></div>
                   <div className="flex justify-between"><span className="text-slate-500">회사명</span><span className="font-medium text-slate-300">{form.company}</span></div>
                   <div className="flex justify-between pt-3 border-t border-white/10">
@@ -1980,7 +2063,7 @@ export default function Checkout() {
                   <div className="flex justify-between"><span className="text-slate-500">공급가액</span><span className="font-medium text-slate-300">{supplyPrice.toLocaleString()}원</span></div>
                   <div className="flex justify-between"><span className="text-slate-500">부가세 (10%)</span><span className="font-medium text-slate-300">{vatAmount.toLocaleString()}원</span></div>
                   <div className="flex justify-between"><span className="text-slate-500">결제 금액 (VAT 포함)</span><span className="font-bold text-purple-400">{totalPrice.toLocaleString()}원</span></div>
-                  <div className="flex justify-between"><span className="text-slate-500">이메일</span><span className="font-medium text-slate-300">{form.email}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">이메일</span><span className="font-medium text-slate-300">{user?.email || form.email}</span></div>
                 </div>
               </div>
 
