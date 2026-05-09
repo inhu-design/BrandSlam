@@ -2551,7 +2551,6 @@ const AnalyticsReport = ({ campaign }) => {
     const reportNotion = fd?.report_notion || {};
     const reportTopCreatorsRaw = Array.isArray(fd?.report_top_creators) ? fd.report_top_creators : [];
     const reportTopPostsRaw = Array.isArray(fd?.report_top_posts) ? fd.report_top_posts : [];
-    const reportLinks = fd?.report_links || {};
     const reportInsights = Array.isArray(fd?.report_insights) ? fd.report_insights : [];
     const reportActions = Array.isArray(fd?.report_actions) ? fd.report_actions : [];
 
@@ -2563,6 +2562,20 @@ const AnalyticsReport = ({ campaign }) => {
     const dates = Array.isArray(analytics?.dates) ? analytics.dates : [];
     const maxDaily = Math.max(1, ...dailyViews);
     const topLang = Array.isArray(reportSummary?.top_languages) ? reportSummary.top_languages : [];
+    const topRegions = Array.isArray(reportSummary?.top_regions) ? reportSummary.top_regions : [];
+    const quantSummary = reportDataStudio?.comment_quantitative_summary || {};
+    const qualitativeSummary = Array.isArray(reportDataStudio?.comment_qualitative_summary)
+      ? reportDataStudio.comment_qualitative_summary
+      : [];
+    const dataDrivenInsights = Array.isArray(reportDataStudio?.data_driven_insights)
+      ? reportDataStudio.data_driven_insights
+      : [];
+    const nextActionPlan = Array.isArray(reportDataStudio?.next_action_plan)
+      ? reportDataStudio.next_action_plan
+      : [];
+    const sentimentKeywords = Array.isArray(reportNotion?.sentiment_analysis?.representative_keywords)
+      ? reportNotion.sentiment_analysis.representative_keywords
+      : [];
     const fallbackCreators = Array.isArray(campaign?.creators) ? campaign.creators : [];
     const fallbackPosts = Array.isArray(campaign?.contents) ? campaign.contents : [];
 
@@ -2605,31 +2618,25 @@ const AnalyticsReport = ({ campaign }) => {
             <div className="bg-white/5 backdrop-blur-xl p-8 rounded-[3rem] border border-white/10 shadow-2xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-96 h-96 bg-purple-600/5 blur-[100px] rounded-full"></div>
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8 relative z-10">
-                    <h3 className="font-black text-white text-2xl flex items-center gap-3 tracking-tighter uppercase">
+                    <h3 className="font-black text-white text-3xl md:text-4xl flex items-center gap-3 tracking-tight">
                         <BarChart2 size={28} className="text-purple-400" /> 캠페인 퍼포먼스 리포트
                     </h3>
                     <div className="flex flex-wrap items-center gap-2">
-                        {reportLinks?.notion ? (
-                            <a
-                                href={reportLinks.notion}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-[10px] font-black tracking-widest uppercase px-4 py-2 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 text-slate-300 transition-all flex items-center gap-2"
-                            >
-                                <ExternalLink size={14} /> Notion
-                            </a>
-                        ) : null}
-                        {reportLinks?.data_studio ? (
-                            <a
-                                href={reportLinks.data_studio}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-[10px] font-black tracking-widest uppercase px-4 py-2 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 text-slate-300 transition-all flex items-center gap-2"
-                            >
-                                <ExternalLink size={14} /> Data Studio
-                            </a>
-                        ) : null}
+                        <span className="text-[10px] font-black tracking-widest uppercase px-4 py-2 bg-white/5 border border-white/10 rounded-2xl text-cyan-300">
+                            Advanced Report Mode
+                        </span>
                     </div>
+                </div>
+
+                <div className="mb-8 rounded-[2rem] p-6 border border-fuchsia-400/20 bg-gradient-to-r from-fuchsia-500/10 via-indigo-500/10 to-cyan-500/10 relative z-10">
+                    <p className="text-[11px] uppercase tracking-[0.25em] text-fuchsia-200 font-black mb-2">Executive Highlight</p>
+                    <p className="text-white text-lg md:text-2xl font-black leading-tight">
+                        누적 <span className="text-cyan-300">{fmt(summaryViews)}</span> 조회를 기반으로, 감성·구매의향·바이럴 신호를 한 화면에 통합한
+                        <span className="text-fuchsia-300"> Full-Funnel 분석 리포트</span>입니다.
+                    </p>
+                    <p className="text-slate-300 text-sm mt-3 leading-relaxed">
+                        상위 크리에이터 성과, 댓글 정량/정성 분석, 언어권 반응, 제품별 반응 비교, 다음 실행 전략까지 모두 포함해 즉시 실행 가능한 형태로 구성했습니다.
+                    </p>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 relative z-10">
@@ -2771,7 +2778,7 @@ const AnalyticsReport = ({ campaign }) => {
                         <Trophy size={20} className="text-yellow-400"/> Best Performing Content
                     </h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                        {(reportTopPosts.slice(0, 9)).map((p, idx) => (
+                        {(reportTopPosts.slice(0, 15)).map((p, idx) => (
                             <a
                                 key={`${p?.url || idx}-${idx}`}
                                 href={p?.url || '#'}
@@ -2794,7 +2801,7 @@ const AnalyticsReport = ({ campaign }) => {
                 </div>
 
                 <div className="mt-8 border-t border-white/5 pt-8 space-y-6 relative z-10">
-                    <h4 className="text-lg font-black text-white tracking-tighter">Data Studio 스타일 상세 섹션</h4>
+                    <h4 className="text-xl font-black text-white tracking-tight">성과 분석 상세 섹션</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                         <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
                             <p className="text-[10px] text-slate-500 uppercase tracking-widest">포스팅 개수</p>
@@ -2830,7 +2837,7 @@ const AnalyticsReport = ({ campaign }) => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-white/5">
-                                {((reportDataStudio?.report_table || []).slice(0, 12)).map((r, idx) => (
+                                {((reportDataStudio?.report_table || []).slice(0, 20)).map((r, idx) => (
                                     <tr key={`tbl-${idx}`}>
                                         <td className="py-2 pr-3 text-slate-500">{r.rank || idx + 1}</td>
                                         <td className="py-2 pr-3 text-white font-semibold">{r.creator || '-'}</td>
@@ -2870,12 +2877,49 @@ const AnalyticsReport = ({ campaign }) => {
                                     <span key={`ulang-${lang}`} className="px-2 py-1 rounded-md border border-white/15 text-[10px] text-slate-300">{String(lang).toUpperCase()} {cnt}</span>
                                 ))}
                             </div>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                                {(topRegions.slice(0, 6)).map(([region, cnt]) => (
+                                    <span key={`uregion-${region}`} className="px-2 py-1 rounded-md border border-white/15 text-[10px] text-cyan-200">{String(region).toUpperCase()} {cnt}</span>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                            <h5 className="text-sm font-black text-white mb-3 uppercase tracking-widest">댓글 정량 요약</h5>
+                            <div className="space-y-2 text-xs">
+                                <div className="flex justify-between rounded-lg bg-white/[0.02] px-3 py-2"><span className="text-slate-300">총 댓글</span><span className="text-white font-black">{fmt(quantSummary.total_comments || reportSummary.total_comments)}</span></div>
+                                <div className="flex justify-between rounded-lg bg-white/[0.02] px-3 py-2"><span className="text-slate-300">댓글 좋아요</span><span className="text-cyan-300 font-black">{fmt(quantSummary.total_comment_likes || reportSummary.total_comment_likes)}</span></div>
+                                <div className="flex justify-between rounded-lg bg-white/[0.02] px-3 py-2"><span className="text-slate-300">댓글 답글</span><span className="text-fuchsia-300 font-black">{fmt(quantSummary.total_comment_replies || reportSummary.total_comment_replies)}</span></div>
+                                <div className="flex justify-between rounded-lg bg-white/[0.02] px-3 py-2"><span className="text-slate-300">구매의향</span><span className="text-emerald-300 font-black">{pct(quantSummary.purchase_intent_pct || reportSummary.purchase_intent_pct)}</span></div>
+                                <div className="flex justify-between rounded-lg bg-white/[0.02] px-3 py-2"><span className="text-slate-300">바이럴 신호</span><span className="text-purple-300 font-black">{pct(quantSummary.viral_signal_pct || reportSummary.viral_signal_pct)}</span></div>
+                            </div>
+                        </div>
+                        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                            <h5 className="text-sm font-black text-white mb-3 uppercase tracking-widest">댓글 정성 분석 요약</h5>
+                            <ul className="space-y-2 text-xs text-slate-300">
+                                {(qualitativeSummary.length > 0 ? qualitativeSummary : [
+                                    '긍정/중립 비중이 높아 전반적인 제품 수용도가 양호합니다.',
+                                    '구매처·가격 문의 비중이 존재하여 전환형 CTA를 강화할 여지가 있습니다.',
+                                ]).map((x, idx) => (
+                                    <li key={`qual-${idx}`} className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">{x}</li>
+                                ))}
+                            </ul>
+                        </div>
+                        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                            <h5 className="text-sm font-black text-white mb-3 uppercase tracking-widest">다음 액션 플랜</h5>
+                            <ul className="space-y-2 text-xs text-slate-300">
+                                {(nextActionPlan.length > 0 ? nextActionPlan : reportActions).map((x, idx) => (
+                                    <li key={`plan-${idx}`} className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">{x}</li>
+                                ))}
+                            </ul>
                         </div>
                     </div>
                 </div>
 
                 <div className="mt-8 border-t border-white/5 pt-8 space-y-6 relative z-10">
-                    <h4 className="text-lg font-black text-white tracking-tighter">Notion 스타일 심층 분석</h4>
+                    <h4 className="text-xl font-black text-white tracking-tight">심층 인사이트 섹션</h4>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
                             <h5 className="text-sm font-black text-white mb-3">감정분석</h5>
@@ -2884,6 +2928,13 @@ const AnalyticsReport = ({ campaign }) => {
                                 중립 {pct(reportNotion?.sentiment_analysis?.neutral_pct || reportSummary.neutral_pct)} ·
                                 부정 {pct(reportNotion?.sentiment_analysis?.negative_pct || reportSummary.negative_pct)}
                             </p>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                                {sentimentKeywords.slice(0, 6).map((k, idx) => (
+                                    <span key={`senti-kw-${idx}`} className="px-2 py-1 rounded-md bg-white/[0.03] border border-white/15 text-[10px] text-fuchsia-200">
+                                        {k.keyword}: {fmt(k.mentions)}
+                                    </span>
+                                ))}
+                            </div>
                         </div>
                         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
                             <h5 className="text-sm font-black text-white mb-3">제품별 반응 비교</h5>
@@ -2910,6 +2961,17 @@ const AnalyticsReport = ({ campaign }) => {
                             <h6 className="text-slate-100 font-black mb-2">바이럴 포인트 분석</h6>
                             {((reportNotion?.viral_point_analysis || []).slice(0, 5)).map((v, idx) => (
                                 <p key={`viral-${idx}`} className="text-slate-300">{v.keyword}: {fmt(v.mentions)}</p>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/10 bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-fuchsia-500/10 p-5">
+                        <h5 className="text-sm font-black text-white mb-3 uppercase tracking-widest">데이터 기반 핵심 인사이트</h5>
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                            {(dataDrivenInsights.length > 0 ? dataDrivenInsights : reportInsights).map((x, idx) => (
+                                <div key={`ddi-${idx}`} className="rounded-xl border border-white/15 bg-black/20 px-3 py-3 text-xs text-slate-200 leading-relaxed">
+                                    {x}
+                                </div>
                             ))}
                         </div>
                     </div>
