@@ -2589,6 +2589,14 @@ const AnalyticsReport = ({ campaign }) => {
       ? reportNotion.purchase_intent_signal_analysis.viral_examples
       : [];
     const strategyAssetDirection = Array.isArray(reportNotion?.strategy_asset_direction) ? reportNotion.strategy_asset_direction : [];
+    const insightStatements = dataDrivenInsights.length > 0 ? dataDrivenInsights : reportInsights;
+    const strategySummaryList = Array.isArray(reportNotion?.strategy_summary) ? reportNotion.strategy_summary : [];
+    const keyStatementClass = [
+        'from-fuchsia-500/12 via-indigo-500/10 to-cyan-500/12',
+        'from-cyan-500/12 via-blue-500/10 to-emerald-500/12',
+        'from-rose-500/12 via-fuchsia-500/10 to-indigo-500/12',
+        'from-emerald-500/12 via-cyan-500/10 to-blue-500/12',
+    ];
     const fallbackCreators = Array.isArray(campaign?.creators) ? campaign.creators : [];
     const fallbackPosts = Array.isArray(campaign?.contents) ? campaign.contents : [];
 
@@ -2911,20 +2919,26 @@ const AnalyticsReport = ({ campaign }) => {
                         </div>
                         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
                             <h5 className="text-sm font-black text-white mb-3 uppercase tracking-widest">댓글 정성 분석 요약</h5>
-                            <ul className="space-y-2 text-xs text-slate-300">
+                            <ul className="space-y-3 text-xs text-slate-300">
                                 {(qualitativeSummary.length > 0 ? qualitativeSummary : [
                                     '긍정/중립 비중이 높아 전반적인 제품 수용도가 양호합니다.',
                                     '구매처·가격 문의 비중이 존재하여 전환형 CTA를 강화할 여지가 있습니다.',
                                 ]).map((x, idx) => (
-                                    <li key={`qual-${idx}`} className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">{x}</li>
+                                    <li key={`qual-${idx}`} className={`rounded-xl border border-white/15 bg-gradient-to-r ${keyStatementClass[idx % keyStatementClass.length]} px-4 py-3`}>
+                                        <p className="text-[10px] uppercase tracking-[0.22em] font-black text-white/70 mb-1">Key Message {idx + 1}</p>
+                                        <p className="text-sm leading-relaxed text-white font-semibold">{x}</p>
+                                    </li>
                                 ))}
                             </ul>
                         </div>
                         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
                             <h5 className="text-sm font-black text-white mb-3 uppercase tracking-widest">다음 액션 플랜</h5>
-                            <ul className="space-y-2 text-xs text-slate-300">
+                            <ul className="space-y-2.5 text-xs text-slate-300">
                                 {(nextActionPlan.length > 0 ? nextActionPlan : reportActions).map((x, idx) => (
-                                    <li key={`plan-${idx}`} className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">{x}</li>
+                                    <li key={`plan-${idx}`} className="rounded-xl border border-cyan-300/20 bg-cyan-500/5 px-3.5 py-3 flex items-start gap-2.5">
+                                        <span className="mt-0.5 w-5 h-5 rounded-full bg-cyan-300/20 border border-cyan-300/30 text-cyan-100 text-[10px] font-black flex items-center justify-center shrink-0">{idx + 1}</span>
+                                        <span className="text-sm leading-relaxed text-slate-100 font-semibold">{x}</span>
+                                    </li>
                                 ))}
                             </ul>
                         </div>
@@ -3049,21 +3063,35 @@ const AnalyticsReport = ({ campaign }) => {
 
                     <div className="rounded-2xl border border-white/10 bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-fuchsia-500/10 p-5">
                         <h5 className="text-sm font-black text-white mb-3 uppercase tracking-widest">데이터 기반 핵심 인사이트</h5>
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-                            {(dataDrivenInsights.length > 0 ? dataDrivenInsights : reportInsights).map((x, idx) => (
-                                <div key={`ddi-${idx}`} className="rounded-xl border border-white/15 bg-black/20 px-3 py-3 text-xs text-slate-200 leading-relaxed">
-                                    {x}
+                        <div className="space-y-3">
+                            {insightStatements.length > 0 ? (
+                                <div className="rounded-xl border border-fuchsia-300/25 bg-black/30 px-4 py-4">
+                                    <p className="text-[10px] uppercase tracking-[0.2em] text-fuchsia-200 font-black mb-1">Most Critical Insight</p>
+                                    <p className="text-base md:text-lg leading-snug text-white font-black">{insightStatements[0]}</p>
                                 </div>
-                            ))}
+                            ) : null}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                                {insightStatements.slice(1).map((x, idx) => (
+                                    <div key={`ddi-${idx}`} className={`rounded-xl border border-white/15 bg-gradient-to-r ${keyStatementClass[idx % keyStatementClass.length]} px-4 py-3`}>
+                                        <p className="text-[10px] uppercase tracking-[0.2em] text-white/70 font-black mb-1">Insight {idx + 2}</p>
+                                        <p className="text-sm text-white leading-relaxed font-semibold">{x}</p>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
                             <h5 className="text-sm font-black text-white mb-3">콘텐츠 포맷별 반응 힌트</h5>
-                            <ul className="space-y-2 text-xs text-slate-300">
-                                {(reportNotion?.content_format_hints || []).map((x, idx) => <li key={`fmt-${idx}`}>- {x}</li>)}
-                            </ul>
+                            <div className="grid grid-cols-1 gap-2.5">
+                                {(reportNotion?.content_format_hints || []).map((x, idx) => (
+                                    <div key={`fmt-${idx}`} className="rounded-lg border border-white/15 bg-gradient-to-r from-purple-500/10 to-cyan-500/10 px-3 py-2.5">
+                                        <p className="text-[10px] uppercase tracking-[0.18em] text-cyan-200 font-black mb-1">Format Hint {idx + 1}</p>
+                                        <p className="text-sm text-white leading-relaxed font-semibold">{x}</p>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
                             <h5 className="text-sm font-black text-white mb-3">개선 및 보완 포인트</h5>
@@ -3088,15 +3116,25 @@ const AnalyticsReport = ({ campaign }) => {
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
                             <h5 className="text-sm font-black text-white mb-3">모집 전략 추천</h5>
-                            <ul className="space-y-2 text-xs text-slate-300">
-                                {(reportNotion?.recruitment_strategy || []).map((x, idx) => <li key={`rec-${idx}`}>- {x}</li>)}
-                            </ul>
+                            <div className="space-y-2.5">
+                                {(reportNotion?.recruitment_strategy || []).map((x, idx) => (
+                                    <div key={`rec-${idx}`} className="rounded-lg border border-cyan-300/25 bg-cyan-500/5 px-3 py-2.5">
+                                        <p className="text-[10px] uppercase tracking-[0.18em] text-cyan-200 font-black mb-1">Priority {idx + 1}</p>
+                                        <p className="text-sm text-white font-semibold leading-relaxed">{x}</p>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
                             <h5 className="text-sm font-black text-white mb-3">전략 요약</h5>
-                            <ul className="space-y-2 text-xs text-slate-300">
-                                {(reportNotion?.strategy_summary || []).map((x, idx) => <li key={`sum-${idx}`}>- {x}</li>)}
-                            </ul>
+                            <div className="space-y-2.5">
+                                {strategySummaryList.map((x, idx) => (
+                                    <div key={`sum-${idx}`} className={`rounded-lg border border-white/15 bg-gradient-to-r ${keyStatementClass[idx % keyStatementClass.length]} px-3 py-2.5`}>
+                                        <p className="text-[10px] uppercase tracking-[0.18em] text-white/70 font-black mb-1">Summary {idx + 1}</p>
+                                        <p className="text-sm text-white font-semibold leading-relaxed">{x}</p>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
 
