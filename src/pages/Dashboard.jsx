@@ -2545,75 +2545,183 @@ const CandidateList = ({
 
 // --- Detail Component: Analytics (완료된 캠페인) ---
 const AnalyticsReport = ({ campaign }) => {
+    const fd = campaign?.setup_submission_summary?.form_data || {};
+    const reportSummary = fd?.report_summary || {};
+    const reportTopCreators = Array.isArray(fd?.report_top_creators) ? fd.report_top_creators : [];
+    const reportTopPosts = Array.isArray(fd?.report_top_posts) ? fd.report_top_posts : [];
+    const reportLinks = fd?.report_links || {};
+
+    const fmt = (n) => Number(n || 0).toLocaleString();
+    const pct = (n) => `${Number(n || 0).toFixed(2)}%`;
+    const analytics = campaign?.analytics || {};
+    const dailyViews = Array.isArray(analytics?.daily_views) ? analytics.daily_views : [];
+    const dates = Array.isArray(analytics?.dates) ? analytics.dates : [];
+    const maxDaily = Math.max(1, ...dailyViews);
+    const topLang = Array.isArray(reportSummary?.top_languages) ? reportSummary.top_languages : [];
+
     return (
         <div className="space-y-10 animate-fade-in-up">
             <div className="bg-white/5 backdrop-blur-xl p-8 rounded-[3rem] border border-white/10 shadow-2xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-96 h-96 bg-purple-600/5 blur-[100px] rounded-full"></div>
-                <div className="flex justify-between items-center mb-10 relative z-10">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8 relative z-10">
                     <h3 className="font-black text-white text-2xl flex items-center gap-3 tracking-tighter uppercase">
                         <BarChart2 size={28} className="text-purple-400" /> 캠페인 퍼포먼스 리포트
                     </h3>
-                    <button className="text-[10px] font-black tracking-widest uppercase px-5 py-2.5 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 text-slate-300 transition-all flex items-center gap-2">
-                        <ExternalLink size={16}/> Download PDF
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2">
+                        {reportLinks?.notion ? (
+                            <a
+                                href={reportLinks.notion}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[10px] font-black tracking-widest uppercase px-4 py-2 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 text-slate-300 transition-all flex items-center gap-2"
+                            >
+                                <ExternalLink size={14} /> Notion
+                            </a>
+                        ) : null}
+                        {reportLinks?.data_studio ? (
+                            <a
+                                href={reportLinks.data_studio}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[10px] font-black tracking-widest uppercase px-4 py-2 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 text-slate-300 transition-all flex items-center gap-2"
+                            >
+                                <ExternalLink size={14} /> Data Studio
+                            </a>
+                        ) : null}
+                    </div>
                 </div>
 
-                <div className="bg-black/20 rounded-[2rem] border border-white/5 p-10 mb-10 relative z-10">
-                    <div className="flex h-72 relative items-end pb-12 pl-12 gap-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 relative z-10">
+                    <div className="p-5 bg-blue-500/5 rounded-2xl border border-blue-500/20">
+                        <p className="text-[10px] text-blue-300 font-black tracking-widest uppercase">Posts</p>
+                        <p className="text-2xl font-black text-white mt-1">{fmt(reportSummary.posts || campaign.content_count || 0)}</p>
+                    </div>
+                    <div className="p-5 bg-purple-500/5 rounded-2xl border border-purple-500/20">
+                        <p className="text-[10px] text-purple-300 font-black tracking-widest uppercase">Views</p>
+                        <p className="text-2xl font-black text-white mt-1">{campaign.kpi_views || fmt(reportSummary.views)}</p>
+                    </div>
+                    <div className="p-5 bg-rose-500/5 rounded-2xl border border-rose-500/20">
+                        <p className="text-[10px] text-rose-300 font-black tracking-widest uppercase">Likes</p>
+                        <p className="text-2xl font-black text-white mt-1">{campaign.kpi_likes || fmt(reportSummary.likes)}</p>
+                    </div>
+                    <div className="p-5 bg-emerald-500/5 rounded-2xl border border-emerald-500/20">
+                        <p className="text-[10px] text-emerald-300 font-black tracking-widest uppercase">Engagement</p>
+                        <p className="text-2xl font-black text-white mt-1">{analytics?.engagement_rate || pct(reportSummary.engagement_rate)}</p>
+                    </div>
+                </div>
+
+                <div className="bg-black/20 rounded-[2rem] border border-white/5 p-8 mb-8 relative z-10">
+                    <p className="text-xs font-black tracking-widest text-slate-400 uppercase mb-5">Daily View Trend</p>
+                    <div className="flex h-64 relative items-end pb-12 pl-10 gap-4">
                         <div className="absolute top-0 left-0 h-full flex flex-col justify-between text-[10px] text-slate-600 font-black uppercase tracking-[0.2em] pb-12">
-                            <span>300K</span>
-                            <span>200K</span>
-                            <span>100K</span>
+                            <span>{fmt(maxDaily)}K</span>
+                            <span>{fmt(Math.round(maxDaily * 0.66))}K</span>
+                            <span>{fmt(Math.round(maxDaily * 0.33))}K</span>
                             <span>0</span>
                         </div>
-                        
-                        {campaign.analytics?.daily_views.map((views, idx) => (
-                            <div key={idx} className="flex-1 flex flex-col justify-end group relative h-full">
-                                <div 
+                        {dailyViews.map((views, idx) => (
+                            <div key={`${dates[idx] || idx}`} className="flex-1 flex flex-col justify-end group relative h-full">
+                                <div
                                     className="w-full bg-gradient-to-t from-purple-600/40 to-cyan-400/80 hover:to-white transition-all duration-500 rounded-t-xl relative shadow-[0_0_20px_rgba(168,85,247,0.2)]"
-                                    style={{ height: `${(views / 300) * 100}%` }}
+                                    style={{ height: `${Math.max(6, (Number(views || 0) / maxDaily) * 100)}%` }}
                                 >
-                                    <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-white text-[#020617] text-[10px] font-black px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all whitespace-nowrap z-20 shadow-2xl">
-                                        {views}K VIEWS
+                                    <div className="absolute -top-9 left-1/2 -translate-x-1/2 bg-white text-[#020617] text-[10px] font-black px-2.5 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-all whitespace-nowrap z-20 shadow-2xl">
+                                        {fmt(views)}K
                                     </div>
                                 </div>
                                 <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[10px] font-black text-slate-500 tracking-tighter whitespace-nowrap uppercase">
-                                    {campaign.analytics?.dates[idx]}
+                                    {dates[idx]}
                                 </div>
                             </div>
                         ))}
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative z-10">
-                    <div className="p-8 bg-purple-500/5 rounded-3xl border border-purple-500/10 group hover:border-purple-500/30 transition-all">
-                        <p className="text-[10px] text-purple-400 font-black uppercase tracking-[0.3em] mb-3">총 도달 (TOTAL REACH)</p>
-                        <p className="text-4xl font-black text-white tracking-tighter">{campaign.kpi_views}</p>
-                        <p className="text-[10px] text-emerald-400 font-bold mt-3 tracking-tight">▲ 예상 대비 145% 초과 달성</p>
-                    </div>
-                    <div className="p-8 bg-emerald-500/5 rounded-3xl border border-emerald-500/10 group hover:border-emerald-500/30 transition-all">
-                        <p className="text-[10px] text-emerald-400 font-black uppercase tracking-[0.3em] mb-3">참여율 (ENGAGEMENT)</p>
-                        <p className="text-4xl font-black text-white tracking-tighter">{campaign.analytics?.engagement_rate}</p>
-                        <p className="text-[10px] text-slate-500 font-medium mt-3 tracking-tight">글로벌 뷰티 평균(3.5%) 대비 우수</p>
-                    </div>
-                    <div className="col-span-1 md:col-span-3 mt-10 border-t border-white/5 pt-10">
-                        <h4 className="text-lg font-black text-white mb-8 flex items-center gap-3 tracking-tighter">
-                            <Trophy size={22} className="text-yellow-400 animate-bounce"/> Best Performing Content
-                        </h4>
-                        <div className="grid grid-cols-3 gap-8">
-                            {campaign.analytics?.top_contents.map((content) => (
-                                <div key={content.id} className="relative aspect-[9/16] rounded-[2rem] overflow-hidden group cursor-pointer border border-white/10 shadow-2xl transition-transform hover:scale-[1.03]">
-                                    <img src={content.thumbnail} alt="Top Content" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
-                                    <div className="absolute top-4 left-4 bg-yellow-400 text-slate-900 text-[10px] font-black px-4 py-1.5 rounded-full shadow-2xl tracking-[0.2em]">
-                                        TOP {content.id}
-                                    </div>
-                                    <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black via-black/40 to-transparent p-6">
-                                        <p className="text-white text-lg font-black mb-1 tracking-tight">{content.creator}</p>
-                                        <p className="text-cyan-400 text-xs font-bold flex items-center gap-2 uppercase tracking-widest italic"><Eye size={14}/> {content.views}</p>
-                                    </div>
-                                </div>
-                            ))}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 relative z-10">
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+                        <h4 className="text-sm font-black uppercase tracking-widest text-slate-200 mb-5">Comment Sentiment</h4>
+                        <div className="space-y-4">
+                            <div>
+                                <div className="flex justify-between text-xs mb-1"><span className="text-emerald-300 font-bold">긍정</span><span className="text-slate-300">{pct(reportSummary.positive_pct)}</span></div>
+                                <div className="h-2 rounded-full bg-white/10 overflow-hidden"><div className="h-full bg-emerald-400" style={{ width: `${Math.min(100, Number(reportSummary.positive_pct || 0))}%` }} /></div>
+                            </div>
+                            <div>
+                                <div className="flex justify-between text-xs mb-1"><span className="text-sky-300 font-bold">중립</span><span className="text-slate-300">{pct(reportSummary.neutral_pct)}</span></div>
+                                <div className="h-2 rounded-full bg-white/10 overflow-hidden"><div className="h-full bg-sky-400" style={{ width: `${Math.min(100, Number(reportSummary.neutral_pct || 0))}%` }} /></div>
+                            </div>
+                            <div>
+                                <div className="flex justify-between text-xs mb-1"><span className="text-rose-300 font-bold">부정</span><span className="text-slate-300">{pct(reportSummary.negative_pct)}</span></div>
+                                <div className="h-2 rounded-full bg-white/10 overflow-hidden"><div className="h-full bg-rose-400" style={{ width: `${Math.min(100, Number(reportSummary.negative_pct || 0))}%` }} /></div>
+                            </div>
                         </div>
+                        <div className="mt-6 grid grid-cols-2 gap-4 text-xs">
+                            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+                                <p className="text-slate-500 uppercase tracking-widest">구매의도</p>
+                                <p className="text-white font-black mt-1">{pct(reportSummary.purchase_intent_pct)}</p>
+                            </div>
+                            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+                                <p className="text-slate-500 uppercase tracking-widest">바이럴 신호</p>
+                                <p className="text-white font-black mt-1">{pct(reportSummary.viral_signal_pct)}</p>
+                            </div>
+                        </div>
+                        {topLang.length > 0 ? (
+                            <div className="mt-5 flex flex-wrap gap-2">
+                                {topLang.map(([lang, cnt]) => (
+                                    <span key={lang} className="px-2.5 py-1 rounded-full text-[10px] font-bold border border-white/20 text-slate-300 bg-white/5">
+                                        {String(lang).toUpperCase()} · {cnt}
+                                    </span>
+                                ))}
+                            </div>
+                        ) : null}
+                    </div>
+
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+                        <h4 className="text-sm font-black uppercase tracking-widest text-slate-200 mb-5">Top 10 Creators</h4>
+                        <div className="space-y-2">
+                            {(reportTopCreators.slice(0, 10)).map((c, idx) => {
+                                const v = Number(c?.views || 0);
+                                const l = Number(c?.likes || 0);
+                                const cm = Number(c?.comments || 0);
+                                const sh = Number(c?.shares || 0);
+                                const er = v > 0 ? (((l + cm + sh) / v) * 100).toFixed(2) : '0.00';
+                                return (
+                                    <div key={`${c?.name || idx}-${idx}`} className="grid grid-cols-12 gap-2 items-center rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2.5 text-xs">
+                                        <div className="col-span-1 text-slate-500 font-black">{idx + 1}</div>
+                                        <div className="col-span-5 text-white font-bold truncate">{c?.name || '-'}</div>
+                                        <div className="col-span-2 text-cyan-300 font-bold">{fmt(v)}</div>
+                                        <div className="col-span-2 text-slate-400">{c?.platform || '-'}</div>
+                                        <div className="col-span-2 text-emerald-300 font-bold">{er}%</div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="col-span-1 md:col-span-3 mt-8 border-t border-white/5 pt-8 relative z-10">
+                    <h4 className="text-lg font-black text-white mb-6 flex items-center gap-3 tracking-tighter">
+                        <Trophy size={20} className="text-yellow-400"/> Best Performing Content
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                        {(reportTopPosts.slice(0, 9)).map((p, idx) => (
+                            <a
+                                key={`${p?.url || idx}-${idx}`}
+                                href={p?.url || '#'}
+                                target={p?.url ? '_blank' : undefined}
+                                rel={p?.url ? 'noreferrer' : undefined}
+                                className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 hover:bg-white/[0.06] transition-colors"
+                            >
+                                <p className="text-[10px] font-black text-yellow-300 tracking-widest mb-2">TOP {idx + 1}</p>
+                                <p className="text-white font-bold text-sm truncate">{p?.name || '-'}</p>
+                                <p className="text-slate-400 text-xs mt-1">{p?.platform || '-'}</p>
+                                <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
+                                    <div className="rounded-lg bg-white/5 px-2 py-1"><span className="text-slate-500">Views</span><p className="text-cyan-300 font-bold">{fmt(p?.views)}</p></div>
+                                    <div className="rounded-lg bg-white/5 px-2 py-1"><span className="text-slate-500">Likes</span><p className="text-rose-300 font-bold">{fmt(p?.likes)}</p></div>
+                                    <div className="rounded-lg bg-white/5 px-2 py-1"><span className="text-slate-500">Comments</span><p className="text-emerald-300 font-bold">{fmt(p?.comments)}</p></div>
+                                    <div className="rounded-lg bg-white/5 px-2 py-1"><span className="text-slate-500">Shares</span><p className="text-purple-300 font-bold">{fmt(p?.shares)}</p></div>
+                                </div>
+                            </a>
+                        ))}
                     </div>
                 </div>
             </div>
