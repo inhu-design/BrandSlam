@@ -5634,10 +5634,53 @@ async function enrichNonAdminDashboardCampaigns(rows, user) {
       : { ...c, setup_submission_summary: setupByCampaignId[c.id] || null },
   );
 
+  const buildAnalyticsFromSetupSummary = (campaign) => {
+    const fd = campaign?.setup_submission_summary?.form_data || {};
+    const reportSummary = fd?.report_summary || null;
+    const reportTopPosts = Array.isArray(fd?.report_top_posts) ? fd.report_top_posts : [];
+    if (!reportSummary && reportTopPosts.length === 0) return null;
+
+    const byDay = new Map();
+    for (const p of reportTopPosts) {
+      const day = String(p?.upload_day || '').trim();
+      const viewsNum = Number(String(p?.views || '').replace(/[^0-9]/g, '')) || 0;
+      if (!day) continue;
+      byDay.set(day, (byDay.get(day) || 0) + viewsNum);
+    }
+    const dateKeys = [...byDay.keys()].sort().slice(-7);
+    const daily_views = dateKeys.length > 0
+      ? dateKeys.map((d) => Math.max(1, Math.round((byDay.get(d) || 0) / 1000)))
+      : [20, 35, 48, 62, 55, 44, 37];
+    const dates = dateKeys.length > 0
+      ? dateKeys.map((d) => {
+          const parts = d.split('/');
+          if (parts.length === 3) return `${parts[1]}/${parts[2]}`;
+          return d;
+        })
+      : ['W1', 'W2', 'W3', 'W4', 'W5', 'W6', 'W7'];
+
+    const top_contents = reportTopPosts.slice(0, 3).map((p, idx) => ({
+      id: idx + 1,
+      creator: `${p?.name || 'Creator'}${p?.platform ? ` (${p.platform})` : ''}`,
+      views: `${Number(String(p?.views || '0').replace(/[^0-9]/g, '') || 0).toLocaleString()} views`,
+      thumbnail:
+        (typeof p?.thumbnail_url === 'string' && p.thumbnail_url.trim())
+        || `https://dummyimage.com/540x960/0f172a/ffffff&text=KOCOSTAR+TOP+${idx + 1}`,
+    }));
+
+    return {
+      daily_views,
+      dates,
+      engagement_rate: `${Number(reportSummary?.engagement_rate || 0).toFixed(2)}%`,
+      top_contents,
+    };
+  };
+
   return campaignList.map((c) => ({
     ...c,
     creators: Array.isArray(c.creators) ? c.creators : [],
     contents: Array.isArray(c.contents) ? c.contents : [],
+    analytics: c.analytics || buildAnalyticsFromSetupSummary(c),
   }));
 }
 
