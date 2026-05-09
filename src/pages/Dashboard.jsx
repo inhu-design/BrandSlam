@@ -2576,6 +2576,19 @@ const AnalyticsReport = ({ campaign }) => {
     const sentimentKeywords = Array.isArray(reportNotion?.sentiment_analysis?.representative_keywords)
       ? reportNotion.sentiment_analysis.representative_keywords
       : [];
+    const topicMatrix = Array.isArray(reportDataStudio?.comment_topic_matrix) ? reportDataStudio.comment_topic_matrix : [];
+    const userPersonas = Array.isArray(reportDataStudio?.user_personas) ? reportDataStudio.user_personas : [];
+    const langMarketMatrix = Array.isArray(reportNotion?.language_market_matrix) ? reportNotion.language_market_matrix : [];
+    const highIntentExamples = Array.isArray(reportNotion?.purchase_intent_signal_analysis?.high_intent_examples)
+      ? reportNotion.purchase_intent_signal_analysis.high_intent_examples
+      : [];
+    const midIntentExamples = Array.isArray(reportNotion?.purchase_intent_signal_analysis?.mid_intent_examples)
+      ? reportNotion.purchase_intent_signal_analysis.mid_intent_examples
+      : [];
+    const viralExamples = Array.isArray(reportNotion?.purchase_intent_signal_analysis?.viral_examples)
+      ? reportNotion.purchase_intent_signal_analysis.viral_examples
+      : [];
+    const strategyAssetDirection = Array.isArray(reportNotion?.strategy_asset_direction) ? reportNotion.strategy_asset_direction : [];
     const fallbackCreators = Array.isArray(campaign?.creators) ? campaign.creators : [];
     const fallbackPosts = Array.isArray(campaign?.contents) ? campaign.contents : [];
 
@@ -2916,6 +2929,26 @@ const AnalyticsReport = ({ campaign }) => {
                             </ul>
                         </div>
                     </div>
+
+                    <div className="rounded-2xl border border-fuchsia-400/20 bg-gradient-to-r from-fuchsia-500/10 via-indigo-500/10 to-cyan-500/10 p-5">
+                        <h5 className="text-base font-black text-white mb-3 tracking-tight">댓글 데이터 정량/정성 분석 매트릭스</h5>
+                        <div className="space-y-3">
+                            {topicMatrix.map((row, idx) => (
+                                <div key={`topic-matrix-${idx}`} className="rounded-xl border border-white/15 bg-black/25 p-4">
+                                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                                        <span className="text-sm font-black text-cyan-200">{row.topic}</span>
+                                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-fuchsia-500/20 border border-fuchsia-300/30 text-fuchsia-100 font-black">{row.intensity}</span>
+                                    </div>
+                                    <p className="text-[11px] text-slate-200 leading-relaxed"><span className="font-black text-white">인사이트:</span> {row.insight}</p>
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                        {(row.evidence || []).map((e, eIdx) => (
+                                            <span key={`topic-evi-${idx}-${eIdx}`} className="text-[10px] px-2 py-1 rounded-md bg-white/[0.06] border border-white/20 text-slate-200">{e}</span>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
 
                 <div className="mt-8 border-t border-white/5 pt-8 space-y-6 relative z-10">
@@ -2956,14 +2989,63 @@ const AnalyticsReport = ({ campaign }) => {
                             <h6 className="text-slate-100 font-black mb-2">구매 의향 신호 분석</h6>
                             <p className="text-slate-300">구매의향 비율: {pct(reportNotion?.purchase_intent_signal_analysis?.purchase_intent_pct || reportSummary.purchase_intent_pct)}</p>
                             <p className="text-slate-500 mt-2">{reportNotion?.purchase_intent_signal_analysis?.prompt || '구매처/가격/링크 질문 비중'}</p>
+                            {highIntentExamples.length > 0 ? (
+                                <div className="mt-3">
+                                    <p className="text-[10px] text-emerald-300 font-black uppercase tracking-widest mb-1">High Intent</p>
+                                    {highIntentExamples.slice(0, 4).map((t, idx) => <p key={`hi-${idx}`} className="text-slate-200">- {t}</p>)}
+                                </div>
+                            ) : null}
+                            {midIntentExamples.length > 0 ? (
+                                <div className="mt-3">
+                                    <p className="text-[10px] text-cyan-300 font-black uppercase tracking-widest mb-1">Mid Intent</p>
+                                    {midIntentExamples.slice(0, 4).map((t, idx) => <p key={`mi-${idx}`} className="text-slate-200">- {t}</p>)}
+                                </div>
+                            ) : null}
+                            {viralExamples.length > 0 ? (
+                                <div className="mt-3">
+                                    <p className="text-[10px] text-fuchsia-300 font-black uppercase tracking-widest mb-1">Viral Signal</p>
+                                    {viralExamples.slice(0, 4).map((t, idx) => <p key={`vi-${idx}`} className="text-slate-200">- {t}</p>)}
+                                </div>
+                            ) : null}
                         </div>
                         <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
                             <h6 className="text-slate-100 font-black mb-2">바이럴 포인트 분석</h6>
                             {((reportNotion?.viral_point_analysis || []).slice(0, 5)).map((v, idx) => (
-                                <p key={`viral-${idx}`} className="text-slate-300">{v.keyword}: {fmt(v.mentions)}</p>
+                                <div key={`viral-${idx}`} className="mb-1.5 rounded-lg bg-white/[0.03] border border-white/10 px-2 py-1.5">
+                                    <p className="text-slate-200 font-semibold">
+                                        {v?.rank ? `${v.rank}위` : `TOP ${idx + 1}`} · {v?.trigger || v?.keyword || '-'}
+                                    </p>
+                                    <p className="text-slate-400 text-[11px]">{v?.evidence || (v?.mentions ? `언급 ${fmt(v.mentions)}회` : '')}</p>
+                                </div>
                             ))}
                         </div>
                     </div>
+
+                    {langMarketMatrix.length > 0 ? (
+                        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 overflow-x-auto">
+                            <h5 className="text-sm font-black text-white mb-3 uppercase tracking-widest">언어별 시장 가능성 매트릭스</h5>
+                            <table className="w-full min-w-[700px] text-xs">
+                                <thead className="text-slate-400 border-b border-white/10">
+                                    <tr>
+                                        <th className="py-2 pr-3 text-left">언어권</th>
+                                        <th className="py-2 pr-3 text-left">비율</th>
+                                        <th className="py-2 pr-3 text-left">주요 반응</th>
+                                        <th className="py-2 pr-3 text-left">시장 가능성</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-white/5">
+                                    {langMarketMatrix.map((row, idx) => (
+                                        <tr key={`lang-matrix-${idx}`}>
+                                            <td className="py-2 pr-3 text-white font-semibold">{row.language}</td>
+                                            <td className="py-2 pr-3 text-cyan-300 font-black">{row.ratio}</td>
+                                            <td className="py-2 pr-3 text-slate-300">{row.reaction}</td>
+                                            <td className="py-2 pr-3 text-fuchsia-200">{row.market_potential}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : null}
 
                     <div className="rounded-2xl border border-white/10 bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-fuchsia-500/10 p-5">
                         <h5 className="text-sm font-black text-white mb-3 uppercase tracking-widest">데이터 기반 핵심 인사이트</h5>
@@ -2986,7 +3068,19 @@ const AnalyticsReport = ({ campaign }) => {
                         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
                             <h5 className="text-sm font-black text-white mb-3">개선 및 보완 포인트</h5>
                             <ul className="space-y-2 text-xs text-slate-300">
-                                {(reportNotion?.improvements_and_complements || []).map((x, idx) => <li key={`imp-${idx}`}>- {x}</li>)}
+                                {(reportNotion?.improvements_and_complements || []).map((x, idx) => (
+                                    <li key={`imp-${idx}`} className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
+                                        {typeof x === 'string'
+                                            ? `- ${x}`
+                                            : (
+                                                <div className="space-y-1">
+                                                    <p className="text-white font-semibold">{x.problem || '이슈'}</p>
+                                                    <p className="text-slate-400">근거: {x.evidence || '-'}</p>
+                                                    <p className="text-cyan-200">액션: {x.action || '-'}</p>
+                                                </div>
+                                            )}
+                                    </li>
+                                ))}
                             </ul>
                         </div>
                     </div>
@@ -3005,6 +3099,39 @@ const AnalyticsReport = ({ campaign }) => {
                             </ul>
                         </div>
                     </div>
+
+                    {userPersonas.length > 0 ? (
+                        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                            <h5 className="text-sm font-black text-white mb-3 uppercase tracking-widest">댓글 유저 핵심 특성 3가지</h5>
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                                {userPersonas.map((p, idx) => (
+                                    <div key={`persona-${idx}`} className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+                                        <p className="text-white font-black text-sm leading-snug mb-2">{p.title}</p>
+                                        <div className="flex flex-wrap gap-1 mb-2">
+                                            {(p.traits || []).map((t, tIdx) => (
+                                                <span key={`pt-${idx}-${tIdx}`} className="text-[10px] px-2 py-1 rounded-md border border-white/15 text-cyan-200">{t}</span>
+                                            ))}
+                                        </div>
+                                        <p className="text-xs text-slate-300 leading-relaxed">{p.analysis}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ) : null}
+
+                    {strategyAssetDirection.length > 0 ? (
+                        <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/5 p-5">
+                            <h5 className="text-sm font-black text-white mb-3 uppercase tracking-widest">핵심 자산별 실행 방향</h5>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                {strategyAssetDirection.map((row, idx) => (
+                                    <div key={`asset-dir-${idx}`} className="rounded-xl border border-emerald-300/20 bg-black/20 p-3">
+                                        <p className="text-emerald-300 text-[11px] font-black uppercase tracking-wider">{row.asset}</p>
+                                        <p className="text-slate-200 text-xs mt-2 leading-relaxed">{row.direction}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ) : null}
                 </div>
             </div>
         </div>

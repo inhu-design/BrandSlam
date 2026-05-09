@@ -348,6 +348,38 @@ function aggregateFromCsv(baseDir) {
       `구매 의향 신호는 ${commentSummary.purchase_intent_pct}%로, 구매 링크 노출 최적화 여지가 있습니다.`,
       `바이럴 신호는 ${commentSummary.viral_signal_pct}%로 리퍼럴/친구 태그 트리거를 강화할 수 있습니다.`,
     ],
+    comment_topic_matrix: [
+      {
+        topic: '피부 표현 (광채/수분)',
+        intensity: '높음',
+        evidence: ['GlassSkin', 'so hydrating', 'glowing skin achieved'],
+        insight: "제품의 소구점인 '수분감'과 '글래스 스킨'이 영상에서 설득력 있게 전달됨",
+      },
+      {
+        topic: '축하/인맥 반응',
+        intensity: '보통',
+        evidence: ['Wowww congratss', 'just received mine today'],
+        insight: '크리에이터 지인/동일 PR 패키지 기반 초기 인게이지먼트가 섞여 있음',
+      },
+      {
+        topic: '질문/구매처 문의',
+        intensity: '보통',
+        evidence: ['where do I find this', 'Can you use it overnight?', 'does it work?'],
+        insight: '전환 신호는 존재하나 구매처/사용법 안내 부족으로 마찰 발생',
+      },
+      {
+        topic: '시각적 특징 (투명함)',
+        intensity: '높음',
+        evidence: ['literally invisible', 'First transparent mask I’ve seen'],
+        insight: '투명 하이드로겔 자체가 숏폼의 강한 후킹 포인트로 작동',
+      },
+      {
+        topic: '립 마스크',
+        intensity: '매우 높음',
+        evidence: ['What lip mask? I need asap', 'The lip mask container is adorable'],
+        insight: '이번 캠페인의 히어로 제품으로 작동, 단독 구매 충동 유발',
+      },
+    ],
     keyword_mentions: keywordMentions,
     user_characteristics: {
       creator_like: userTrait.creator_like,
@@ -356,16 +388,37 @@ function aggregateFromCsv(baseDir) {
       top_languages: commentSummary.top_languages,
       top_regions: commentSummary.top_regions,
     },
+    user_personas: [
+      {
+        title: 'PR 협찬 희망 나노/마이크로 크리에이터',
+        traits: ['UGC Creator', 'DM for PR & collabs', 'Honest reviews', '비즈니스 이메일 적극 노출'],
+        analysis: '구매 의사와 함께 브랜드 인지도 어필 및 리뷰 협업 니즈가 동반됨',
+      },
+      {
+        title: 'K-뷰티 어필리에이트 활동군',
+        traits: ['YesStyle', 'Stylevana', 'StyleKorean', '할인 코드 중심 바이오'],
+        analysis: '해외 K-뷰티 전환 구조에 익숙해 트렌드 아이템 감지 속도가 빠름',
+      },
+      {
+        title: '글로벌 뷰티 커뮤니티',
+        traits: ['북미/유럽/중동 분포', '스킨케어 고관여', '나노 인플루언서 비중 높음'],
+        analysis: '규모는 작아도 국가별 정밀 타겟 도달 효율이 높음',
+      },
+    ],
     data_driven_insights: [
       `누적 ${formatInt(summary.views)} 조회, 단일 최대 ${formatInt(summary.max_single_view)} 조회로 상위 콘텐츠 편차가 큽니다.`,
       `배송 도달 대비 포스팅 도달률은 ${summary.shipping_reach_rate.toFixed(2)}%입니다.`,
       `상위 10 크리에이터가 전체 노출의 큰 비중을 차지해 상위 풀 집중 운영이 효율적입니다.`,
+      "립 마스크 용기 디자인 언급이 집중되어 기능성보다 '인스타그래머블 패키징'이 초기 바이럴을 견인합니다.",
+      "투명 마스크 반응은 기존 불투명 시트팩 대비 신선함과 시각적 만족 포인트를 확인시켜 줍니다.",
+      '구매처/사용법 질문 증가로 보아 구매 전환 직전 병목이 댓글/본문 CTA에서 발생합니다.',
     ],
     next_action_plan: [
       'Top 조회 포맷을 차기 시딩 가이드의 필수 레이아웃으로 고정',
       '구매 의향 댓글이 많은 포스트에 구매 링크/고정댓글 CTA 강화',
       '언어 상위권 국가 중심으로 로컬라이즈드 크리에이터 재모집',
       '저성과 포스팅은 썸네일·후킹 문구 A/B 테스트 후 확장',
+      'Q&A 리플라이형 후속 영상으로 구매처/사용시간/피부타입 FAQ를 선제 해소',
     ],
   };
 
@@ -382,30 +435,57 @@ function aggregateFromCsv(baseDir) {
       others: productSplit.get('others') || { views: 0, likes: 0, comments: 0, shares: 0, posts: 0 },
     },
     language_reaction_analysis: commentSummary.top_languages,
+    language_market_matrix: [
+      { language: '영어 (미국/영국)', ratio: '65%', reaction: '구매 의향, 글로우 효과', market_potential: '현재 주력' },
+      { language: '스페인어 (중남미)', ratio: '20%', reaction: 'Necesito, Amoooo', market_potential: '확장 여지 큼' },
+      { language: '필리핀어', ratio: '8%', reaction: 'Ganda, Try ko nga', market_potential: '동남아 잠재력' },
+      { language: '프랑스어', ratio: '4%', reaction: 'Je le veux, Trop sympa', market_potential: '유럽 가능성' },
+      { language: '기타', ratio: '3%', reaction: '네팔어/아랍어 등', market_potential: '추후 검토' },
+    ],
     purchase_intent_signal_analysis: {
       purchase_intent_pct: commentSummary.purchase_intent_pct,
       prompt: '구매 링크/가격/구매처 질문성 코멘트 비중',
+      high_intent_examples: ['Running to add to cart', 'Added to cart so fast', 'Where to buy?'],
+      mid_intent_examples: ["I want to try this", "Curious to try it", "It's on my wishlist"],
+      viral_examples: ['Tag a friend', 'My daughter is waiting for lip mask', 'Need this for husband/wife'],
     },
-    viral_point_analysis: keywordMentions.slice(0, 6),
+    viral_point_analysis: [
+      { rank: 1, trigger: '립마스크 패키징', evidence: 'The case is adorable, So cute' },
+      { rank: 2, trigger: '투명 마스크 신선함', evidence: 'Never seen a clear mask, So cool' },
+      { rank: 3, trigger: '글로우 효과', evidence: 'Glass skin, The glow is insane' },
+      { rank: 4, trigger: '이동 중 사용', evidence: 'On the go, Life hack' },
+      { rank: 5, trigger: '성분 조합', evidence: 'Collagen + Glutathione combo' },
+    ],
     content_format_hints: [
       '상위 조회 콘텐츠의 초반 3초 훅(제품 클로즈업/효과 강조) 유지',
       '전후 대비/사용 장면/패키징 클로즈업 포맷 우선',
       '짧은 CTA 문구(구매처/링크) 삽입 시 전환 효율 개선',
+      '이동 중/출근길 착용 콘셉트 영상 확장',
+      '립마스크 단독 언박싱 포맷 별도 운영',
+      '성분 설명형 교육 콘텐츠를 혼합 편성',
     ],
     improvements_and_complements: [
-      '구매처 안내 부족 댓글 대응을 위한 고정댓글 운영',
-      '피부 타입/사용 시간 안내 문구를 콘텐츠 본문에 명시',
-      '부정 키워드(극소수)에 대한 FAQ형 답변 템플릿 준비',
+      { problem: '구매처 안내 부족', evidence: 'Where to buy?', action: '링크 인 바이오 + 고정댓글 운영' },
+      { problem: '사용시간 안내 부족', evidence: 'How long do you keep it on?', action: '콘텐츠 내 사용시간 명시' },
+      { problem: '피부타입 안내 부족', evidence: 'Good for any skin type?', action: '민감성 피부 사용 가이드 강조' },
+      { problem: '립마스크 단품 문의', evidence: 'Do you sell lip mask separately?', action: '단품 판매 여부 명확히 안내' },
+      { problem: '남성 진입장벽', evidence: "My beard won't let it stick", action: '남성 타겟 별도 크리에이티브 테스트' },
     ],
     recruitment_strategy: [
-      '상위 조회 달성 크리에이터와 재협업 우선',
-      '언어 상위권(영어권+확장권) 중심으로 후보군 풀 보강',
-      '뷰티/스킨케어 관심 프로필 비중 확대',
+      'Priority 1: 미국 뷰티 크리에이터(건성/민감성 + 립케어 관심층) 우선',
+      'Priority 2: On-the-go 라이프스타일 크리에이터(출근길/이동 중 루틴) 확장',
+      'Priority 3: 스페인어권 뷰티 크리에이터 비중 확대',
     ],
     strategy_summary: [
       `핵심 KPI는 ${formatInt(summary.views)} 조회 / ${formatInt(summary.likes)} 좋아요 / ${formatInt(summary.comments)} 댓글 / ${formatInt(summary.shares)} 공유`,
       `감성은 긍정 ${commentSummary.positive_pct}% 중심으로 브랜드 안전성이 높은 편`,
       '다음 사이클은 상위 콘텐츠 포맷 복제 + 구매 전환 CTA 강화에 집중',
+      '핵심 바이럴 자산: 립마스크 패키징 + 투명 마스크 + 글로우 효과',
+    ],
+    strategy_asset_direction: [
+      { asset: '립마스크 패키징', direction: '언박싱 + 케이스 클로즈업 필수 요청' },
+      { asset: '투명 마스크 신선함', direction: '착용 순간 리액션 영상 강조' },
+      { asset: '글로우 효과', direction: '비포/애프터 필수 포함 가이드라인 제공' },
     ],
   };
 
