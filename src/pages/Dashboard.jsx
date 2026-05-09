@@ -2547,6 +2547,8 @@ const CandidateList = ({
 const AnalyticsReport = ({ campaign }) => {
     const fd = campaign?.setup_submission_summary?.form_data || {};
     const reportSummary = fd?.report_summary || {};
+    const reportDataStudio = fd?.report_data_studio || {};
+    const reportNotion = fd?.report_notion || {};
     const reportTopCreatorsRaw = Array.isArray(fd?.report_top_creators) ? fd.report_top_creators : [];
     const reportTopPostsRaw = Array.isArray(fd?.report_top_posts) ? fd.report_top_posts : [];
     const reportLinks = fd?.report_links || {};
@@ -2788,6 +2790,158 @@ const AnalyticsReport = ({ campaign }) => {
                                 </div>
                             </a>
                         ))}
+                    </div>
+                </div>
+
+                <div className="mt-8 border-t border-white/5 pt-8 space-y-6 relative z-10">
+                    <h4 className="text-lg font-black text-white tracking-tighter">Data Studio 스타일 상세 섹션</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                            <p className="text-[10px] text-slate-500 uppercase tracking-widest">포스팅 개수</p>
+                            <p className="text-xl font-black text-white mt-1">{fmt(reportDataStudio?.overview_cards?.posting_count || summaryPosts)}</p>
+                        </div>
+                        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                            <p className="text-[10px] text-slate-500 uppercase tracking-widest">누적 뷰</p>
+                            <p className="text-xl font-black text-white mt-1">{fmt(reportDataStudio?.overview_cards?.cumulative_views || summaryViews)}</p>
+                        </div>
+                        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                            <p className="text-[10px] text-slate-500 uppercase tracking-widest">단일 조회 최대값</p>
+                            <p className="text-xl font-black text-white mt-1">{fmt(reportDataStudio?.overview_cards?.max_single_view || 0)}</p>
+                        </div>
+                        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                            <p className="text-[10px] text-slate-500 uppercase tracking-widest">배송도달율</p>
+                            <p className="text-xl font-black text-white mt-1">{pct(reportDataStudio?.overview_cards?.shipping_reach_rate || 0)}</p>
+                        </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 overflow-x-auto">
+                        <h5 className="text-sm font-black text-white mb-4 uppercase tracking-widest">리포트 표 (Top Posts)</h5>
+                        <table className="w-full text-xs text-left min-w-[760px]">
+                            <thead className="text-slate-400 border-b border-white/10">
+                                <tr>
+                                    <th className="py-2 pr-3">#</th>
+                                    <th className="py-2 pr-3">Creator</th>
+                                    <th className="py-2 pr-3">Platform</th>
+                                    <th className="py-2 pr-3">Upload Day</th>
+                                    <th className="py-2 pr-3">Views</th>
+                                    <th className="py-2 pr-3">Likes</th>
+                                    <th className="py-2 pr-3">Comments</th>
+                                    <th className="py-2 pr-3">Shares</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5">
+                                {((reportDataStudio?.report_table || []).slice(0, 12)).map((r, idx) => (
+                                    <tr key={`tbl-${idx}`}>
+                                        <td className="py-2 pr-3 text-slate-500">{r.rank || idx + 1}</td>
+                                        <td className="py-2 pr-3 text-white font-semibold">{r.creator || '-'}</td>
+                                        <td className="py-2 pr-3 text-slate-300">{r.platform || '-'}</td>
+                                        <td className="py-2 pr-3 text-slate-400">{r.upload_day || '-'}</td>
+                                        <td className="py-2 pr-3 text-cyan-300">{fmt(r.views)}</td>
+                                        <td className="py-2 pr-3 text-rose-300">{fmt(r.likes)}</td>
+                                        <td className="py-2 pr-3 text-emerald-300">{fmt(r.comments)}</td>
+                                        <td className="py-2 pr-3 text-purple-300">{fmt(r.shares)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                            <h5 className="text-sm font-black text-white mb-3 uppercase tracking-widest">주요 키워드/언급</h5>
+                            <div className="space-y-2">
+                                {((reportDataStudio?.keyword_mentions || []).slice(0, 8)).map((k, idx) => (
+                                    <div key={`kw-${idx}`} className="flex items-center justify-between rounded-lg bg-white/[0.02] border border-white/10 px-3 py-2 text-xs">
+                                        <span className="text-slate-200 font-semibold">{k.keyword}</span>
+                                        <span className="text-cyan-300 font-black">{fmt(k.mentions)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                            <h5 className="text-sm font-black text-white mb-3 uppercase tracking-widest">댓글단 유저 특성</h5>
+                            <div className="grid grid-cols-1 gap-2 text-xs">
+                                <div className="rounded-lg bg-white/[0.02] border border-white/10 px-3 py-2 flex justify-between"><span className="text-slate-300">Creator-like bio</span><span className="text-white font-bold">{fmt(reportDataStudio?.user_characteristics?.creator_like || 0)}</span></div>
+                                <div className="rounded-lg bg-white/[0.02] border border-white/10 px-3 py-2 flex justify-between"><span className="text-slate-300">Shopper-like bio</span><span className="text-white font-bold">{fmt(reportDataStudio?.user_characteristics?.shopper_like || 0)}</span></div>
+                                <div className="rounded-lg bg-white/[0.02] border border-white/10 px-3 py-2 flex justify-between"><span className="text-slate-300">Skincare-interest bio</span><span className="text-white font-bold">{fmt(reportDataStudio?.user_characteristics?.skincare_interest || 0)}</span></div>
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                                {((reportDataStudio?.user_characteristics?.top_languages || []).slice(0, 6)).map(([lang, cnt]) => (
+                                    <span key={`ulang-${lang}`} className="px-2 py-1 rounded-md border border-white/15 text-[10px] text-slate-300">{String(lang).toUpperCase()} {cnt}</span>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="mt-8 border-t border-white/5 pt-8 space-y-6 relative z-10">
+                    <h4 className="text-lg font-black text-white tracking-tighter">Notion 스타일 심층 분석</h4>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                            <h5 className="text-sm font-black text-white mb-3">감정분석</h5>
+                            <p className="text-xs text-slate-300 leading-relaxed">
+                                긍정 {pct(reportNotion?.sentiment_analysis?.positive_pct || reportSummary.positive_pct)} ·
+                                중립 {pct(reportNotion?.sentiment_analysis?.neutral_pct || reportSummary.neutral_pct)} ·
+                                부정 {pct(reportNotion?.sentiment_analysis?.negative_pct || reportSummary.negative_pct)}
+                            </p>
+                        </div>
+                        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                            <h5 className="text-sm font-black text-white mb-3">제품별 반응 비교</h5>
+                            <div className="text-xs text-slate-300 space-y-1">
+                                <p>Lip mask views: {fmt(reportNotion?.product_reaction_comparison?.lip_mask?.views || 0)}</p>
+                                <p>Face mask views: {fmt(reportNotion?.product_reaction_comparison?.face_mask?.views || 0)}</p>
+                                <p>Others views: {fmt(reportNotion?.product_reaction_comparison?.others?.views || 0)}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 text-xs">
+                        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                            <h6 className="text-slate-100 font-black mb-2">언어별 반응 분석</h6>
+                            {((reportNotion?.language_reaction_analysis || []).slice(0, 6)).map(([lang, cnt]) => (
+                                <p key={`lang-${lang}`} className="text-slate-300">{String(lang).toUpperCase()} · {cnt}</p>
+                            ))}
+                        </div>
+                        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                            <h6 className="text-slate-100 font-black mb-2">구매 의향 신호 분석</h6>
+                            <p className="text-slate-300">구매의향 비율: {pct(reportNotion?.purchase_intent_signal_analysis?.purchase_intent_pct || reportSummary.purchase_intent_pct)}</p>
+                            <p className="text-slate-500 mt-2">{reportNotion?.purchase_intent_signal_analysis?.prompt || '구매처/가격/링크 질문 비중'}</p>
+                        </div>
+                        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                            <h6 className="text-slate-100 font-black mb-2">바이럴 포인트 분석</h6>
+                            {((reportNotion?.viral_point_analysis || []).slice(0, 5)).map((v, idx) => (
+                                <p key={`viral-${idx}`} className="text-slate-300">{v.keyword}: {fmt(v.mentions)}</p>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                            <h5 className="text-sm font-black text-white mb-3">콘텐츠 포맷별 반응 힌트</h5>
+                            <ul className="space-y-2 text-xs text-slate-300">
+                                {(reportNotion?.content_format_hints || []).map((x, idx) => <li key={`fmt-${idx}`}>- {x}</li>)}
+                            </ul>
+                        </div>
+                        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                            <h5 className="text-sm font-black text-white mb-3">개선 및 보완 포인트</h5>
+                            <ul className="space-y-2 text-xs text-slate-300">
+                                {(reportNotion?.improvements_and_complements || []).map((x, idx) => <li key={`imp-${idx}`}>- {x}</li>)}
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                            <h5 className="text-sm font-black text-white mb-3">모집 전략 추천</h5>
+                            <ul className="space-y-2 text-xs text-slate-300">
+                                {(reportNotion?.recruitment_strategy || []).map((x, idx) => <li key={`rec-${idx}`}>- {x}</li>)}
+                            </ul>
+                        </div>
+                        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                            <h5 className="text-sm font-black text-white mb-3">전략 요약</h5>
+                            <ul className="space-y-2 text-xs text-slate-300">
+                                {(reportNotion?.strategy_summary || []).map((x, idx) => <li key={`sum-${idx}`}>- {x}</li>)}
+                            </ul>
+                        </div>
                     </div>
                 </div>
             </div>

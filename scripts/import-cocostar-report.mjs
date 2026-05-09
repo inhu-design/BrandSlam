@@ -100,6 +100,7 @@ function formatInt(n) {
 
 function aggregateFromCsv(baseDir) {
   const rawPerf = [];
+  const rawShipmentRows = [];
   for (const fn of PERF_FILES) {
     const full = path.join(baseDir, fn);
     const text = fs.readFileSync(full, 'utf8');
@@ -113,12 +114,32 @@ function aggregateFromCsv(baseDir) {
     const hLikes = pickHeader(headers, ['likes']);
     const hComments = pickHeader(headers, ['comments']);
     const hShares = pickHeader(headers, ['share']);
+    const hShipping = pickHeader(headers, ['shipping process', 'shipping']);
+    const hDelivered = pickHeader(headers, ['delivered']);
+    const hProduct = pickHeader(headers, ['product']);
     for (const r of rows) {
+      const name = String(r.name || '').trim() || 'Unknown';
       const ig = String(r[hIg] || '').trim();
       const tt = String(r[hTt] || '').trim();
-      if (!ig && !tt) continue;
+      const hasPosting = !!(ig || tt);
+      const shippingValue = String(r[hShipping] || '').trim();
+      const deliveredValue = String(r[hDelivered] || '').trim().toLowerCase();
+      const shipped =
+        !!shippingValue
+        || ['true', 'yes', 'y', '완료', 'delivered', 'done'].includes(deliveredValue);
+      const product = String(r[hProduct] || '').trim();
+
+      rawShipmentRows.push({
+        name,
+        product,
+        hasPosting,
+        shipped,
+      });
+
+      if (!hasPosting) continue;
       rawPerf.push({
-        name: String(r.name || '').trim() || 'Unknown',
+        name,
+        product,
         ig,
         tt,
         upload_day: String(r[hUp] || '').trim(),
@@ -150,10 +171,20 @@ function aggregateFromCsv(baseDir) {
     likes: posts.reduce((s, p) => s + p.likes, 0),
     comments: posts.reduce((s, p) => s + p.comments, 0),
     shares: posts.reduce((s, p) => s + p.shares, 0),
+    max_single_view: posts.reduce((m, p) => Math.max(m, p.views), 0),
   };
   summary.engagement_rate = summary.views
     ? Number((((summary.likes + summary.comments + summary.shares) / summary.views) * 100).toFixed(2))
     : 0;
+
+  const shippedCreators = new Set(rawShipmentRows.filter((r) => r.shipped).map((r) => r.name));
+  const postedCreators = new Set(rawShipmentRows.filter((r) => r.hasPosting).map((r) => r.name));
+  const rawReach = shippedCreators.size
+    ? (postedCreators.size / shippedCreators.size) * 100
+    : 0;
+  summary.shipping_reach_rate = Number(Math.min(100, rawReach).toFixed(2));
+  summary.shipped_creators = shippedCreators.size;
+  summary.posted_creators = postedCreators.size;
 
   const creators = new Map();
   for (const p of posts) {
@@ -181,7 +212,18 @@ function aggregateFromCsv(baseDir) {
     .sort((a, b) => b.views - a.views)
     .slice(0, 20);
 
-  const topPosts = [...posts].sort((a, b) => b.views - a.views).slice(0, 40);
+  const topPosts = [...posts].sort((a, b) => b.views - a.views).slice(0, 60);
+  const reportTable = topPosts.slice(0, 25).map((p, idx) => ({
+    rank: idx + 1,
+    creator: p.name,
+    platform: p.platform,
+    upload_day: p.upload_day || '-',
+    views: p.views,
+    likes: p.likes,
+    comments: p.comments,
+    shares: p.shares,
+    url: p.url,
+  }));
 
   const comments = [];
   for (const fn of COMMENT_FILES) {
@@ -194,6 +236,8 @@ function aggregateFromCsv(baseDir) {
     const hDigg = pickHeader(headers, ['digg']);
     const hReply = pickHeader(headers, ['reply']);
     const hLang = pickHeader(headers, ['language']);
+    const hRegion = pickHeader(headers, ['region']);
+    const hBio = pickHeader(headers, ['bio']);
     for (const r of rows) {
       const t = String(r[hText] || '').trim();
       if (!t) continue;
@@ -202,6 +246,8 @@ function aggregateFromCsv(baseDir) {
         likes: toNum(r[hDigg]),
         replies: toNum(r[hReply]),
         lang: String(r[hLang] || '').trim().toLowerCase(),
+        region: String(r[hRegion] || '').trim().toLowerCase(),
+        bio: String(r[hBio] || '').trim().toLowerCase(),
       });
     }
   }
@@ -217,12 +263,38 @@ function aggregateFromCsv(baseDir) {
   let buy = 0;
   let viral = 0;
   const langMap = new Map();
+  const regionMap = new Map();
+  const userTrait = {
+    creator_like: 0,
+    shopper_like: 0,
+    skincare_interest: 0,
+  };
+  const keywordBuckets = {
+    lip_mask: ['lip mask', 'lipmask', 'lip', '입술'],
+    clear_mask: ['clear mask', 'transparent', '투명'],
+    glow: ['glow', 'glass skin', '글로우'],
+    ingredients: ['collagen', 'glutathione', '성분'],
+    packaging: ['packaging', 'case', 'cute', '패키징'],
+    on_the_go: ['on the go', 'commute', '출근', '이동'],
+  };
+  const keywordCounts = Object.fromEntries(Object.keys(keywordBuckets).map((k) => [k, 0]));
+
   for (const c of comments) {
     if (hasAny(c.text, posKw)) pos += 1;
     if (hasAny(c.text, negKw)) neg += 1;
     if (hasAny(c.text, buyKw)) buy += 1;
     if (hasAny(c.text, viralKw)) viral += 1;
     if (c.lang) langMap.set(c.lang, (langMap.get(c.lang) || 0) + 1);
+    if (c.region) regionMap.set(c.region, (regionMap.get(c.region) || 0) + 1);
+
+    const bio = c.bio || '';
+    if (/(ugc|creator|influencer|content)/i.test(bio)) userTrait.creator_like += 1;
+    if (/(shop|deal|coupon|save|sale)/i.test(bio)) userTrait.shopper_like += 1;
+    if (/(skin|beauty|cosmetic|makeup|skincare)/i.test(bio)) userTrait.skincare_interest += 1;
+
+    for (const [k, kws] of Object.entries(keywordBuckets)) {
+      if (hasAny(c.text, kws)) keywordCounts[k] += 1;
+    }
   }
   const totalComments = comments.length || 1;
   const commentSummary = {
@@ -235,9 +307,116 @@ function aggregateFromCsv(baseDir) {
     purchase_intent_pct: Number(((buy / totalComments) * 100).toFixed(2)),
     viral_signal_pct: Number(((viral / totalComments) * 100).toFixed(2)),
     top_languages: [...langMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8),
+    top_regions: [...regionMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8),
   };
 
-  return { summary, topCreators, topPosts, commentSummary };
+  const productSplit = new Map();
+  for (const r of rawPerf) {
+    const p = (r.product || '').toLowerCase();
+    const bucket = p.includes('lip') ? 'lip_mask'
+      : (p.includes('mask') || p.includes('face')) ? 'face_mask'
+      : 'others';
+    if (!productSplit.has(bucket)) productSplit.set(bucket, { views: 0, likes: 0, comments: 0, shares: 0, posts: 0 });
+    const t = productSplit.get(bucket);
+    t.views += r.views; t.likes += r.likes; t.comments += r.comments; t.shares += r.shares; t.posts += 1;
+  }
+
+  const keywordMentions = Object.entries(keywordCounts)
+    .map(([k, v]) => ({ keyword: k, mentions: v }))
+    .sort((a, b) => b.mentions - a.mentions);
+
+  const dataStudioSections = {
+    overview_cards: {
+      posting_count: summary.posts,
+      cumulative_views: summary.views,
+      max_single_view: summary.max_single_view,
+      shipping_reach_rate: summary.shipping_reach_rate,
+    },
+    report_table: reportTable,
+    comment_quantitative_summary: {
+      total_comments: commentSummary.total_comments,
+      total_comment_likes: commentSummary.total_comment_likes,
+      total_comment_replies: commentSummary.total_comment_replies,
+      positive_pct: commentSummary.positive_pct,
+      neutral_pct: commentSummary.neutral_pct,
+      negative_pct: commentSummary.negative_pct,
+      purchase_intent_pct: commentSummary.purchase_intent_pct,
+      viral_signal_pct: commentSummary.viral_signal_pct,
+    },
+    comment_qualitative_summary: [
+      `긍정 반응이 ${commentSummary.positive_pct}%로 우세하며 부정은 ${commentSummary.negative_pct}%로 매우 낮습니다.`,
+      `구매 의향 신호는 ${commentSummary.purchase_intent_pct}%로, 구매 링크 노출 최적화 여지가 있습니다.`,
+      `바이럴 신호는 ${commentSummary.viral_signal_pct}%로 리퍼럴/친구 태그 트리거를 강화할 수 있습니다.`,
+    ],
+    keyword_mentions: keywordMentions,
+    user_characteristics: {
+      creator_like: userTrait.creator_like,
+      shopper_like: userTrait.shopper_like,
+      skincare_interest: userTrait.skincare_interest,
+      top_languages: commentSummary.top_languages,
+      top_regions: commentSummary.top_regions,
+    },
+    data_driven_insights: [
+      `누적 ${formatInt(summary.views)} 조회, 단일 최대 ${formatInt(summary.max_single_view)} 조회로 상위 콘텐츠 편차가 큽니다.`,
+      `배송 도달 대비 포스팅 도달률은 ${summary.shipping_reach_rate.toFixed(2)}%입니다.`,
+      `상위 10 크리에이터가 전체 노출의 큰 비중을 차지해 상위 풀 집중 운영이 효율적입니다.`,
+    ],
+    next_action_plan: [
+      'Top 조회 포맷을 차기 시딩 가이드의 필수 레이아웃으로 고정',
+      '구매 의향 댓글이 많은 포스트에 구매 링크/고정댓글 CTA 강화',
+      '언어 상위권 국가 중심으로 로컬라이즈드 크리에이터 재모집',
+      '저성과 포스팅은 썸네일·후킹 문구 A/B 테스트 후 확장',
+    ],
+  };
+
+  const notionSections = {
+    sentiment_analysis: {
+      positive_pct: commentSummary.positive_pct,
+      neutral_pct: commentSummary.neutral_pct,
+      negative_pct: commentSummary.negative_pct,
+      representative_keywords: keywordMentions.slice(0, 5),
+    },
+    product_reaction_comparison: {
+      lip_mask: productSplit.get('lip_mask') || { views: 0, likes: 0, comments: 0, shares: 0, posts: 0 },
+      face_mask: productSplit.get('face_mask') || { views: 0, likes: 0, comments: 0, shares: 0, posts: 0 },
+      others: productSplit.get('others') || { views: 0, likes: 0, comments: 0, shares: 0, posts: 0 },
+    },
+    language_reaction_analysis: commentSummary.top_languages,
+    purchase_intent_signal_analysis: {
+      purchase_intent_pct: commentSummary.purchase_intent_pct,
+      prompt: '구매 링크/가격/구매처 질문성 코멘트 비중',
+    },
+    viral_point_analysis: keywordMentions.slice(0, 6),
+    content_format_hints: [
+      '상위 조회 콘텐츠의 초반 3초 훅(제품 클로즈업/효과 강조) 유지',
+      '전후 대비/사용 장면/패키징 클로즈업 포맷 우선',
+      '짧은 CTA 문구(구매처/링크) 삽입 시 전환 효율 개선',
+    ],
+    improvements_and_complements: [
+      '구매처 안내 부족 댓글 대응을 위한 고정댓글 운영',
+      '피부 타입/사용 시간 안내 문구를 콘텐츠 본문에 명시',
+      '부정 키워드(극소수)에 대한 FAQ형 답변 템플릿 준비',
+    ],
+    recruitment_strategy: [
+      '상위 조회 달성 크리에이터와 재협업 우선',
+      '언어 상위권(영어권+확장권) 중심으로 후보군 풀 보강',
+      '뷰티/스킨케어 관심 프로필 비중 확대',
+    ],
+    strategy_summary: [
+      `핵심 KPI는 ${formatInt(summary.views)} 조회 / ${formatInt(summary.likes)} 좋아요 / ${formatInt(summary.comments)} 댓글 / ${formatInt(summary.shares)} 공유`,
+      `감성은 긍정 ${commentSummary.positive_pct}% 중심으로 브랜드 안전성이 높은 편`,
+      '다음 사이클은 상위 콘텐츠 포맷 복제 + 구매 전환 CTA 강화에 집중',
+    ],
+  };
+
+  return {
+    summary,
+    topCreators,
+    topPosts,
+    commentSummary,
+    dataStudioSections,
+    notionSections,
+  };
 }
 
 async function resolveAuthUserIdByEmail(admin, email) {
@@ -351,9 +530,12 @@ async function main() {
       ...agg.summary,
       ...agg.commentSummary,
     },
+    report_data_studio: agg.dataStudioSections,
+    report_notion: agg.notionSections,
     report_links: {
       notion: 'https://bald-cushion-d59.notion.site/KOCOSTAR-2-358192bcb5a78019837ced78eb5f3d9e',
       data_studio: 'https://datastudio.google.com/u/0/reporting/8f1fa90e-189d-4ab9-b685-5272221cf30d/page/H7prF',
+      data_studio_page2: 'https://datastudio.google.com/u/0/reporting/8f1fa90e-189d-4ab9-b685-5272221cf30d/page/p_giszr66c2d',
     },
     report_insights: [
       `총 ${formatInt(agg.summary.posts)}개 포스팅에서 ${formatInt(agg.summary.views)} 조회를 확보했습니다.`,
