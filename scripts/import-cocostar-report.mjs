@@ -355,10 +355,23 @@ async function main() {
       notion: 'https://bald-cushion-d59.notion.site/KOCOSTAR-2-358192bcb5a78019837ced78eb5f3d9e',
       data_studio: 'https://datastudio.google.com/u/0/reporting/8f1fa90e-189d-4ab9-b685-5272221cf30d/page/H7prF',
     },
+    report_insights: [
+      `총 ${formatInt(agg.summary.posts)}개 포스팅에서 ${formatInt(agg.summary.views)} 조회를 확보했습니다.`,
+      `좋아요·댓글·공유 합산 참여율은 ${agg.summary.engagement_rate.toFixed(2)}%로 안정 구간입니다.`,
+      `댓글 감성 비중은 긍정 ${agg.commentSummary.positive_pct}% / 부정 ${agg.commentSummary.negative_pct}%입니다.`,
+      `구매의도 신호는 ${agg.commentSummary.purchase_intent_pct}%로 CTA 최적화 여지가 있습니다.`,
+    ],
+    report_actions: [
+      '상위 조회 Top 포맷을 차기 가이드라인 템플릿으로 고정',
+      '구매의도 댓글 발생 게시물에 링크 고정 및 랜딩 연결 강화',
+      '반응 높은 언어권 중심으로 크리에이터 풀 재배치',
+      '저성과 포스트는 썸네일/후킹 문구 A/B 테스트 권장',
+    ],
     report_top_creators: agg.topCreators.slice(0, 10),
     report_top_posts: agg.topPosts.slice(0, 10),
   };
 
+  await admin.from('campaign_setup_submissions').delete().eq('campaign_id', campaignId);
   const { error: sErr } = await admin
     .from('campaign_setup_submissions')
     .insert([{ campaign_id: campaignId, user_id: userId, form_data: reportForm }]);

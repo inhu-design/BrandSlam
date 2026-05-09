@@ -221,10 +221,21 @@ export default async function handler(req, res) {
         .in('campaign_id', campaignIds)
         .order('created_at', { ascending: false });
       if (setupError) return res.status(500).json({ error: setupError.message || 'Failed to load setup submissions' });
+      const hasReport = (row) =>
+        !!(row?.form_data && typeof row.form_data === 'object' && (
+          row.form_data.report_summary || row.form_data.report_top_posts || row.form_data.report_top_creators
+        ));
       for (const row of setupRows || []) {
         const campaignId = row?.campaign_id;
         if (!campaignId) continue;
         if (!setupByCampaignId[campaignId]) {
+          setupByCampaignId[campaignId] = pickSetupSummary(row);
+          continue;
+        }
+        const prev = setupByCampaignId[campaignId];
+        const prevHasReport = hasReport(prev);
+        const nextHasReport = hasReport(row);
+        if (!prevHasReport && nextHasReport) {
           setupByCampaignId[campaignId] = pickSetupSummary(row);
         }
       }

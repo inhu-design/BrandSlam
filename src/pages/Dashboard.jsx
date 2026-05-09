@@ -2547,17 +2547,56 @@ const CandidateList = ({
 const AnalyticsReport = ({ campaign }) => {
     const fd = campaign?.setup_submission_summary?.form_data || {};
     const reportSummary = fd?.report_summary || {};
-    const reportTopCreators = Array.isArray(fd?.report_top_creators) ? fd.report_top_creators : [];
-    const reportTopPosts = Array.isArray(fd?.report_top_posts) ? fd.report_top_posts : [];
+    const reportTopCreatorsRaw = Array.isArray(fd?.report_top_creators) ? fd.report_top_creators : [];
+    const reportTopPostsRaw = Array.isArray(fd?.report_top_posts) ? fd.report_top_posts : [];
     const reportLinks = fd?.report_links || {};
+    const reportInsights = Array.isArray(fd?.report_insights) ? fd.report_insights : [];
+    const reportActions = Array.isArray(fd?.report_actions) ? fd.report_actions : [];
 
     const fmt = (n) => Number(n || 0).toLocaleString();
     const pct = (n) => `${Number(n || 0).toFixed(2)}%`;
+    const parseNum = (v) => Number(String(v ?? '').replace(/[^0-9]/g, '') || 0);
     const analytics = campaign?.analytics || {};
     const dailyViews = Array.isArray(analytics?.daily_views) ? analytics.daily_views : [];
     const dates = Array.isArray(analytics?.dates) ? analytics.dates : [];
     const maxDaily = Math.max(1, ...dailyViews);
     const topLang = Array.isArray(reportSummary?.top_languages) ? reportSummary.top_languages : [];
+    const fallbackCreators = Array.isArray(campaign?.creators) ? campaign.creators : [];
+    const fallbackPosts = Array.isArray(campaign?.contents) ? campaign.contents : [];
+
+    const reportTopCreators = reportTopCreatorsRaw.length > 0
+      ? reportTopCreatorsRaw
+      : fallbackCreators.slice(0, 10).map((c) => ({
+          name: c.name || '-',
+          platform: c.platform || '-',
+          views: parseNum(c.views),
+          likes: 0,
+          comments: 0,
+          shares: 0,
+          posts: 1,
+        }));
+
+    const reportTopPosts = reportTopPostsRaw.length > 0
+      ? reportTopPostsRaw
+      : fallbackPosts.slice(0, 12).map((c) => ({
+          name: c.creator || '-',
+          platform: 'POST',
+          views: parseNum(c.views),
+          likes: 0,
+          comments: 0,
+          shares: 0,
+          url: null,
+        }));
+
+    const summaryViews = parseNum(campaign.kpi_views) || Number(reportSummary.views || 0);
+    const summaryLikes = parseNum(campaign.kpi_likes) || Number(reportSummary.likes || 0);
+    const summaryComments = parseNum(campaign.kpi_comments) || Number(reportSummary.comments || 0);
+    const summaryShares = parseNum(campaign.kpi_shares) || Number(reportSummary.shares || 0);
+    const summaryPosts = Number(reportSummary.posts || campaign.content_count || reportTopPosts.length || 0);
+    const engagementPct = analytics?.engagement_rate
+      || (summaryViews > 0
+        ? `${(((summaryLikes + summaryComments + summaryShares) / summaryViews) * 100).toFixed(2)}%`
+        : pct(reportSummary.engagement_rate));
 
     return (
         <div className="space-y-10 animate-fade-in-up">
@@ -2594,19 +2633,19 @@ const AnalyticsReport = ({ campaign }) => {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 relative z-10">
                     <div className="p-5 bg-blue-500/5 rounded-2xl border border-blue-500/20">
                         <p className="text-[10px] text-blue-300 font-black tracking-widest uppercase">Posts</p>
-                        <p className="text-2xl font-black text-white mt-1">{fmt(reportSummary.posts || campaign.content_count || 0)}</p>
+                        <p className="text-2xl font-black text-white mt-1">{fmt(summaryPosts)}</p>
                     </div>
                     <div className="p-5 bg-purple-500/5 rounded-2xl border border-purple-500/20">
                         <p className="text-[10px] text-purple-300 font-black tracking-widest uppercase">Views</p>
-                        <p className="text-2xl font-black text-white mt-1">{campaign.kpi_views || fmt(reportSummary.views)}</p>
+                        <p className="text-2xl font-black text-white mt-1">{fmt(summaryViews)}</p>
                     </div>
                     <div className="p-5 bg-rose-500/5 rounded-2xl border border-rose-500/20">
                         <p className="text-[10px] text-rose-300 font-black tracking-widest uppercase">Likes</p>
-                        <p className="text-2xl font-black text-white mt-1">{campaign.kpi_likes || fmt(reportSummary.likes)}</p>
+                        <p className="text-2xl font-black text-white mt-1">{fmt(summaryLikes)}</p>
                     </div>
                     <div className="p-5 bg-emerald-500/5 rounded-2xl border border-emerald-500/20">
                         <p className="text-[10px] text-emerald-300 font-black tracking-widest uppercase">Engagement</p>
-                        <p className="text-2xl font-black text-white mt-1">{analytics?.engagement_rate || pct(reportSummary.engagement_rate)}</p>
+                        <p className="text-2xl font-black text-white mt-1">{engagementPct}</p>
                     </div>
                 </div>
 
@@ -2695,6 +2734,33 @@ const AnalyticsReport = ({ campaign }) => {
                                 );
                             })}
                         </div>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8 relative z-10">
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+                        <h4 className="text-sm font-black uppercase tracking-widest text-slate-200 mb-4">핵심 인사이트</h4>
+                        <ul className="space-y-2 text-sm text-slate-300">
+                            {(reportInsights.length > 0 ? reportInsights : [
+                                `총 ${fmt(summaryPosts)}개 포스팅에서 ${fmt(summaryViews)} 조회를 확보했습니다.`,
+                                `좋아요+댓글+공유 기반 참여율은 ${engagementPct}입니다.`,
+                                `댓글 감성은 긍정 ${pct(reportSummary.positive_pct)} / 부정 ${pct(reportSummary.negative_pct)}로 안정적입니다.`,
+                            ]).map((x, idx) => (
+                                <li key={`insight-${idx}`} className="rounded-xl bg-white/[0.02] border border-white/10 px-3 py-2">{x}</li>
+                            ))}
+                        </ul>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+                        <h4 className="text-sm font-black uppercase tracking-widest text-slate-200 mb-4">추천 액션</h4>
+                        <ul className="space-y-2 text-sm text-slate-300">
+                            {(reportActions.length > 0 ? reportActions : [
+                                '상위 조회 콘텐츠 포맷을 다음 물량 가이드의 기본 템플릿으로 고정',
+                                '구매의도 댓글이 붙은 영상에 링크 고정/프로필 CTA 재강화',
+                                '언어 비중 상위 국가 중심으로 차기 시딩 크리에이터를 재배치',
+                            ]).map((x, idx) => (
+                                <li key={`action-${idx}`} className="rounded-xl bg-white/[0.02] border border-white/10 px-3 py-2">{x}</li>
+                            ))}
+                        </ul>
                     </div>
                 </div>
 
@@ -5625,7 +5691,7 @@ async function enrichNonAdminDashboardCampaigns(rows, user) {
 
   const campaignIds = campaignList.map((c) => c.id).filter(Boolean);
   if (campaignIds.length > 0) {
-    const [settingsRes, scopedDeliveryRes] = await Promise.all([
+    const [settingsRes, scopedDeliveryRes, setupRes] = await Promise.all([
       supabase
         .from('campaign_admin_settings')
         .select(
@@ -5637,6 +5703,11 @@ async function enrichNonAdminDashboardCampaigns(rows, user) {
         .select('*')
         .in('campaign_id', campaignIds)
         .order('created_at', { ascending: true }),
+      supabase
+        .from('campaign_setup_submissions')
+        .select('campaign_id, created_at, form_data')
+        .in('campaign_id', campaignIds)
+        .order('created_at', { ascending: false }),
     ]);
     const runtimeRows = settingsRes?.data;
     settingsByCampaignId = Object.fromEntries(
@@ -5661,6 +5732,33 @@ async function enrichNonAdminDashboardCampaigns(rows, user) {
         if (!cid) continue;
         if (!creatorsByCampaignId[cid]) creatorsByCampaignId[cid] = [];
         creatorsByCampaignId[cid].push(row);
+      }
+    }
+    const { data: setupRows, error: setupErr } = setupRes || {};
+    if (!setupErr && setupRows?.length) {
+      const hasReport = (r) =>
+        !!(r?.form_data && typeof r.form_data === 'object' && (
+          r.form_data.report_summary || r.form_data.report_top_posts || r.form_data.report_top_creators
+        ));
+      for (const row of setupRows) {
+        const cid = row?.campaign_id;
+        if (!cid) continue;
+        if (!setupByCampaignId[cid]) {
+          setupByCampaignId[cid] = {
+            created_at: row?.created_at || null,
+            form_data: row?.form_data ?? null,
+          };
+          continue;
+        }
+        const prev = setupByCampaignId[cid];
+        const prevHasReport = hasReport(prev);
+        const nextHasReport = hasReport(row);
+        if (!prevHasReport && nextHasReport) {
+          setupByCampaignId[cid] = {
+            created_at: row?.created_at || null,
+            form_data: row?.form_data ?? null,
+          };
+        }
       }
     }
   }
