@@ -4,6 +4,9 @@
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, BarChart2, ExternalLink } from 'lucide-react';
 
+/** 리포트 2페이지(실제 TikTok 댓글) 카드 최대 노출 건수 */
+const COMMENT_DECK_DISPLAY_MAX = 200;
+
 const NAV_SLIDES = [
   { key: 'overview', label: '1. 개요 · 핵심 수치' },
   { key: 'comments-live', label: '2. 실제 TikTok 댓글' },
@@ -267,7 +270,7 @@ export default function KocostarReportDeck({ campaign }) {
     ...highIntentExamples,
     ...midIntentExamples,
     ...viralExamples,
-  ].filter(Boolean).slice(0, 180), [topicMatrix, highIntentExamples, midIntentExamples, viralExamples]);
+  ].filter(Boolean).slice(0, COMMENT_DECK_DISPLAY_MAX), [topicMatrix, highIntentExamples, midIntentExamples, viralExamples]);
 
   const reportCommentSamples = useMemo(() => {
     const norm = reportCommentSamplesRaw
@@ -290,6 +293,11 @@ export default function KocostarReportDeck({ campaign }) {
       created_at: null,
     }));
   }, [reportCommentSamplesRaw, commentExampleSnippets]);
+
+  const commentSamplesForDeck = useMemo(
+    () => reportCommentSamples.slice(0, COMMENT_DECK_DISPLAY_MAX),
+    [reportCommentSamples],
+  );
 
   /** Notion 표기와 동일 순서로 라벨 */
   const productReactionRows = useMemo(() => {
@@ -526,11 +534,25 @@ export default function KocostarReportDeck({ campaign }) {
 
         <div className="min-w-0" data-slide-item>
           <SlideFrame title="실제 TikTok 댓글" eyebrow="Comment verbatim · scraped feed">
-            <div className="flex flex-col min-h-0">
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 flex-1 min-h-0 content-start overflow-y-auto pr-0.5">
-                {reportCommentSamples.length ? reportCommentSamples.map((c, idx) => (
+            <div className="flex min-h-0 flex-1 flex-col gap-1.5">
+              {commentSamplesForDeck.length ? (
+                <p className="shrink-0 text-[10px] font-semibold leading-snug text-slate-600 tabular-nums">
+                  원문 댓글 <span className="text-slate-900">{fmt(commentSamplesForDeck.length)}</span>건 표시
+                  {reportCommentSamples.length > commentSamplesForDeck.length ? (
+                    <span className="font-normal text-slate-500">
+                      {' '}
+                      · 저장된 표본 {fmt(reportCommentSamples.length)}건 중 앞부분
+                    </span>
+                  ) : null}
+                  {commentSamplesForDeck.length >= 40 ? (
+                    <span className="font-normal text-slate-500"> · 아래 스크롤</span>
+                  ) : null}
+                </p>
+              ) : null}
+              <div className="grid min-h-[min(280px,38vh)] max-h-[min(58vh,640px)] flex-1 grid-cols-2 content-start gap-1.5 overflow-y-auto overscroll-contain pr-0.5 sm:grid-cols-3 lg:grid-cols-4 [scrollbar-width:thin]">
+                {commentSamplesForDeck.length ? commentSamplesForDeck.map((c, idx) => (
                   <div
-                    key={`cmt-${idx}-${String(c.unique_id || '')}-${c.text.slice(0, 10)}`}
+                    key={`cmt-${idx}`}
                     className="rounded-lg border border-slate-100 bg-white px-2 py-1.5 shadow-sm flex flex-col gap-1 text-left"
                   >
                     <p className="text-[10px] md:text-[11px] text-slate-900 leading-snug line-clamp-4 whitespace-pre-wrap break-words">{c.text}</p>
@@ -547,7 +569,7 @@ export default function KocostarReportDeck({ campaign }) {
                     </div>
                   </div>
                 )) : (
-                  <p className="col-span-full text-sm text-slate-500 py-12 text-center">댓글 샘이 비어 있습니다. CSV 임포트로 report_comment_samples를 채워 주세요.</p>
+                  <p className="col-span-full text-sm text-slate-500 py-12 text-center">댓글 원문이 비어 있습니다. 스프레드시트 두 탭을 CSV로 저장해 `npm run import:kocostar-report`로 재임포트하세요.</p>
                 )}
               </div>
             </div>

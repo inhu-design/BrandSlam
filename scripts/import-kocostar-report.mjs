@@ -1,9 +1,17 @@
+/**
+ * 두 탭 모두 TikTok 분석 원문이면 각각 아래 이름으로 저장 후 이 스크립트를 실행하세요.
+ * @see gid=496390458 → tmp_reports/sheet5.csv
+ * @see gid=481172263 → tmp_reports/sheet6.csv
+ * 원본 스프레드시트 예: docs.google.com/spreadsheets/d/16KCVpfEvWS3ZPHMspHcodL_GChhMruB-O6k5RhZuk4Y/…
+ */
 import fs from 'fs';
 import path from 'path';
 import { createClient } from '@supabase/supabase-js';
 
 const PERF_FILES = ['sheet1.csv', 'sheet2.csv', 'sheet3.csv', 'sheet4.csv'];
 const COMMENT_FILES = ['sheet5.csv', 'sheet6.csv'];
+/** 대시보드 2페이지에 실을 원문 JSON 상한(집계·감성 통계는 전체 댓글 기준 그대로) */
+const MAX_COMMENT_SAMPLES_STORAGE = 220;
 const REPORT_EMAIL = 'kocostar@report.com';
 
 function loadEnvLocal() {
@@ -536,7 +544,7 @@ function aggregateFromCsv(baseDir) {
     ],
   };
 
-  const commentSamples = comments.map((c) => ({
+  const commentSamples = comments.slice(0, MAX_COMMENT_SAMPLES_STORAGE).map((c) => ({
     text: c.display_text,
     digg_count: c.likes,
     reply_comment_total: c.replies,
