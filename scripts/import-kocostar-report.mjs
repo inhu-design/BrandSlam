@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 
 const PERF_FILES = ['sheet1.csv', 'sheet2.csv', 'sheet3.csv', 'sheet4.csv'];
 const COMMENT_FILES = ['sheet5.csv', 'sheet6.csv'];
-const REPORT_EMAIL = 'cocostar@report.com';
+const REPORT_EMAIL = 'kocostar@report.com';
 
 function loadEnvLocal() {
   const p = path.resolve(process.cwd(), '.env.local');
@@ -541,16 +541,19 @@ async function main() {
 
   let campaignId = existing?.[0]?.id || null;
   const now = new Date();
-  const orderNumber = existing?.[0]?.order_number || `BS-COCOSTAR-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+  let orderNumber =
+    existing?.[0]?.order_number
+    || `BS-KOCOSTAR-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+  orderNumber = String(orderNumber).replace(/^BS-COCOSTAR/i, 'BS-KOCOSTAR');
 
   const campaignRow = {
     user_id: userId,
     order_number: orderNumber,
-    plan: 'Cocostar Report',
+    plan: 'Kocostar Report',
     status: 'COMPLETED',
     brand_name: 'KOCOSTAR',
-    product_name: 'Cocostar Performance & Comment Report',
-    customer_name: 'COCOSTAR',
+    product_name: 'Kocostar Performance & Comment Report',
+    customer_name: 'KOCOSTAR',
     customer_email: REPORT_EMAIL,
     target_creators: agg.topCreators.length,
     matched_creators: agg.topCreators.length,
@@ -601,9 +604,9 @@ async function main() {
 
   const reportForm = {
     companyName: 'KOCOSTAR',
-    contactName: 'COCOSTAR Report Bot',
+    contactName: 'KOCOSTAR Report Bot',
     contactEmail: REPORT_EMAIL,
-    productName: 'Cocostar Completed Campaign Report',
+    productName: 'Kocostar Completed Campaign Report',
     targetAudienceCountry: 'Global (US 중심)',
     guidelineStatus: 'completed',
     report_summary: {

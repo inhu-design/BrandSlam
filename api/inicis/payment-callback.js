@@ -35,10 +35,13 @@ export default async function handler(req, res) {
   const successCodes = ['00', '0000', '0', '000'];
   const isSuccess = successCodes.includes(resultCode);
 
-  // 결제 실패·취소: 임시 초안만 제거 (orders 행은 없음)
+  // 결제 실패·취소: 임시 초안만 제거 (orders 행은 없음); CPM은 대기 상태 제거
   if (!isSuccess && orderId && supabase) {
     try {
       await supabase.from('checkout_drafts').delete().eq('oid', orderId);
+      if (String(orderId).startsWith('CPM-')) {
+        await supabase.from('cpm_orders').delete().eq('order_number', orderId).eq('status', 'pending_payment');
+      }
     } catch (err) {
       console.error('[inicis payment-callback] draft delete', err);
     }
@@ -56,7 +59,19 @@ export default async function handler(req, res) {
       if (!order?.user_id) {
         const { data: draftRow } = await supabase.from('checkout_drafts').select('payload').eq('oid', orderId).maybeSingle();
         const p = draftRow?.payload;
-        if (p && p.user_id && Array.isArray(p.order_items) && p.order_items.length > 0) {
+        if (
+          p &&
+          String(p.flow || '').toLowerCase() === 'cpm' &&
+          p.user_id &&
+          orderId.startsWith('CPM-')
+        ) {
+          await supabase
+            .from('cpm_orders')
+            .update({ status: 'paid', updated_at: new Date().toISOString() })
+            .eq('order_number', orderId)
+            .eq('status', 'pending_payment');
+          await supabase.from('checkout_drafts').delete().eq('oid', orderId);
+        } else if (p && p.user_id && Array.isArray(p.order_items) && p.order_items.length > 0) {
           const insertRow = {
             order_number: orderId,
             plan_name: p.plan_name,
@@ -119,6 +134,7 @@ export default async function handler(req, res) {
     success: isSuccess ? '1' : '0',
   });
   if (body.resultMsg) q.set('msg', body.resultMsg);
-  res.setHeader('Location', `${baseUrl}/checkout/result?${q.toString()}`);
+  const resultPath = orderId.startsWith('CPM-') ? '/cpm/result' : '/checkout/result';
+  res.setHeader('Location', `${baseUrl}${resultPath}?${q.toString()}`);
   return res.status(302).end();
 }

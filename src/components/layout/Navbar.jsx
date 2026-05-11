@@ -79,6 +79,7 @@ const Navbar = () => {
   const FAQ_URL = 'https://spiral-playground-cff.notion.site/306259eb52488045a8b1f4ec3b64dfe9';
 
   const navLinks = [
+    { name: 'CPM 매체', path: '/cpm' },
     { name: '고객 사례', path: '/#cases'},
     { name: '프로세스', path: '/#process' },
     { name: '요금제', path: '/#pricing'},

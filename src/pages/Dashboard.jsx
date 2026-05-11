@@ -2633,21 +2633,117 @@ const AnalyticsReport = ({ campaign }) => {
       || (summaryViews > 0
         ? `${(((summaryLikes + summaryComments + summaryShares) / summaryViews) * 100).toFixed(2)}%`
         : pct(reportSummary.engagement_rate));
+    const reportDeckRef = useRef(null);
+
+    const dedupedReportTopCreators = [...reportTopCreators.reduce((acc, creator) => {
+      const name = String(creator?.name || '-').trim();
+      const key = name.toLowerCase();
+      const prev = acc.get(key) || {
+        name,
+        platformSet: new Set(),
+        views: 0,
+        likes: 0,
+        comments: 0,
+        shares: 0,
+        posts: 0,
+      };
+      String(creator?.platform || '-')
+        .split('/')
+        .map((x) => x.trim())
+        .filter(Boolean)
+        .forEach((platform) => prev.platformSet.add(platform));
+      prev.views += Number(creator?.views || 0);
+      prev.likes += Number(creator?.likes || 0);
+      prev.comments += Number(creator?.comments || 0);
+      prev.shares += Number(creator?.shares || 0);
+      prev.posts += Number(creator?.posts || 1);
+      acc.set(key, prev);
+      return acc;
+    }, new Map()).values()]
+      .map((creator) => ({
+        ...creator,
+        platform: [...creator.platformSet].sort().join('/'),
+      }))
+      .sort((a, b) => b.views - a.views);
+
+    const commentExampleSnippets = [
+      ...topicMatrix.flatMap((row) => Array.isArray(row?.evidence) ? row.evidence : []),
+      ...highIntentExamples,
+      ...midIntentExamples,
+      ...viralExamples,
+    ].filter(Boolean).slice(0, 10);
+
+    const userCharacteristicNotes = [
+      {
+        label: 'Creator-like bio',
+        value: reportDataStudio?.user_characteristics?.creator_like || 0,
+        help: '댓글 작성자 프로필에 UGC, creator, influencer, content 등 제작자 성향 단어가 감지된 수입니다.',
+      },
+      {
+        label: 'Shopper-like bio',
+        value: reportDataStudio?.user_characteristics?.shopper_like || 0,
+        help: '프로필에 shop, deal, coupon, save, sale 등 쇼핑·할인 탐색 성향 단어가 감지된 수입니다. 1 미만이면 해당 성향이 거의 없다는 뜻입니다.',
+      },
+      {
+        label: 'Skincare-interest bio',
+        value: reportDataStudio?.user_characteristics?.skincare_interest || 0,
+        help: '프로필에 skin, beauty, cosmetic, makeup, skincare 등 뷰티·스킨케어 관심 단어가 감지된 수입니다.',
+      },
+    ];
+
+    const scrollReportDeck = (direction) => {
+      const deck = reportDeckRef.current;
+      if (!deck) return;
+      deck.scrollBy({ left: direction * deck.clientWidth, behavior: 'smooth' });
+    };
 
     return (
-        <div className="space-y-10 animate-fade-in-up">
-            <div className="bg-white/5 backdrop-blur-xl p-8 rounded-[3rem] border border-white/10 shadow-2xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-96 h-96 bg-purple-600/5 blur-[100px] rounded-full"></div>
+        <div className="space-y-10 animate-fade-in-up report-light">
+            <style>{`
+              .report-light .report-shell { background: #f8fafc; color: #0f172a; }
+              .report-light .text-white { color: #0f172a !important; }
+              .report-light .text-slate-100, .report-light .text-slate-200, .report-light .text-slate-300 { color: #334155 !important; }
+              .report-light .text-slate-400, .report-light .text-slate-500 { color: #64748b !important; }
+              .report-light .border-white\\/10, .report-light .border-white\\/15, .report-light .border-white\\/20, .report-light .border-white\\/5 { border-color: #e2e8f0 !important; }
+              .report-light .bg-white\\/\\[0\\.03\\], .report-light .bg-white\\/\\[0\\.02\\], .report-light .bg-white\\/5 { background: #ffffff !important; }
+              .report-light .bg-black\\/20, .report-light .bg-black\\/25, .report-light .bg-black\\/30 { background: #f1f5f9 !important; }
+              .report-light .divide-white\\/5 > :not([hidden]) ~ :not([hidden]) { border-color: #e2e8f0 !important; }
+              .report-slide-deck { display: flex; gap: 1.25rem; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 1rem; }
+              .report-slide-deck > div { flex: 0 0 100%; scroll-snap-align: start; min-height: 620px; }
+              .report-slide-deck::-webkit-scrollbar { height: 10px; }
+              .report-slide-deck::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+            `}</style>
+            <div className="report-shell bg-white backdrop-blur-xl p-6 md:p-8 rounded-[3rem] border border-slate-200 shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-200/30 blur-[100px] rounded-full"></div>
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8 relative z-10">
                     <h3 className="font-black text-white text-3xl md:text-4xl flex items-center gap-3 tracking-tight">
-                        <BarChart2 size={28} className="text-purple-400" /> 캠페인 퍼포먼스 리포트
+                        <BarChart2 size={28} className="text-cyan-600" /> KOCOSTAR 캠페인 리포트
                     </h3>
                     <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-[10px] font-black tracking-widest uppercase px-4 py-2 bg-white/5 border border-white/10 rounded-2xl text-cyan-300">
-                            Advanced Report Mode
+                        <span className="text-[10px] font-black tracking-widest uppercase px-4 py-2 bg-cyan-50 border border-cyan-200 rounded-2xl text-cyan-700">
+                            Client-facing Report Deck
                         </span>
                     </div>
                 </div>
+
+                <div className="mb-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 rounded-[2rem] border border-cyan-100 bg-white p-5 shadow-sm relative z-10">
+                    <div>
+                        <p className="text-[11px] uppercase tracking-[0.22em] text-cyan-700 font-black mb-1">Ad-ready proof asset</p>
+                        <p className="text-sm md:text-base text-slate-700 font-semibold leading-relaxed">
+                            유료 광고 소재로 바로 보여줄 수 있도록, “브랜드가 맡기면 이런 수준의 댓글·성과 리포트를 받는다”는 메시지가 드러나게 정리했습니다.
+                        </p>
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                        <button type="button" onClick={() => scrollReportDeck(-1)} className="w-11 h-11 rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm flex items-center justify-center hover:bg-slate-50">
+                            <ChevronLeft size={20} />
+                        </button>
+                        <button type="button" onClick={() => scrollReportDeck(1)} className="w-11 h-11 rounded-full border border-slate-200 bg-slate-900 text-white shadow-sm flex items-center justify-center hover:bg-slate-800">
+                            <ChevronRight size={20} />
+                        </button>
+                    </div>
+                </div>
+
+                <div ref={reportDeckRef} className="report-slide-deck relative z-10">
 
                 <div className="mb-8 rounded-[2rem] p-6 border border-fuchsia-400/20 bg-gradient-to-r from-fuchsia-500/10 via-indigo-500/10 to-cyan-500/10 relative z-10">
                     <p className="text-[11px] uppercase tracking-[0.25em] text-fuchsia-200 font-black mb-2">Executive Highlight</p>
@@ -2679,10 +2775,16 @@ const AnalyticsReport = ({ campaign }) => {
                     </div>
                 </div>
 
-                <div className="bg-black/20 rounded-[2rem] border border-white/5 p-8 mb-8 relative z-10">
-                    <p className="text-xs font-black tracking-widest text-slate-400 uppercase mb-5">Daily View Trend</p>
-                    <div className="flex h-64 relative items-end pb-12 pl-10 gap-4">
-                        <div className="absolute top-0 left-0 h-full flex flex-col justify-between text-[10px] text-slate-600 font-black uppercase tracking-[0.2em] pb-12">
+                <div className="bg-white rounded-[2rem] border border-cyan-100 p-6 md:p-8 mb-8 relative z-10 shadow-sm">
+                    <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-2 mb-6">
+                        <div>
+                            <p className="text-[11px] font-black tracking-[0.22em] text-cyan-700 uppercase">Daily View Trend</p>
+                            <h4 className="text-2xl md:text-3xl font-black text-slate-950 mt-1">일별 조회수 추이</h4>
+                        </div>
+                        <p className="text-xs text-slate-500 font-semibold">가장 높은 일별 피크를 기준으로 막대 높이를 환산했습니다.</p>
+                    </div>
+                    <div className="flex h-80 relative items-end pb-14 pl-12 gap-4 rounded-2xl bg-slate-50 border border-slate-100 px-5 pt-6">
+                        <div className="absolute top-6 left-4 h-[calc(100%-5rem)] flex flex-col justify-between text-[10px] text-slate-500 font-black uppercase tracking-[0.15em]">
                             <span>{fmt(maxDaily)}K</span>
                             <span>{fmt(Math.round(maxDaily * 0.66))}K</span>
                             <span>{fmt(Math.round(maxDaily * 0.33))}K</span>
@@ -2691,14 +2793,14 @@ const AnalyticsReport = ({ campaign }) => {
                         {dailyViews.map((views, idx) => (
                             <div key={`${dates[idx] || idx}`} className="flex-1 flex flex-col justify-end group relative h-full">
                                 <div
-                                    className="w-full bg-gradient-to-t from-purple-600/40 to-cyan-400/80 hover:to-white transition-all duration-500 rounded-t-xl relative shadow-[0_0_20px_rgba(168,85,247,0.2)]"
+                                    className="w-full bg-gradient-to-t from-cyan-700 to-cyan-400 hover:from-cyan-900 hover:to-sky-400 transition-all duration-500 rounded-t-xl relative shadow-[0_10px_25px_rgba(8,145,178,0.25)]"
                                     style={{ height: `${Math.max(6, (Number(views || 0) / maxDaily) * 100)}%` }}
                                 >
-                                    <div className="absolute -top-9 left-1/2 -translate-x-1/2 bg-white text-[#020617] text-[10px] font-black px-2.5 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-all whitespace-nowrap z-20 shadow-2xl">
+                                    <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-950 text-white text-[10px] font-black px-2.5 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-all whitespace-nowrap z-20 shadow-2xl">
                                         {fmt(views)}K
                                     </div>
                                 </div>
-                                <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[10px] font-black text-slate-500 tracking-tighter whitespace-nowrap uppercase">
+                                <div className="absolute -bottom-9 left-1/2 -translate-x-1/2 text-[10px] font-black text-slate-600 tracking-tighter whitespace-nowrap uppercase">
                                     {dates[idx]}
                                 </div>
                             </div>
@@ -2729,7 +2831,15 @@ const AnalyticsReport = ({ campaign }) => {
                                 <p className="text-white font-black mt-1">{pct(reportSummary.purchase_intent_pct)}</p>
                             </div>
                             <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
-                                <p className="text-slate-500 uppercase tracking-widest">바이럴 신호</p>
+                                <div className="flex items-center gap-1.5">
+                                    <p className="text-slate-500 uppercase tracking-widest">바이럴 신호</p>
+                                    <span className="relative group inline-flex">
+                                        <span className="w-4 h-4 rounded-full bg-slate-900 text-white text-[10px] font-black flex items-center justify-center cursor-help">?</span>
+                                        <span className="pointer-events-none absolute left-1/2 top-6 z-30 w-72 -translate-x-1/2 rounded-xl bg-slate-950 px-3 py-2 text-[11px] leading-relaxed text-white opacity-0 shadow-2xl transition-opacity group-hover:opacity-100">
+                                            친구 태그, 공유, 가족/지인에게 보여주고 싶다는 댓글처럼 콘텐츠 확산 가능성을 암시하는 표현의 비중입니다.
+                                        </span>
+                                    </span>
+                                </div>
                                 <p className="text-white font-black mt-1">{pct(reportSummary.viral_signal_pct)}</p>
                             </div>
                         </div>
@@ -2747,7 +2857,7 @@ const AnalyticsReport = ({ campaign }) => {
                     <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
                         <h4 className="text-sm font-black uppercase tracking-widest text-slate-200 mb-5">Top 10 Creators</h4>
                         <div className="space-y-2">
-                            {(reportTopCreators.slice(0, 10)).map((c, idx) => {
+                            {(dedupedReportTopCreators.slice(0, 10)).map((c, idx) => {
                                 const v = Number(c?.views || 0);
                                 const l = Number(c?.likes || 0);
                                 const cm = Number(c?.comments || 0);
@@ -2888,10 +2998,19 @@ const AnalyticsReport = ({ campaign }) => {
                         </div>
                         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
                             <h5 className="text-sm font-black text-white mb-3 uppercase tracking-widest">댓글단 유저 특성</h5>
+                            <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+                                댓글 작성자의 프로필 소개문(bio)에 들어간 키워드를 기준으로 성향을 자동 분류한 보조 지표입니다.
+                            </p>
                             <div className="grid grid-cols-1 gap-2 text-xs">
-                                <div className="rounded-lg bg-white/[0.02] border border-white/10 px-3 py-2 flex justify-between"><span className="text-slate-300">Creator-like bio</span><span className="text-white font-bold">{fmt(reportDataStudio?.user_characteristics?.creator_like || 0)}</span></div>
-                                <div className="rounded-lg bg-white/[0.02] border border-white/10 px-3 py-2 flex justify-between"><span className="text-slate-300">Shopper-like bio</span><span className="text-white font-bold">{fmt(reportDataStudio?.user_characteristics?.shopper_like || 0)}</span></div>
-                                <div className="rounded-lg bg-white/[0.02] border border-white/10 px-3 py-2 flex justify-between"><span className="text-slate-300">Skincare-interest bio</span><span className="text-white font-bold">{fmt(reportDataStudio?.user_characteristics?.skincare_interest || 0)}</span></div>
+                                {userCharacteristicNotes.map((note) => (
+                                    <div key={note.label} className="rounded-lg bg-white/[0.02] border border-white/10 px-3 py-2">
+                                        <div className="flex justify-between gap-3">
+                                            <span className="text-slate-300 font-black">{note.label}</span>
+                                            <span className="text-white font-bold">{fmt(note.value)}</span>
+                                        </div>
+                                        <p className="mt-1 text-[11px] leading-relaxed text-slate-500">{note.help}</p>
+                                    </div>
+                                ))}
                             </div>
                             <div className="mt-3 flex flex-wrap gap-2">
                                 {((reportDataStudio?.user_characteristics?.top_languages || []).slice(0, 6)).map(([lang, cnt]) => (
@@ -2914,11 +3033,26 @@ const AnalyticsReport = ({ campaign }) => {
                                 <div className="flex justify-between rounded-lg bg-white/[0.02] px-3 py-2"><span className="text-slate-300">댓글 좋아요</span><span className="text-cyan-300 font-black">{fmt(quantSummary.total_comment_likes || reportSummary.total_comment_likes)}</span></div>
                                 <div className="flex justify-between rounded-lg bg-white/[0.02] px-3 py-2"><span className="text-slate-300">댓글 답글</span><span className="text-fuchsia-300 font-black">{fmt(quantSummary.total_comment_replies || reportSummary.total_comment_replies)}</span></div>
                                 <div className="flex justify-between rounded-lg bg-white/[0.02] px-3 py-2"><span className="text-slate-300">구매의향</span><span className="text-emerald-300 font-black">{pct(quantSummary.purchase_intent_pct || reportSummary.purchase_intent_pct)}</span></div>
-                                <div className="flex justify-between rounded-lg bg-white/[0.02] px-3 py-2"><span className="text-slate-300">바이럴 신호</span><span className="text-purple-300 font-black">{pct(quantSummary.viral_signal_pct || reportSummary.viral_signal_pct)}</span></div>
+                                <div className="flex justify-between rounded-lg bg-white/[0.02] px-3 py-2">
+                                    <span className="text-slate-300 flex items-center gap-1.5">
+                                        바이럴 신호
+                                        <span className="relative group inline-flex">
+                                            <span className="w-4 h-4 rounded-full bg-slate-900 text-white text-[10px] font-black flex items-center justify-center cursor-help">?</span>
+                                            <span className="pointer-events-none absolute left-0 top-6 z-30 w-72 rounded-xl bg-slate-950 px-3 py-2 text-[11px] leading-relaxed text-white opacity-0 shadow-2xl transition-opacity group-hover:opacity-100">
+                                                친구 태그, 공유 요청, 가족/지인 언급처럼 자연 확산을 만들 수 있는 댓글 키워드를 집계한 비율입니다.
+                                            </span>
+                                        </span>
+                                    </span>
+                                    <span className="text-purple-300 font-black">{pct(quantSummary.viral_signal_pct || reportSummary.viral_signal_pct)}</span>
+                                </div>
                             </div>
                         </div>
-                        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-                            <h5 className="text-sm font-black text-white mb-3 uppercase tracking-widest">댓글 정성 분석 요약</h5>
+                        <div className="rounded-2xl border border-cyan-200 bg-cyan-50 p-5 shadow-sm">
+                            <p className="text-[10px] font-black tracking-[0.22em] text-cyan-700 uppercase mb-1">Strongest selling point</p>
+                            <h5 className="text-xl font-black text-slate-950 mb-3 tracking-tight">댓글 분석: 이 리포트의 핵심 강점</h5>
+                            <p className="text-xs text-slate-600 leading-relaxed mb-4">
+                                단순 조회수 리포트가 아니라, 실제 고객 댓글에서 감성·구매 의도·바이럴 가능성·개선 포인트를 뽑아 다음 실행 전략으로 연결합니다.
+                            </p>
                             <ul className="space-y-3 text-xs text-slate-300">
                                 {(qualitativeSummary.length > 0 ? qualitativeSummary : [
                                     '긍정/중립 비중이 높아 전반적인 제품 수용도가 양호합니다.',
@@ -2930,6 +3064,18 @@ const AnalyticsReport = ({ campaign }) => {
                                     </li>
                                 ))}
                             </ul>
+                            {commentExampleSnippets.length > 0 ? (
+                                <div className="mt-5">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">실제 댓글 예시</p>
+                                    <div className="grid grid-cols-1 gap-2">
+                                        {commentExampleSnippets.slice(0, 6).map((text, idx) => (
+                                            <blockquote key={`comment-example-${idx}`} className="rounded-xl border border-cyan-100 bg-white px-3 py-2 text-xs text-slate-700 leading-relaxed">
+                                                “{text}”
+                                            </blockquote>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : null}
                         </div>
                         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
                             <h5 className="text-sm font-black text-white mb-3 uppercase tracking-widest">다음 액션 플랜</h5>
@@ -3170,6 +3316,7 @@ const AnalyticsReport = ({ campaign }) => {
                             </div>
                         </div>
                     ) : null}
+                </div>
                 </div>
             </div>
         </div>

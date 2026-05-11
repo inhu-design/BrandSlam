@@ -8,6 +8,7 @@ import { createHash } from 'crypto';
 import { supabase } from '../../server/lib/supabase-server.js';
 import { assertFramelessOfferPrice } from '../../server/lib/custom-offers.js';
 import { assertDbCustomPaymentOfferPrice } from '../../server/lib/db-custom-payment-offers.js';
+import { assertCpmOrderPrice } from '../../server/lib/assert-cpm-order-price.js';
 
 const INICIS_MID = process.env.INICIS_MID || '';
 const INICIS_SIGNKEY = process.env.INICIS_SIGNKEY || '';
@@ -43,9 +44,15 @@ export default async function handler(req, res) {
     });
   }
 
+  const base = (process.env.INICIS_RETURN_BASE_URL || 'https://www.slam-global.com').replace(/\/$/, '');
+  let closeUrlOverride = `${base}/checkout`;
+
   if (orderDraft != null && typeof orderDraft === 'object') {
     let priceCheck;
-    if (orderDraft.custom_payment_offer_id) {
+    if (String(orderDraft.flow || '').toLowerCase() === 'cpm') {
+      priceCheck = await assertCpmOrderPrice(orderDraft, price, supabase);
+      closeUrlOverride = `${base}/cpm`;
+    } else if (orderDraft.custom_payment_offer_id) {
       priceCheck = await assertDbCustomPaymentOfferPrice(orderDraft, price, supabase);
     } else {
       priceCheck = assertFramelessOfferPrice(orderDraft, price);
@@ -91,9 +98,8 @@ export default async function handler(req, res) {
   // mKey = SHA256(signKey) — signKey 문자열 그대로 해시
   const mKey = sha256(INICIS_SIGNKEY);
 
-  const base = (process.env.INICIS_RETURN_BASE_URL || 'https://www.slam-global.com').replace(/\/$/, '');
   const returnUrl = `${base}/api/inicis/payment-callback`;
-  const closeUrl = `${base}/checkout`;
+  const closeUrl = closeUrlOverride;
 
   // 테스트: stgstdpay.inicis.com / 운영: stdpay.inicis.com (기본)
   const paymentUrl = (process.env.INICIS_PAYMENT_URL || 'https://stdpay.inicis.com/stdpay/INIStdPay.php').replace(/\/$/, '');

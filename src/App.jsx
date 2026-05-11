@@ -25,6 +25,8 @@ import CampaignSetup from './pages/CampaignSetup';
 import SetPassword from './pages/SetPassword';
 import Impersonate from './pages/Impersonate';
 import SlamLab from './pages/SlamLab';
+import CpmSite from './pages/CpmSite';
+import CpmOrderResult from './pages/CpmOrderResult';
 import SupportChatPortal from './components/support/SupportChatPortal';
 import DashboardChunkWarmup from './components/DashboardChunkWarmup';
 
@@ -64,6 +66,8 @@ function App() {
             element={<Navigate to="/dashboard" replace state={{ adminPanel: 'all_invoices' }} />}
           />
           <Route path="/slam-lab" element={<SlamLab />} />
+          <Route path="/cpm" element={<CpmSite />} />
+          <Route path="/cpm/result" element={<CpmOrderResult />} />
           <Route path="/landing-new" element={<Navigate to="/slam-lab" replace />} />
           {/* 매직 링크 등으로 잘못된 경로 진입 시 대시보드로 (SPA 폴백) */}
           <Route path="*" element={<Navigate to="/" replace />} />

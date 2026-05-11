@@ -25,14 +25,18 @@ export default async function handler(req, res) {
   }
 
   const orderNumber = (body.order_number || '').toString().trim();
-  if (!orderNumber || !orderNumber.startsWith('BS-')) {
-    return res.status(400).json({ error: 'order_number required (BS-...)' });
+  if (!orderNumber || (!orderNumber.startsWith('BS-') && !orderNumber.startsWith('CPM-'))) {
+    return res.status(400).json({ error: 'order_number required (BS-... or CPM-...)' });
   }
 
   try {
-    await supabase.from('campaigns').delete().eq('order_number', orderNumber);
-    await supabase.from('orders').delete().eq('order_number', orderNumber);
     await supabase.from('checkout_drafts').delete().eq('oid', orderNumber);
+    if (orderNumber.startsWith('BS-')) {
+      await supabase.from('campaigns').delete().eq('order_number', orderNumber);
+      await supabase.from('orders').delete().eq('order_number', orderNumber);
+    } else if (orderNumber.startsWith('CPM-')) {
+      await supabase.from('cpm_orders').delete().eq('order_number', orderNumber).eq('status', 'pending_payment');
+    }
     return res.status(200).json({ ok: true });
   } catch (err) {
     console.error('[rollback-order]', err);
