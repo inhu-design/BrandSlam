@@ -324,6 +324,7 @@ export default function KocostarReportDeck({ campaign }) {
   const bestPostsForSlide = useMemo(() => mergedTopPosts.slice(0, 12), [mergedTopPosts]);
 
   const [slideIdx, setSlideIdx] = useState(0);
+  const [dailyBarHover, setDailyBarHover] = useState(null);
   const trackRef = useRef(null);
 
   /** 페이지 세로 스크롤 유발하지 않도록 가로 트랙만 scrollLeft 이동 (한 칼럼 폭 = 트랙 clientWidth) */
@@ -339,6 +340,10 @@ export default function KocostarReportDeck({ campaign }) {
   useEffect(() => {
     scrollTrackToIndex(slideIdx, 'smooth');
   }, [slideIdx, scrollTrackToIndex]);
+
+  useEffect(() => {
+    setDailyBarHover(null);
+  }, [slideIdx]);
 
   /** 드래그·트랙패드 등으로 스크롤했을 때 인덱스 동기화 */
   useEffect(() => {
@@ -471,9 +476,7 @@ export default function KocostarReportDeck({ campaign }) {
           <SlideFrame title="개요 · 핵심 수치" eyebrow="Executive Overview">
             <div className="flex flex-col gap-3">
               <p className="text-xs md:text-sm text-slate-700 font-semibold leading-snug shrink-0">
-                누적 <span className="text-cyan-700 font-black">{fmt(summaryViews)}</span> 조회 ·{' '}
-                <span className="text-emerald-800 font-black">{fmt(summaryComments)}</span> 영상 단 댓글 ·{' '}
-                수집·분석 <span className="text-indigo-800 font-black">{fmt(reportCommentSamples.length)}</span>건의 코멘트 원문 포함
+                누적 <span className="text-cyan-700 font-black">{fmt(summaryViews)}</span> 조회
               </p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 shrink-0">
                 <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
@@ -523,14 +526,7 @@ export default function KocostarReportDeck({ campaign }) {
 
         <div className="min-w-0" data-slide-item>
           <SlideFrame title="실제 TikTok 댓글" eyebrow="Comment verbatim · scraped feed">
-            <div className="flex flex-col gap-2 min-h-0">
-              <div className="rounded-md border border-amber-200/90 bg-amber-50/80 px-2.5 py-1.5 shrink-0">
-                <p className="text-[10px] md:text-[11px] text-amber-950 font-semibold leading-snug">
-                  스프레드시트와 동일한 원문입니다. 카드는 컴팩트하게 두어 한 슬라이드에서 많이 확인할 수 있게 했습니다.
-                  <span className="tabular-nums"> 총 {fmt(reportCommentSamples.length)}건</span>
-                  — 슬라이드 안 세로 스크롤로 이어 보기.
-                </p>
-              </div>
+            <div className="flex flex-col min-h-0">
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 flex-1 min-h-0 content-start overflow-y-auto pr-0.5">
                 {reportCommentSamples.length ? reportCommentSamples.map((c, idx) => (
                   <div
@@ -561,7 +557,21 @@ export default function KocostarReportDeck({ campaign }) {
         <div className="min-w-0" data-slide-item>
           <SlideFrame title="일별 조회 추이" eyebrow="Daily View Trend">
             <div className="flex-1 flex flex-col min-h-0">
-              <p className="text-[11px] text-slate-500 mb-3 shrink-0 leading-snug">막대는 일별 피크 대비 높이로 환산했습니다. 막대에 마우스를 올리면 해당 일의 조회수를 확인할 수 있습니다.</p>
+              <p className="text-[11px] text-slate-500 mb-2 shrink-0 leading-snug">막대는 일별 피크 대비 높이로 환산했습니다.</p>
+              <div
+                className="mb-2 min-h-[1.375rem] shrink-0 text-sm font-black tabular-nums text-slate-900"
+                aria-live="polite"
+              >
+                {dailyBarHover ? (
+                  <>
+                    {dailyBarHover.label}: <span className="text-cyan-800">{fmt(dailyBarHover.views)}</span> 조회
+                  </>
+                ) : (
+                  <span className="invisible select-none pointer-events-none" aria-hidden>
+                    &nbsp;
+                  </span>
+                )}
+              </div>
               <div className="flex-1 flex items-end pb-12 pl-8 pr-2 gap-1 rounded-xl bg-slate-50 border border-slate-100 min-h-[180px] max-h-[48vh] px-3 pt-3 relative">
                 <div className="absolute top-4 left-2 h-[calc(100%-3.75rem)] flex flex-col justify-between text-[9px] text-slate-500 font-black uppercase tracking-wider leading-none">
                   <span>{fmt(maxDaily)}</span>
@@ -572,18 +582,26 @@ export default function KocostarReportDeck({ campaign }) {
                 {dailyViews.map((views, idx) => {
                   const dv = Number(views || 0);
                   const dLabel = dates[idx] != null && dates[idx] !== '' ? String(dates[idx]) : `일 ${idx + 1}`;
-                  const tip = `${dLabel}: ${fmt(dv)} 조회`;
                   return (
-                  <div key={`${dates[idx] || idx}-bar`} className="relative h-full flex flex-col justify-end group" style={{ width: barW }} title={tip}>
+                  <button
+                    key={`${dates[idx] || idx}-bar`}
+                    type="button"
+                    className="relative h-full flex min-h-0 min-w-0 flex-col justify-end rounded-sm border border-transparent bg-transparent p-0 text-left hover:border-cyan-300/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-600"
+                    style={{ width: barW }}
+                    onMouseEnter={() => setDailyBarHover({ label: dLabel, views: dv })}
+                    onMouseLeave={() => setDailyBarHover(null)}
+                    onFocus={() => setDailyBarHover({ label: dLabel, views: dv })}
+                    onBlur={() => setDailyBarHover(null)}
+                    aria-label={`${dLabel} ${fmt(dv)} 조회`}
+                  >
                     <div
-                      className="w-full mx-0.5 bg-gradient-to-t from-cyan-700 to-sky-400 rounded-t-lg shadow-sm min-h-[3px]"
+                      className="w-full mx-0.5 bg-gradient-to-t from-cyan-700 to-sky-400 rounded-t-lg shadow-sm min-h-[3px] pointer-events-none"
                       style={{ height: `${Math.max(4, (dv / maxDaily) * 100)}%` }}
-                      title={tip}
                     />
-                    <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[9px] font-bold text-slate-600 truncate max-w-full">
+                    <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[9px] font-bold text-slate-600 truncate max-w-full pointer-events-none">
                       {dLabel}
                     </div>
-                  </div>
+                  </button>
                   );
                 })}
               </div>
