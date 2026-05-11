@@ -22,8 +22,8 @@ const NAV_SLIDES = [
 function SlideFrame({ title, eyebrow, children }) {
   return (
     <div
-      className="w-full min-w-full shrink-0 snap-start flex flex-col rounded-[1.75rem] border border-slate-200 bg-white shadow-[0_20px_50px_-24px_rgba(15,23,42,0.25)] overflow-hidden"
-      style={{ height: 'min(calc(100dvh - 12.5rem), 720px)', maxHeight: 'min(calc(100dvh - 12.5rem), 720px)' }}
+      className="w-full max-w-none min-w-0 h-full snap-start snap-always flex flex-col rounded-[1.75rem] border border-slate-200 bg-white shadow-[0_20px_50px_-24px_rgba(15,23,42,0.25)] overflow-hidden box-border"
+      style={{ height: 'min(calc(100dvh - 13rem), 760px)', maxHeight: 'min(calc(100dvh - 13rem), 760px)' }}
       role="group"
       aria-roledescription="slide"
     >
@@ -194,19 +194,48 @@ export default function KocostarReportDeck({ campaign }) {
   const [slideIdx, setSlideIdx] = useState(0);
   const trackRef = useRef(null);
 
-  const scrollSlideIntoView = useCallback((index) => {
-    const row = trackRef.current;
-    if (!row) return;
-    const slides = row.querySelectorAll('[data-slide-item]');
-    const el = slides[index];
-    if (el && typeof el.scrollIntoView === 'function') {
-      el.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
-    }
+  /** 페이지 세로 스크롤 유발하지 않도록 가로 트랙만 scrollLeft 이동 (한 칼럼 폭 = 트랙 clientWidth) */
+  const scrollTrackToIndex = useCallback((index, behavior = 'smooth') => {
+    const track = trackRef.current;
+    if (!track) return;
+    const w = track.clientWidth;
+    if (!(w > 0)) return;
+    const clamped = Math.max(0, Math.min(NAV_SLIDES.length - 1, index));
+    track.scrollTo({ left: clamped * w, behavior: behavior === 'smooth' ? 'smooth' : 'auto' });
   }, []);
 
   useEffect(() => {
-    scrollSlideIntoView(slideIdx);
-  }, [slideIdx, scrollSlideIntoView]);
+    scrollTrackToIndex(slideIdx, 'smooth');
+  }, [slideIdx, scrollTrackToIndex]);
+
+  /** 드래그·트랙패드 등으로 스크롤했을 때 인덱스 동기화 */
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track) return;
+    let t;
+    const onScroll = () => {
+      window.clearTimeout(t);
+      t = window.setTimeout(() => {
+        const w = track.clientWidth;
+        if (!(w > 0)) return;
+        const i = Math.round(track.scrollLeft / w);
+        setSlideIdx((prev) => (i === prev ? prev : Math.max(0, Math.min(NAV_SLIDES.length - 1, i))));
+      }, 80);
+    };
+    track.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.clearTimeout(t);
+      track.removeEventListener('scroll', onScroll);
+    };
+  }, []);
+
+  useEffect(() => {
+    const onResize = () => {
+      scrollTrackToIndex(slideIdx, 'auto');
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [slideIdx, scrollTrackToIndex]);
 
   const go = (delta) => {
     setSlideIdx((i) => Math.max(0, Math.min(NAV_SLIDES.length - 1, i + delta)));
@@ -265,12 +294,17 @@ export default function KocostarReportDeck({ campaign }) {
         각 페이지가 한 화면에 들어오도록 정보를 나누었습니다. 아래 목록을 누르거나 좌우 버튼으로 이동하세요.
       </p>
 
-      <nav aria-label="리포트 페이지" className="flex flex-wrap gap-2 px-1">
+      <nav aria-label="리포트 페이지" className="flex flex-wrap gap-2 px-1 scroll-mt-28 md:scroll-mt-32">
         {NAV_SLIDES.map((s, i) => (
           <button
             key={s.key}
             type="button"
-            onClick={() => setSlideIdx(i)}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => {
+              e.preventDefault();
+              setSlideIdx(i);
+              requestAnimationFrame(() => scrollTrackToIndex(i, 'smooth'));
+            }}
             className={`text-left px-3 py-2 rounded-xl text-[11px] md:text-xs font-bold border transition-colors max-w-[200px] sm:max-w-none ${
               i === slideIdx
                 ? 'bg-slate-900 text-white border-slate-900 shadow-md'
@@ -286,14 +320,18 @@ export default function KocostarReportDeck({ campaign }) {
         {slideIdx + 1} / {NAV_SLIDES.length}
       </p>
 
-      <div
-        ref={trackRef}
-        className="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-2 scrollbar-thin [scrollbar-width:thin]"
-        style={{ scrollbarColor: '#cbd5e1 transparent' }}
-        role="region"
-        aria-label="리포트 슬라이드 영역"
-      >
-        <div data-slide-item>
+      <div className="w-full overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-slate-100/40">
+        <div
+          ref={trackRef}
+          className="grid w-full grid-flow-col auto-cols-[100%] overflow-x-auto overflow-y-hidden snap-x snap-mandatory snap-always overscroll-x-contain scroll-smooth scrollbar-thin [scrollbar-width:thin] touch-pan-x"
+          style={{
+            scrollbarColor: '#cbd5e1 transparent',
+            WebkitOverflowScrolling: 'touch',
+          }}
+          role="region"
+          aria-label="리포트 슬라이드 영역"
+        >
+        <div className="min-w-0" data-slide-item>
           <SlideFrame title="개요 · 핵심 수치" eyebrow="Executive Overview">
             <div className="flex-1 min-h-0 flex flex-col gap-4 overflow-hidden">
               <p className="text-xs md:text-sm text-slate-700 font-semibold leading-snug shrink-0">
@@ -327,7 +365,7 @@ export default function KocostarReportDeck({ campaign }) {
           </SlideFrame>
         </div>
 
-        <div data-slide-item>
+        <div className="min-w-0" data-slide-item>
           <SlideFrame title="일별 조회 추이" eyebrow="Daily View Trend">
             <div className="flex-1 flex flex-col min-h-0">
               <p className="text-[11px] text-slate-500 mb-3 shrink-0 leading-snug">막대는 일별 피크 대비 높이로 환산했습니다.</p>
@@ -354,7 +392,7 @@ export default function KocostarReportDeck({ campaign }) {
           </SlideFrame>
         </div>
 
-        <div data-slide-item>
+        <div className="min-w-0" data-slide-item>
           <SlideFrame title="댓글 감성 · 반응 신호" eyebrow="Audience signals">
             <div className="flex-1 min-h-0 grid gap-4 md:grid-cols-2 overflow-hidden">
               <div className="min-h-0 flex flex-col gap-3 overflow-hidden">
@@ -418,7 +456,7 @@ export default function KocostarReportDeck({ campaign }) {
           </SlideFrame>
         </div>
 
-        <div data-slide-item>
+        <div className="min-w-0" data-slide-item>
           <SlideFrame title="상위 크리에이터" eyebrow={`Top performers · 최대 ${Math.min(dedupedReportTopCreators.length, 8)}명`}>
             <div className="flex-1 min-h-0 overflow-hidden rounded-xl border border-slate-100">
               <div className="grid grid-cols-12 gap-1 text-[10px] font-black text-slate-500 uppercase tracking-tighter px-3 py-2 bg-slate-50 border-b border-slate-100">
@@ -445,7 +483,7 @@ export default function KocostarReportDeck({ campaign }) {
           </SlideFrame>
         </div>
 
-        <div data-slide-item>
+        <div className="min-w-0" data-slide-item>
           <SlideFrame title="핵심 인사이트 · 추천 액션" eyebrow="What it means · What to do">
             <div className="flex-1 grid md:grid-cols-2 gap-4 min-h-0 overflow-hidden">
               <div className="min-h-0 flex flex-col rounded-xl border border-slate-100 bg-slate-50/70 p-3 overflow-hidden">
@@ -473,7 +511,7 @@ export default function KocostarReportDeck({ campaign }) {
         </div>
 
         {bestPostsChunks.map((chunk, chunkIdx) => (
-          <div data-slide-item key={`best-${chunkIdx}`}>
+          <div className="min-w-0" data-slide-item key={`best-${chunkIdx}`}>
             <SlideFrame title={chunkIdx === 0 ? '베스트 콘텐츠 (1)' : '베스트 콘텐츠 (2)'} eyebrow="Top-performing posts">
               <div className="flex-1 min-h-0 grid grid-cols-2 lg:grid-cols-3 gap-2 md:gap-3 auto-rows-fr">
                 {(chunk.length ? chunk : []).map((p, idx) => {
@@ -504,7 +542,7 @@ export default function KocostarReportDeck({ campaign }) {
           </div>
         ))}
 
-        <div data-slide-item>
+        <div className="min-w-0" data-slide-item>
           <SlideFrame title="성과 카드 · 키워드" eyebrow="Data studio pulse">
             <div className="flex-1 min-h-0 grid grid-cols-2 md:grid-cols-4 gap-2 overflow-hidden shrink-0">
               <div className="rounded-lg border border-slate-100 bg-slate-50 p-2">
@@ -542,7 +580,7 @@ export default function KocostarReportDeck({ campaign }) {
           </SlideFrame>
         </div>
 
-        <div data-slide-item>
+        <div className="min-w-0" data-slide-item>
           <SlideFrame title="리포트 표 · 유저 특성" eyebrow="Table & commenter traits">
             <div className="flex-1 min-h-0 flex flex-col gap-3 md:flex-row overflow-hidden">
               <div className="flex-1 min-h-0 border border-slate-100 rounded-xl overflow-auto">
@@ -597,7 +635,7 @@ export default function KocostarReportDeck({ campaign }) {
           </SlideFrame>
         </div>
 
-        <div data-slide-item>
+        <div className="min-w-0" data-slide-item>
           <SlideFrame title="댓글 정량 · 핵심 강점" eyebrow="Why this matters">
             <div className="flex-1 min-h-0 grid md:grid-cols-5 gap-3 overflow-hidden">
               <div className="md:col-span-2 rounded-xl border border-slate-100 bg-slate-50 p-3 space-y-2 overflow-hidden shrink-0">
@@ -650,7 +688,7 @@ export default function KocostarReportDeck({ campaign }) {
           </SlideFrame>
         </div>
 
-        <div data-slide-item>
+        <div className="min-w-0" data-slide-item>
           <SlideFrame title="토픽 매트릭스" eyebrow="Comment themes · evidence">
             <div className="flex-1 min-h-0 space-y-2 overflow-hidden">
               {topicMatrix.slice(0, 3).length ? (
@@ -675,7 +713,7 @@ export default function KocostarReportDeck({ campaign }) {
           </SlideFrame>
         </div>
 
-        <div data-slide-item>
+        <div className="min-w-0" data-slide-item>
           <SlideFrame title="심층 분석 · 전략" eyebrow="Notion synthesis">
             <div className="flex-1 min-h-0 overflow-hidden flex flex-col gap-3 text-[11px]">
               <div className="grid md:grid-cols-3 gap-2 shrink-0">
@@ -755,6 +793,7 @@ export default function KocostarReportDeck({ campaign }) {
             </div>
           </SlideFrame>
         </div>
+      </div>
       </div>
       <style>{`
         .scrollbar-thin::-webkit-scrollbar { height: 8px; }
