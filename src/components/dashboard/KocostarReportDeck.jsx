@@ -8,19 +8,136 @@ import { ChevronLeft, ChevronRight, BarChart2, ExternalLink } from 'lucide-react
 const COMMENT_DECK_DISPLAY_MAX = 200;
 
 const NAV_SLIDES = [
-  { key: 'overview', label: '1. 개요 · 핵심 수치' },
+  { key: 'overview', label: '1. 개요' },
   { key: 'comments-live', label: '2. 실제 TikTok 댓글' },
-  { key: 'daily', label: '3. 일별 조회 추이' },
-  { key: 'sentiment', label: '4. 댓글 감성 · 반응 신호' },
+  { key: 'daily', label: '3. 일별 조회' },
+  { key: 'sentiment', label: '4. 댓글 감성' },
   { key: 'creators', label: '5. 상위 크리에이터' },
-  { key: 'insight-action', label: '6. 인사이트 · 추천 액션' },
+  { key: 'insight-action', label: '6. 인사이트' },
   { key: 'best-posts', label: '7. 베스트 콘텐츠' },
-  { key: 'metrics-keywords', label: '8. 성과 카드 · 키워드' },
-  { key: 'table-personas', label: '9. 리포트 표 · 유저 특성' },
-  { key: 'comments-core', label: '10. 댓글 정량 · 핵심 강점' },
+  { key: 'metrics-keywords', label: '8. 성과 카드' },
+  { key: 'table-personas', label: '9. 리포트 표' },
+  { key: 'comments-core', label: '10. 댓글 정량' },
   { key: 'topic-matrix', label: '11. 토픽 매트릭스' },
-  { key: 'deep-strategy', label: '12. 심층 분석 · 전략' },
+  { key: 'deep-strategy', label: '12. 심층 분석' },
 ];
+
+function normalizeCommentSnippet(s) {
+  return String(s ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+/** 원문 샘플 중 예시 문구와 겹치는 댓글이 있는 영상 URL */
+function resolveVideoUrlForSnippet(snippet, samples) {
+  if (!snippet || !Array.isArray(samples) || samples.length === 0) return null;
+  const n = normalizeCommentSnippet(typeof snippet === 'string' ? snippet : JSON.stringify(snippet));
+  if (n.length < 2) return null;
+  const words = n.split(' ').filter((w) => w.length > 2);
+  for (const row of samples) {
+    const t = normalizeCommentSnippet(row.text);
+    if (!t) continue;
+    if (t === n || t.includes(n) || n.includes(t)) {
+      const u = row.video_url;
+      if (u && String(u).trim()) return String(u).trim();
+    }
+  }
+  const need = Math.min(3, Math.max(2, words.length));
+  for (const row of samples) {
+    const t = normalizeCommentSnippet(row.text);
+    if (words.filter((w) => t.includes(w)).length >= need) {
+      const u = row.video_url;
+      if (u && String(u).trim()) return String(u).trim();
+    }
+  }
+  return null;
+}
+
+function hrefFromVideoUrl(url) {
+  if (!url) return '';
+  const raw = String(url).trim();
+  const normalized = /^https?:\/\//i.test(raw) ? raw : `https://${raw.replace(/^\/+/, '')}`;
+  try {
+    return new URL(normalized).href;
+  } catch {
+    return '';
+  }
+}
+
+function BestContentCard({ post, badge, fmt, parseNum }) {
+  const raw = typeof post?.url === 'string' ? post.url.trim() : '';
+  const openHref = raw ? hrefFromVideoUrl(raw) : '';
+  const v = parseNum(post?.views);
+  const l = Number(post?.likes || 0);
+  const cmt = Number(post?.comments || 0);
+  const shr = Number(post?.shares || 0);
+  const er = v > 0 ? (((l + cmt + shr) / v) * 100).toFixed(2) : '0.00';
+  const cardCls = `rounded-lg border border-slate-200 bg-white p-2 flex flex-col gap-0.5 shadow-sm min-h-[76px] text-left text-[10px] leading-tight ${
+    openHref ? 'cursor-pointer hover:border-cyan-300 hover:ring-2 hover:ring-cyan-500/20 transition-[box-shadow,border-color] no-underline text-inherit group' : 'opacity-85'
+  }`;
+  const body = (
+    <>
+      <div className="flex items-start justify-between gap-1">
+        <span className="font-black text-amber-800 tabular-nums shrink-0">{badge}</span>
+        {openHref ? (
+          <span className="inline-flex items-center gap-0.5 rounded bg-cyan-50 border border-cyan-200 px-1 py-0.5 text-[7px] font-black uppercase text-cyan-900 group-hover:bg-cyan-100 shrink-0">
+            <ExternalLink size={9} aria-hidden /> 원본
+          </span>
+        ) : null}
+      </div>
+      <p className={`font-bold text-slate-900 line-clamp-2 ${openHref ? 'group-hover:text-cyan-900 group-hover:underline decoration-cyan-600/50' : ''}`}>{post?.name || '-'}</p>
+      <p className="text-slate-500 truncate">{post?.platform || '-'}</p>
+      <div className="mt-auto pt-1 grid grid-cols-2 gap-0.5 text-slate-700 font-semibold tabular-nums border-t border-slate-50">
+        <span>V {fmt(v)}</span>
+        <span>ER {er}%</span>
+        <span className="col-span-2 text-[9px] font-normal text-slate-600">♥{fmt(l)} · 댓{cmt} · 공유{shr}</span>
+      </div>
+    </>
+  );
+  return openHref ? (
+    <a href={openHref} target="_blank" rel="noreferrer noopener" className={cardCls}>
+      {body}
+    </a>
+  ) : (
+    <div className={cardCls}>{body}</div>
+  );
+}
+
+function CommentQuoteLink({ text, samples, className }) {
+  const display = typeof text === 'string' ? text : JSON.stringify(text);
+  const href = hrefFromVideoUrl(resolveVideoUrlForSnippet(display, samples));
+  return (
+    <blockquote className={className}>
+      {href ? (
+        <a
+          href={href}
+          target="_blank"
+          rel="noreferrer noopener"
+          className="group inline-flex items-start gap-1 font-semibold text-cyan-900 underline decoration-cyan-600/50 underline-offset-2 hover:text-cyan-950"
+        >
+          <span className="min-w-0 whitespace-pre-wrap break-words">{display}</span>
+          <ExternalLink size={12} className="mt-0.5 shrink-0 text-cyan-700 opacity-80 group-hover:opacity-100" aria-hidden />
+        </a>
+      ) : (
+        <span className="whitespace-pre-wrap break-words">{display}</span>
+      )}
+    </blockquote>
+  );
+}
+
+function EvidenceSnippet({ text, samples }) {
+  const s = String(text ?? '').trim();
+  if (!s) return null;
+  const href = hrefFromVideoUrl(resolveVideoUrlForSnippet(s, samples));
+  const base = 'text-[10px] px-2 py-0.5 rounded-md bg-slate-50 border border-slate-100 max-w-full whitespace-pre-wrap break-words';
+  if (href) {
+    return (
+      <a href={href} target="_blank" rel="noreferrer noopener" className={`${base} inline-flex items-center gap-1 font-semibold text-cyan-900 hover:bg-cyan-50 hover:border-cyan-200`}>
+        {s}
+        <ExternalLink size={10} className="shrink-0 opacity-70" aria-hidden />
+      </a>
+    );
+  }
+  return <span className={base}>{s}</span>;
+}
 
 /** IG·TT 등 동일 인플루언서 이름 매칭(대소문자·양끝·연속 공백 무시) */
 function normalizeCreatorKey(name) {
@@ -151,7 +268,6 @@ export default function KocostarReportDeck({ campaign }) {
   const dates = Array.isArray(analytics?.dates) ? analytics.dates : [];
   const maxDaily = Math.max(1, ...dailyViews);
 
-  const topLang = Array.isArray(reportSummary?.top_languages) ? reportSummary.top_languages : [];
   const quantSummary = reportDataStudio?.comment_quantitative_summary || {};
   const qualitativeSummary = Array.isArray(reportDataStudio?.comment_qualitative_summary)
     ? reportDataStudio.comment_qualitative_summary
@@ -327,9 +443,27 @@ export default function KocostarReportDeck({ campaign }) {
     },
   ]), [reportDataStudio?.user_characteristics]);
 
-  const topRegions = Array.isArray(reportSummary?.top_regions) ? reportSummary.top_regions : [];
-
-  const bestPostsForSlide = useMemo(() => mergedTopPosts.slice(0, 12), [mergedTopPosts]);
+  const bestPostsByMetric = useMemo(() => {
+    const list = mergedTopPosts;
+    const vNum = (p) => parseNum(p?.views);
+    const byViews = [...list].sort((a, b) => vNum(b) - vNum(a)).slice(0, 3);
+    const enriched = list.map((p) => {
+      const v = Math.max(vNum(p), 1);
+      const l = Number(p?.likes || 0);
+      const cmt = Number(p?.comments || 0);
+      const shr = Number(p?.shares || 0);
+      return {
+        post: p,
+        engagementScore: (l + cmt + shr) / v,
+        viralScore: (shr / v) * 1000 + shr,
+        purchaseScore: (cmt / v) * 1000 + cmt,
+      };
+    });
+    const byEngagement = [...enriched].sort((a, b) => b.engagementScore - a.engagementScore).slice(0, 3).map((x) => x.post);
+    const byViral = [...enriched].sort((a, b) => b.viralScore - a.viralScore).slice(0, 3).map((x) => x.post);
+    const byPurchase = [...enriched].sort((a, b) => b.purchaseScore - a.purchaseScore).slice(0, 3).map((x) => x.post);
+    return { views: byViews, engagement: byEngagement, viral: byViral, purchase: byPurchase };
+  }, [mergedTopPosts]);
 
   const [slideIdx, setSlideIdx] = useState(0);
   const trackRef = useRef(null);
@@ -476,7 +610,7 @@ export default function KocostarReportDeck({ campaign }) {
           aria-label="리포트 슬라이드 영역"
         >
         <div className="min-w-0" data-slide-item>
-          <SlideFrame title="개요 · 핵심 수치" eyebrow="Executive Overview">
+          <SlideFrame title="개요" eyebrow="Executive Overview">
             <div className="flex flex-col gap-3">
               <p className="text-xs md:text-sm text-slate-700 font-semibold leading-snug shrink-0">
                 누적 <span className="text-cyan-700 font-black">{fmt(summaryViews)}</span> 조회
@@ -545,25 +679,36 @@ export default function KocostarReportDeck({ campaign }) {
                 </p>
               ) : null}
               <div className="grid min-h-[min(280px,38vh)] max-h-[min(58vh,640px)] flex-1 grid-cols-2 content-start gap-1.5 overflow-y-auto overscroll-contain pr-0.5 sm:grid-cols-3 lg:grid-cols-4 [scrollbar-width:thin]">
-                {commentSamplesForDeck.length ? commentSamplesForDeck.map((c, idx) => (
+                {commentSamplesForDeck.length ? commentSamplesForDeck.map((c, idx) => {
+                  const vidHref = c.video_url ? hrefFromVideoUrl(c.video_url) : '';
+                  return (
                   <div
                     key={`cmt-${idx}`}
                     className="rounded-lg border border-slate-100 bg-white px-2 py-1.5 shadow-sm flex flex-col gap-1 text-left"
                   >
-                    <p className="text-[10px] md:text-[11px] text-slate-900 leading-snug line-clamp-4 whitespace-pre-wrap break-words">{c.text}</p>
+                    {vidHref ? (
+                      <a href={vidHref} target="_blank" rel="noreferrer noopener" className="group block text-[10px] md:text-[11px] leading-snug line-clamp-4 whitespace-pre-wrap break-words text-slate-900 font-semibold decoration-cyan-600/60 underline underline-offset-2 hover:text-cyan-900">
+                        {c.text}
+                        <ExternalLink size={11} className="ml-0.5 inline align-text-bottom shrink-0 text-cyan-700 opacity-70 group-hover:opacity-100" aria-hidden />
+                      </a>
+                    ) : (
+                      <p className="text-[10px] md:text-[11px] text-slate-900 leading-snug line-clamp-4 whitespace-pre-wrap break-words">{c.text}</p>
+                    )}
                     <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[8px] text-slate-500 pt-1 border-t border-slate-50">
                       {c.unique_id ? (
                         <span className="font-mono text-slate-600 truncate max-w-[92px]" title={String(c.unique_id)}>@{String(c.unique_id)}</span>
                       ) : null}
                       {(c.digg_count != null && c.digg_count !== '') ? <span className="tabular-nums shrink-0">♥ {fmt(Number(c.digg_count) || 0)}</span> : null}
-                      {c.video_url ? (
-                        <a href={c.video_url} target="_blank" rel="noreferrer" className="text-cyan-700 font-bold underline underline-offset-2 shrink-0">
+                      {vidHref ? (
+                        <a href={vidHref} target="_blank" rel="noreferrer noopener" className="text-cyan-700 font-bold underline underline-offset-2 shrink-0 inline-flex items-center gap-0.5">
                           링크
+                          <ExternalLink size={10} aria-hidden />
                         </a>
                       ) : null}
                     </div>
                   </div>
-                )) : (
+                  );
+                }) : (
                   <p className="col-span-full text-sm text-slate-500 py-12 text-center px-2">
                     원문이 비어 있습니다. PC에서 <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px]">npm run import:kocostar-report</code>
                     를 실행하면 공개 시트에서 최신 댓글을 받아 Supabase에 저장합니다.
@@ -575,7 +720,7 @@ export default function KocostarReportDeck({ campaign }) {
         </div>
 
         <div className="min-w-0" data-slide-item>
-          <SlideFrame title="일별 조회 추이" eyebrow="Daily View Trend">
+          <SlideFrame title="일별 조회" eyebrow="Daily View Trend">
             <div className="flex-1 flex flex-col min-h-0">
               <p className="text-[11px] text-slate-500 mb-3 shrink-0 leading-snug">
                 리포트에 포함된 게시의 <span className="font-semibold text-slate-700">업로드일</span>마다 조회수를 합친 값입니다. 막대 높이는 그중 가장 큰 날을 100%로 둔 상대 비율입니다.
@@ -610,7 +755,7 @@ export default function KocostarReportDeck({ campaign }) {
         </div>
 
         <div className="min-w-0" data-slide-item>
-          <SlideFrame title="댓글 감성 · 반응 신호" eyebrow="Audience signals">
+          <SlideFrame title="댓글 감성" eyebrow="Audience signals">
             <div className="flex flex-col gap-4">
               <div className="grid md:grid-cols-2 gap-4 shrink-0">
                 <div className="flex flex-col gap-3">
@@ -656,33 +801,6 @@ export default function KocostarReportDeck({ campaign }) {
                   <p className="text-[10px] text-slate-600 leading-snug rounded-md bg-slate-50 border border-slate-100 px-2 py-1.5">
                     <span className="font-bold text-slate-800">바이럴 신호</span>는 재게시·태그·언급처럼 콘텐츠가 주변으로 퍼지는 패턴으로 보이는 댓글 비중(또는 유사 라벨)을 뜻합니다. 제품 피드백 문의와는 별도 축입니다.
                   </p>
-                  {topLang.length ? (
-                    <div className="flex flex-wrap gap-1.5 content-start">
-                      <span className="text-[10px] font-black text-slate-500 uppercase w-full">언어</span>
-                      {topLang.map(([lang, cnt]) => (
-                        <span key={lang} className="text-[10px] px-2 py-1 rounded-full border border-slate-200 text-slate-700 bg-white font-semibold">
-                          {String(lang).toUpperCase()} · {cnt}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-[11px] text-slate-400">언어 분포 데이터 없음.</p>
-                  )}
-                  {topRegions.length ? (
-                    <div className="flex flex-wrap gap-1.5 content-start mt-2">
-                      <span className="text-[10px] font-black text-slate-500 uppercase w-full">지역 신호</span>
-                      {topRegions.slice(0, 12).map((entry, ri) => {
-                        const lbl = Array.isArray(entry) ? entry[0] : (entry?.region ?? entry?.label ?? entry?.code ?? '?');
-                        const cnt = Array.isArray(entry) ? entry[1] : (entry?.count ?? entry?.cnt);
-                        const hasCnt = cnt !== undefined && cnt !== null && cnt !== '';
-                        return (
-                          <span key={`rg-${lbl}-${ri}`} className="text-[10px] px-2 py-1 rounded-full border border-violet-100 text-violet-900 bg-violet-50 font-semibold">
-                            {String(lbl)}{hasCnt ? ` · ${cnt}` : ''}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  ) : null}
                 </div>
               </div>
               {(qualitativeSummary.length > 0) && (
@@ -700,9 +818,12 @@ export default function KocostarReportDeck({ campaign }) {
                   <p className="text-[10px] font-black uppercase text-indigo-900 shrink-0">구매·관심 코멘트 예시</p>
                   <div className="mt-2 space-y-2 overflow-y-auto flex-1">
                     {[...highIntentExamples, ...midIntentExamples].filter(Boolean).slice(0, 14).map((t, ti) => (
-                      <blockquote key={`ie-${ti}`} className="text-[11px] text-indigo-950 leading-snug border-l-4 border-indigo-300 pl-2 py-0.5 bg-white/80 rounded-r-md whitespace-pre-wrap break-words">
-                        {typeof t === 'string' ? t : JSON.stringify(t)}
-                      </blockquote>
+                      <CommentQuoteLink
+                        key={`ie-${ti}`}
+                        text={typeof t === 'string' ? t : JSON.stringify(t)}
+                        samples={reportCommentSamples}
+                        className="text-[11px] text-indigo-950 leading-snug border-l-4 border-indigo-300 pl-2 py-0.5 bg-white/80 rounded-r-md whitespace-pre-wrap break-words"
+                      />
                     ))}
                     {![...highIntentExamples, ...midIntentExamples].length && (
                       <p className="text-[11px] text-slate-600">예시 문자열 미등록 (Notion 블록)</p>
@@ -713,9 +834,12 @@ export default function KocostarReportDeck({ campaign }) {
                   <p className="text-[10px] font-black uppercase text-emerald-900 shrink-0">확산·태그 라인 예시</p>
                   <div className="mt-2 space-y-2 overflow-y-auto flex-1">
                     {(viralExamples || []).slice(0, 14).map((t, vi) => (
-                      <blockquote key={`ve-${vi}`} className="text-[11px] text-emerald-950 leading-snug border-l-4 border-emerald-300 pl-2 py-0.5 bg-white/80 rounded-r-md whitespace-pre-wrap break-words">
-                        {typeof t === 'string' ? t : JSON.stringify(t)}
-                      </blockquote>
+                      <CommentQuoteLink
+                        key={`ve-${vi}`}
+                        text={typeof t === 'string' ? t : JSON.stringify(t)}
+                        samples={reportCommentSamples}
+                        className="text-[11px] text-emerald-950 leading-snug border-l-4 border-emerald-300 pl-2 py-0.5 bg-white/80 rounded-r-md whitespace-pre-wrap break-words"
+                      />
                     ))}
                   </div>
                 </div>
@@ -724,13 +848,27 @@ export default function KocostarReportDeck({ campaign }) {
                 <div className="rounded-xl border border-fuchsia-100 bg-fuchsia-50/40 p-3 max-h-[24vh] overflow-y-auto shrink-0">
                   <p className="text-[10px] font-black uppercase text-fuchsia-900 mb-2">바이럴 트리거 (Notion)</p>
                   <ul className="space-y-1.5">
-                    {viralPoints.map((v) => (
+                    {viralPoints.map((v) => {
+                      const evList = Array.isArray(v.evidence)
+                        ? v.evidence.map((x) => String(x ?? '').trim()).filter(Boolean)
+                        : String(v.evidence ?? '').split(/[,،]/).map((s) => s.trim()).filter(Boolean);
+                      return (
                       <li key={v.rank} className="text-[11px] text-slate-800">
                         <span className="font-black text-fuchsia-800 mr-2">{v.rank}.</span>
                         <span className="font-bold">{v.trigger}</span>
-                        <span className="text-slate-600 text-[10px]"> — {Array.isArray(v.evidence) ? v.evidence.join(', ') : v.evidence}</span>
+                        {evList.length ? (
+                          <span className="text-slate-600 text-[10px]">
+                            {' — '}
+                            <span className="inline-flex flex-wrap items-center gap-1 align-middle">
+                              {evList.map((ev, evi) => (
+                                <EvidenceSnippet key={`${v.rank}-ev-${evi}`} text={ev} samples={reportCommentSamples} />
+                              ))}
+                            </span>
+                          </span>
+                        ) : null}
                       </li>
-                    ))}
+                      );
+                    })}
                   </ul>
                 </div>
               ) : null}
@@ -766,7 +904,7 @@ export default function KocostarReportDeck({ campaign }) {
         </div>
 
         <div className="min-w-0" data-slide-item>
-          <SlideFrame title="핵심 인사이트 · 추천 액션" eyebrow="What it means · What to do">
+          <SlideFrame title="인사이트" eyebrow="What it means · What to do">
             <div className="grid md:grid-cols-2 gap-4 gap-y-6">
               <div className="min-h-0 flex flex-col rounded-xl border border-slate-100 bg-slate-50/70 p-3 max-h-[72vh]">
                 <p className="text-[10px] font-black uppercase text-slate-500 mb-2 shrink-0 tracking-wider">Insights</p>
@@ -802,64 +940,34 @@ export default function KocostarReportDeck({ campaign }) {
         </div>
 
         <div className="min-w-0" data-slide-item>
-          <SlideFrame title="베스트 콘텐츠" eyebrow="Top-performing posts · 클릭 시 원본 열기">
-            <p className="text-[10px] text-slate-500 mb-2 shrink-0">카드 또는 &quot;원본 열기&quot;를 누르면 해당 게시 URL로 새 탭에서 이동합니다.</p>
-            <div className="flex-1 min-h-0 grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-2 auto-rows-fr content-start">
-              {bestPostsForSlide.length ? bestPostsForSlide.map((p, idx) => {
-                const raw = typeof p?.url === 'string' ? p.url.trim() : '';
-                const normalized = raw ? (/^https?:\/\//i.test(raw) ? raw : `https://${raw.replace(/^\/+/, '')}`) : '';
-                let openHref = normalized;
-                try {
-                  if (normalized) openHref = new URL(normalized).href;
-                  else openHref = '';
-                } catch {
-                  openHref = '';
-                }
-                const cardCls = `rounded-xl border border-slate-200 bg-white p-2 flex flex-col min-h-[88px] shadow-sm overflow-hidden gap-1 text-left ${openHref ? 'cursor-pointer hover:border-cyan-300 hover:ring-2 hover:ring-cyan-500/25 transition-[box-shadow,border-color] outline-offset-2 no-underline text-inherit group' : 'cursor-default opacity-80 group'}`;
-                return openHref ? (
-                  <a
-                    key={`bp-${idx}-${p?.url ?? p?.name}`}
-                    href={openHref}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className={cardCls}
-                  >
-                    <div className="flex items-start justify-between gap-1">
-                      <p className="text-[10px] font-black text-amber-700 shrink-0">TOP {idx + 1}</p>
-                      <span className="inline-flex items-center gap-0.5 rounded-md bg-cyan-50 border border-cyan-200 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide text-cyan-900 shrink-0 group-hover:bg-cyan-100">
-                        <ExternalLink size={11} aria-hidden /> 원본
-                      </span>
-                    </div>
-                    <p className="font-bold text-slate-900 text-[11px] leading-tight line-clamp-2 group-hover:text-cyan-900 group-hover:underline decoration-cyan-600/60 underline-offset-2">{p?.name || '-'}</p>
-                    <p className="text-[10px] text-slate-500 truncate">{p?.platform || '-'}</p>
-                    <div className="mt-auto pt-2 grid grid-cols-2 gap-1 text-[10px] text-slate-700 font-semibold tabular-nums">
-                      <span>V {fmt(p?.views)}</span>
-                      <span>L {fmt(p?.likes)}</span>
-                    </div>
-                  </a>
-                ) : (
-                  <div key={`bp-${idx}-${p?.name}`} className={cardCls}>
-                    <div className="flex items-start justify-between gap-1">
-                      <p className="text-[10px] font-black text-amber-700 shrink-0">TOP {idx + 1}</p>
-                      <span className="rounded-md bg-slate-50 border border-slate-100 px-1.5 py-0.5 text-[8px] font-semibold text-slate-400 shrink-0">URL 없음</span>
-                    </div>
-                    <p className="font-bold text-slate-900 text-[11px] leading-tight line-clamp-2">{p?.name || '-'}</p>
-                    <p className="text-[10px] text-slate-500 truncate">{p?.platform || '-'}</p>
-                    <div className="mt-auto pt-2 grid grid-cols-2 gap-1 text-[10px] text-slate-700 font-semibold tabular-nums">
-                      <span>V {fmt(p?.views)}</span>
-                      <span>L {fmt(p?.likes)}</span>
-                    </div>
+          <SlideFrame title="베스트 콘텐츠" eyebrow="Top 3 × 4 지표 · 클릭 시 원본 열기">
+            <p className="text-[10px] text-slate-500 mb-2 shrink-0">
+              조회수·참여율(좋아요+댓글+공유/조회)·공유 바이럴·댓글(구매 관심 대리 지표)별 상위 3건입니다. 카드를 누르면 원본 게시로 이동합니다.
+            </p>
+            <div className="flex-1 min-h-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 content-start">
+              {[
+                { key: 'views', label: '조회수', posts: bestPostsByMetric.views },
+                { key: 'engagement', label: '인게이지먼트', posts: bestPostsByMetric.engagement },
+                { key: 'viral', label: '바이럴 신호', posts: bestPostsByMetric.viral },
+                { key: 'purchase', label: '구매 신호', posts: bestPostsByMetric.purchase },
+              ].map((col) => (
+                <div key={col.key} className="rounded-xl border border-slate-100 bg-slate-50/60 p-2 flex flex-col gap-2 min-h-0">
+                  <p className="text-[10px] font-black uppercase tracking-wide text-slate-700 shrink-0 border-b border-slate-200/80 pb-1">{col.label}</p>
+                  <div className="flex flex-col gap-2 flex-1 min-h-0">
+                    {(col.posts || []).length ? (col.posts || []).map((p, idx) => (
+                      <BestContentCard key={`${col.key}-${idx}-${p?.name}`} post={p} badge={`TOP ${idx + 1}`} fmt={fmt} parseNum={parseNum} />
+                    )) : (
+                      <p className="text-[11px] text-slate-500 py-6 text-center">데이터 부족</p>
+                    )}
                   </div>
-                );
-              }) : (
-                <p className="col-span-full text-[12px] text-slate-500 self-center justify-self-center py-12">표시할 인기 게시물이 부족합니다.</p>
-              )}
+                </div>
+              ))}
             </div>
           </SlideFrame>
         </div>
 
         <div className="min-w-0" data-slide-item>
-          <SlideFrame title="성과 카드 · 키워드" eyebrow="Data studio pulse">
+          <SlideFrame title="성과 카드" eyebrow="Data studio pulse">
             <div className="flex-1 min-h-0 grid grid-cols-1 sm:grid-cols-3 gap-2 overflow-hidden shrink-0">
               <div className="rounded-lg border border-slate-100 bg-slate-50 p-2">
                 <p className="text-[9px] text-slate-500 uppercase font-black tracking-wider">포스팅</p>
@@ -893,7 +1001,7 @@ export default function KocostarReportDeck({ campaign }) {
         </div>
 
         <div className="min-w-0" data-slide-item>
-          <SlideFrame title="리포트 표 · 유저 특성" eyebrow="Table & commenter traits">
+          <SlideFrame title="리포트 표" eyebrow="Table & commenter traits">
             <div className="flex-1 min-h-0 flex flex-col gap-3 md:flex-row overflow-hidden">
               <div className="flex-1 min-h-0 border border-slate-100 rounded-xl overflow-auto">
                 <table className="w-full text-[9px] md:text-[10px] text-left min-w-[520px]">
@@ -948,7 +1056,7 @@ export default function KocostarReportDeck({ campaign }) {
         </div>
 
         <div className="min-w-0" data-slide-item>
-          <SlideFrame title="댓글 정량 · 핵심 강점" eyebrow="Why this matters · verbatims">
+          <SlideFrame title="댓글 정량" eyebrow="Why this matters · verbatims">
             <div className="flex flex-col gap-3">
               <div className="grid md:grid-cols-12 gap-3">
                 <div className="md:col-span-4 rounded-xl border border-slate-100 bg-slate-50 p-3 space-y-2">
@@ -993,9 +1101,11 @@ export default function KocostarReportDeck({ campaign }) {
                 </div>
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 overflow-y-auto flex-1 pr-1 content-start">
                   {commentExampleSnippets.map((text, idx) => (
-                    <blockquote key={`cex-${idx}`} className="text-[11px] text-slate-800 italic border border-slate-100 bg-slate-50 rounded-lg px-2.5 py-2 leading-snug whitespace-pre-wrap break-words">
-                      “{typeof text === 'string' ? text : JSON.stringify(text)}”
-                    </blockquote>
+                    <div key={`cex-${idx}`} className="text-[11px] text-slate-800 italic border border-slate-100 bg-slate-50 rounded-lg px-2.5 py-2 leading-snug whitespace-pre-wrap break-words">
+                      <span className="text-slate-400 not-italic select-none">“</span>
+                      <EvidenceSnippet text={typeof text === 'string' ? text : JSON.stringify(text)} samples={reportCommentSamples} />
+                      <span className="text-slate-400 not-italic select-none">”</span>
+                    </div>
                   ))}
                   {!commentExampleSnippets.length ? <p className="text-[12px] text-slate-500 col-span-full">예시 줄이 비어 있습니다.</p> : null}
                 </div>
@@ -1017,7 +1127,7 @@ export default function KocostarReportDeck({ campaign }) {
                     <p className="text-[11px] text-slate-800 leading-snug"><strong className="text-slate-900">Insight:</strong> {row.insight}</p>
                     <div className="mt-2 flex flex-wrap gap-1">
                       {(row.evidence || []).map((e, eIdx) => (
-                        <span key={`ev-${eIdx}`} className="text-[10px] px-2 py-0.5 rounded-md bg-slate-50 border border-slate-100 max-w-full whitespace-pre-wrap break-words">{e}</span>
+                        <EvidenceSnippet key={`ev-${eIdx}`} text={e} samples={reportCommentSamples} />
                       ))}
                     </div>
                   </div>
@@ -1030,7 +1140,7 @@ export default function KocostarReportDeck({ campaign }) {
         </div>
 
         <div className="min-w-0" data-slide-item>
-          <SlideFrame title="심층 분석 · 전략" eyebrow="Notion synthesis · full appendix">
+          <SlideFrame title="심층 분석" eyebrow="Notion synthesis · full appendix">
             <div className="flex flex-col gap-3 text-[11px]">
               <div className="grid md:grid-cols-5 gap-2">
                 <div className="md:col-span-2 rounded-lg border border-slate-100 bg-slate-50 p-3 flex flex-col min-h-[100px] max-h-[260px]">
