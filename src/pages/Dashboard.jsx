@@ -5624,9 +5624,9 @@ async function enrichNonAdminDashboardCampaigns(rows, user) {
       if (!day) continue;
       byDay.set(day, (byDay.get(day) || 0) + viewsNum);
     }
-    const dateKeys = [...byDay.keys()].sort().slice(-7);
+    const dateKeys = [...byDay.keys()].sort().slice(-21);
     const daily_views = dateKeys.length > 0
-      ? dateKeys.map((d) => Math.max(1, Math.round((byDay.get(d) || 0) / 1000)))
+      ? dateKeys.map((d) => Math.max(0, Math.round(Number(byDay.get(d)) || 0)))
       : [20, 35, 48, 62, 55, 44, 37];
     const dates = dateKeys.length > 0
       ? dateKeys.map((d) => {

@@ -578,16 +578,7 @@ export default function KocostarReportDeck({ campaign }) {
           <SlideFrame title="일별 조회 추이" eyebrow="Daily View Trend">
             <div className="flex-1 flex flex-col min-h-0">
               <p className="text-[11px] text-slate-500 mb-3 shrink-0 leading-snug">
-                막대 높이는 일별 최고 조회 대비 비율입니다. 스케일 해석은{' '}
-                <a
-                  href="https://datastudio.google.com/reporting/8f1fa90e-189d-4ab9-b685-5272221cf30d/page/H7prF"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-semibold text-cyan-700 underline underline-offset-2 hover:text-cyan-900 whitespace-nowrap"
-                >
-                  Looker Studio 리포트
-                </a>
-                와 동일합니다.
+                리포트에 포함된 게시의 <span className="font-semibold text-slate-700">업로드일</span>마다 조회수를 합친 값입니다. 막대 높이는 그중 가장 큰 날을 100%로 둔 상대 비율입니다.
               </p>
               <div className="flex-1 flex items-end pb-12 pl-8 pr-2 gap-1 rounded-xl bg-slate-50 border border-slate-100 min-h-[180px] max-h-[48vh] px-3 pt-3 relative overflow-x-auto">
                 <div className="absolute top-4 left-2 h-[calc(100%-3.75rem)] flex flex-col justify-between text-[9px] text-slate-500 font-black uppercase tracking-wider leading-none">
