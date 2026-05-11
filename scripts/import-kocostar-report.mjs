@@ -98,6 +98,11 @@ function formatInt(n) {
   return Number(n || 0).toLocaleString('en-US');
 }
 
+/** 동일 인물 IG+TT 처리: 이름 정규 키(대소문자·양끝/연속 공백 무시) */
+function normalizeCreatorKey(name) {
+  return String(name || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
 function aggregateFromCsv(baseDir) {
   const rawPerf = [];
   const rawShipmentRows = [];
@@ -177,8 +182,8 @@ function aggregateFromCsv(baseDir) {
     ? Number((((summary.likes + summary.comments + summary.shares) / summary.views) * 100).toFixed(2))
     : 0;
 
-  const shippedCreators = new Set(rawShipmentRows.filter((r) => r.shipped).map((r) => r.name));
-  const postedCreators = new Set(rawShipmentRows.filter((r) => r.hasPosting).map((r) => r.name));
+  const shippedCreators = new Set(rawShipmentRows.filter((r) => r.shipped).map((r) => normalizeCreatorKey(r.name)));
+  const postedCreators = new Set(rawShipmentRows.filter((r) => r.hasPosting).map((r) => normalizeCreatorKey(r.name)));
   const rawReach = shippedCreators.size
     ? (postedCreators.size / shippedCreators.size) * 100
     : 0;
@@ -188,10 +193,21 @@ function aggregateFromCsv(baseDir) {
 
   const creators = new Map();
   for (const p of posts) {
-    if (!creators.has(p.name)) {
-      creators.set(p.name, { name: p.name, views: 0, likes: 0, comments: 0, shares: 0, posts: 0, platforms: new Set() });
+    const nk = normalizeCreatorKey(p.name) || '__missing__';
+    const displayName = String(p.name || '').trim() || 'Unknown';
+    if (!creators.has(nk)) {
+      creators.set(nk, {
+        displayName,
+        views: 0,
+        likes: 0,
+        comments: 0,
+        shares: 0,
+        posts: 0,
+        platforms: new Set(),
+      });
     }
-    const c = creators.get(p.name);
+    const c = creators.get(nk);
+    if (displayName.length > c.displayName.length) c.displayName = displayName;
     c.views += p.views;
     c.likes += p.likes;
     c.comments += p.comments;
@@ -201,7 +217,7 @@ function aggregateFromCsv(baseDir) {
   }
   const topCreators = [...creators.values()]
     .map((c) => ({
-      name: c.name,
+      name: c.displayName,
       platform: [...c.platforms].sort().join('/'),
       views: c.views,
       likes: c.likes,
@@ -212,18 +228,41 @@ function aggregateFromCsv(baseDir) {
     .sort((a, b) => b.views - a.views)
     .slice(0, 20);
 
-  const topPosts = [...posts].sort((a, b) => b.views - a.views).slice(0, 60);
-  const reportTable = topPosts.slice(0, 25).map((p, idx) => ({
-    rank: idx + 1,
-    creator: p.name,
-    platform: p.platform,
-    upload_day: p.upload_day || '-',
-    views: p.views,
-    likes: p.likes,
-    comments: p.comments,
-    shares: p.shares,
-    url: p.url,
-  }));
+  /** 동일 크리에이터의 대표 게시글(조회 최고) 기준 업로드일·링크 — 표용 */
+  const creatorBestPostByKey = new Map();
+  for (const p of posts) {
+    const nk = normalizeCreatorKey(p.name) || '__missing__';
+    const prev = creatorBestPostByKey.get(nk);
+    if (!prev || Number(p.views || 0) > Number(prev.views || 0)) creatorBestPostByKey.set(nk, p);
+  }
+
+  /** 인플루언서별 1행(플랫폼 합산) — 조회 많은 순 */
+  const topPostsUniq = [];
+  const seenNk = new Set();
+  for (const p of [...posts].sort((a, b) => Number(b.views || 0) - Number(a.views || 0))) {
+    const nk = normalizeCreatorKey(p.name) || '__missing__';
+    if (seenNk.has(nk)) continue;
+    seenNk.add(nk);
+    const canonicalName = creators.get(nk)?.displayName || String(p.name || '').trim();
+    topPostsUniq.push({ ...p, name: canonicalName });
+  }
+  const topPosts = topPostsUniq.slice(0, 60);
+
+  const reportTable = topCreators.slice(0, 25).map((c, idx) => {
+    const nk = normalizeCreatorKey(c.name) || '__missing__';
+    const bp = creatorBestPostByKey.get(nk);
+    return {
+      rank: idx + 1,
+      creator: c.name,
+      platform: c.platform,
+      upload_day: bp?.upload_day || '-',
+      views: c.views,
+      likes: c.likes,
+      comments: c.comments,
+      shares: c.shares,
+      url: bp?.url ?? null,
+    };
+  });
 
   const comments = [];
   for (const fn of COMMENT_FILES) {
@@ -233,21 +272,28 @@ function aggregateFromCsv(baseDir) {
     if (!rows.length) continue;
     const headers = Object.keys(rows[0]);
     const hText = pickHeader(headers, ['text']);
-    const hDigg = pickHeader(headers, ['digg']);
-    const hReply = pickHeader(headers, ['reply']);
+    const hDigg = pickHeader(headers, ['digg', 'diggcount']);
+    const hReply = pickHeader(headers, ['reply', 'replycomment']);
     const hLang = pickHeader(headers, ['language']);
     const hRegion = pickHeader(headers, ['region']);
     const hBio = pickHeader(headers, ['bio']);
+    const hUid = pickHeader(headers, ['uniqueid', 'unique']);
+    const hVideo = pickHeader(headers, ['videoweburl', 'video', 'url']);
+    const hCreated = pickHeader(headers, ['createtimeiso', 'createtime', 'time']);
     for (const r of rows) {
-      const t = String(r[hText] || '').trim();
-      if (!t) continue;
+      const raw = String(r[hText] || '').trim();
+      if (!raw) continue;
       comments.push({
-        text: t.toLowerCase(),
+        text_norm: raw.toLowerCase(),
+        display_text: raw,
         likes: toNum(r[hDigg]),
         replies: toNum(r[hReply]),
         lang: String(r[hLang] || '').trim().toLowerCase(),
         region: String(r[hRegion] || '').trim().toLowerCase(),
         bio: String(r[hBio] || '').trim().toLowerCase(),
+        unique_id: hUid ? String(r[hUid] || '').trim() : '',
+        video_url: hVideo ? String(r[hVideo] || '').trim() : '',
+        created_at: hCreated ? String(r[hCreated] || '').trim() : '',
       });
     }
   }
@@ -280,10 +326,11 @@ function aggregateFromCsv(baseDir) {
   const keywordCounts = Object.fromEntries(Object.keys(keywordBuckets).map((k) => [k, 0]));
 
   for (const c of comments) {
-    if (hasAny(c.text, posKw)) pos += 1;
-    if (hasAny(c.text, negKw)) neg += 1;
-    if (hasAny(c.text, buyKw)) buy += 1;
-    if (hasAny(c.text, viralKw)) viral += 1;
+    const tn = c.text_norm || '';
+    if (hasAny(tn, posKw)) pos += 1;
+    if (hasAny(tn, negKw)) neg += 1;
+    if (hasAny(tn, buyKw)) buy += 1;
+    if (hasAny(tn, viralKw)) viral += 1;
     if (c.lang) langMap.set(c.lang, (langMap.get(c.lang) || 0) + 1);
     if (c.region) regionMap.set(c.region, (regionMap.get(c.region) || 0) + 1);
 
@@ -293,7 +340,7 @@ function aggregateFromCsv(baseDir) {
     if (/(skin|beauty|cosmetic|makeup|skincare)/i.test(bio)) userTrait.skincare_interest += 1;
 
     for (const [k, kws] of Object.entries(keywordBuckets)) {
-      if (hasAny(c.text, kws)) keywordCounts[k] += 1;
+      if (hasAny(tn, kws)) keywordCounts[k] += 1;
     }
   }
   const totalComments = comments.length || 1;
@@ -427,7 +474,7 @@ function aggregateFromCsv(baseDir) {
       positive_pct: commentSummary.positive_pct,
       neutral_pct: commentSummary.neutral_pct,
       negative_pct: commentSummary.negative_pct,
-      representative_keywords: keywordMentions.slice(0, 5),
+      representative_keywords: keywordMentions.slice(0, 24),
     },
     product_reaction_comparison: {
       lip_mask: productSplit.get('lip_mask') || { views: 0, likes: 0, comments: 0, shares: 0, posts: 0 },
@@ -489,10 +536,20 @@ function aggregateFromCsv(baseDir) {
     ],
   };
 
+  const commentSamples = comments.map((c) => ({
+    text: c.display_text,
+    digg_count: c.likes,
+    reply_comment_total: c.replies,
+    unique_id: c.unique_id || null,
+    video_url: c.video_url || null,
+    created_at: c.created_at || null,
+  }));
+
   return {
     summary,
     topCreators,
     topPosts,
+    commentSamples,
     commentSummary,
     dataStudioSections,
     notionSections,
@@ -632,8 +689,9 @@ async function main() {
       '반응 높은 언어권 중심으로 크리에이터 풀 재배치',
       '저성과 포스트는 썸네일/후킹 문구 A/B 테스트 권장',
     ],
-    report_top_creators: agg.topCreators.slice(0, 10),
-    report_top_posts: agg.topPosts.slice(0, 10),
+    report_top_creators: agg.topCreators.slice(0, 12),
+    report_top_posts: agg.topPosts.slice(0, 12),
+    report_comment_samples: agg.commentSamples,
   };
 
   await admin.from('campaign_setup_submissions').delete().eq('campaign_id', campaignId);
