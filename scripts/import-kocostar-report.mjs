@@ -1,15 +1,22 @@
 /**
- * 두 탭 모두 TikTok 분석 원문이면 각각 아래 이름으로 저장 후 이 스크립트를 실행하세요.
- * @see gid=496390458 → tmp_reports/sheet5.csv
- * @see gid=481172263 → tmp_reports/sheet6.csv
- * 원본 스프레드시트 예: docs.google.com/spreadsheets/d/16KCVpfEvWS3ZPHMspHcodL_GChhMruB-O6k5RhZuk4Y/…
+ * 댓글 원문: 기본은 아래 공개 스프레드시트에서 CSV를 받아 옵니다(실행 환경이 인터넷에 연결돼 있어야 함).
+ * 받기 실패 시 tmp_reports 폴더의 백업 CSV를 사용합니다.
+ * 오프라인·로컬만: 환경변수 KOCOSTAR_COMMENTS_LOCAL_ONLY=1
+ *
+ * gid=496390458 → 우선 크롤, 폴백 tmp_reports/sheet5.csv
+ * gid=481172263 → 우선 크롤, 폴백 tmp_reports/sheet6.csv
  */
 import fs from 'fs';
 import path from 'path';
 import { createClient } from '@supabase/supabase-js';
 
 const PERF_FILES = ['sheet1.csv', 'sheet2.csv', 'sheet3.csv', 'sheet4.csv'];
-const COMMENT_FILES = ['sheet5.csv', 'sheet6.csv'];
+const KOCOSTAR_SPREADSHEET_ID = '16KCVpfEvWS3ZPHMspHcodL_GChhMruB-O6k5RhZuk4Y';
+/** 시트별 gid + 웹 실패 시 tmp_reports 폴더 내 백업 CSV */
+const COMMENT_SHEET_TABS = [
+  { gid: '496390458', fallbackCsv: 'sheet5.csv', label: 'TikTok 댓글 탭1' },
+  { gid: '481172263', fallbackCsv: 'sheet6.csv', label: 'TikTok 댓글 탭2' },
+];
 /** 대시보드 2페이지에 실을 원문 JSON 상한(집계·감성 통계는 전체 댓글 기준 그대로) */
 const MAX_COMMENT_SAMPLES_STORAGE = 220;
 const REPORT_EMAIL = 'kocostar@report.com';
@@ -111,7 +118,74 @@ function normalizeCreatorKey(name) {
   return String(name || '').trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
-function aggregateFromCsv(baseDir) {
+async function loadCommentSheetCsv(baseDir, { gid, fallbackCsv, label }) {
+  const full = path.join(baseDir, fallbackCsv);
+  if (process.env.KOCOSTAR_COMMENTS_LOCAL_ONLY === '1') {
+    if (!fs.existsSync(full)) throw new Error(`KOCOSTAR_COMMENTS_LOCAL_ONLY: 로컬 ${fallbackCsv} 없음`);
+    return fs.readFileSync(full, 'utf8');
+  }
+  const exportUrl = `https://docs.google.com/spreadsheets/d/${KOCOSTAR_SPREADSHEET_ID}/export?format=csv&gid=${gid}`;
+  try {
+    const res = await fetch(exportUrl, {
+      redirect: 'follow',
+      headers: {
+        Accept: 'text/csv,text/plain;q=0.9,*/*;q=0.8',
+        'User-Agent': 'Mozilla/5.0 (compatible; BrandSlam-kocostar-import/1.0)',
+      },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    if (/^\s*<!DOCTYPE\b/i.test(text) || /<html\s/i.test(text.slice(0, 400))) {
+      throw new Error('HTML 응답(링크 접근 또는 시트 공개 설정 확인)');
+    }
+    if (text.trim().length < 40) throw new Error('응답이 비어 있음');
+    console.log(`[comments] ✅ Google Sheets ${label} (gid=${gid}) ${(text.length / 1024).toFixed(1)} KB`);
+    return text;
+  } catch (err) {
+    if (!fs.existsSync(full)) {
+      throw new Error(`${label}: 웹 불러오기 실패 (${err.message}) — 백업 ${fallbackCsv}도 없습니다. 시트 공개 또는 CSV 내보내기로 tmp_reports에 두세요.`);
+    }
+    console.warn(`[comments] ⚠️ ${label}: 웹 실패 → 로컬 ${fallbackCsv} 사용 (${err.message})`);
+    return fs.readFileSync(full, 'utf8');
+  }
+}
+
+function appendCommentsFromCsvText(text, comments) {
+  const rows = parseCsv(text);
+  if (!rows.length) return;
+  const headers = Object.keys(rows[0]);
+  const hText = pickHeader(headers, ['text']);
+  const hDigg = pickHeader(headers, ['digg', 'diggcount']);
+  const hReply = pickHeader(headers, ['reply', 'replycomment']);
+  const hLang = pickHeader(headers, ['language']);
+  const hRegion = pickHeader(headers, ['region']);
+  const hBio = pickHeader(headers, ['bio']);
+  const hUid = pickHeader(headers, ['uniqueid', 'unique']);
+  const hVideo = pickHeader(headers, ['videoweburl', 'video', 'url']);
+  const hCreated = pickHeader(headers, ['createtimeiso', 'createtime', 'time']);
+  if (!hText) {
+    console.warn('[comments] CSV에 text 열이 없음, 건너뜀. 헤더:', headers.slice(0, 12));
+    return;
+  }
+  for (const r of rows) {
+    const raw = String(r[hText] || '').trim();
+    if (!raw) continue;
+    comments.push({
+      text_norm: raw.toLowerCase(),
+      display_text: raw,
+      likes: toNum(r[hDigg]),
+      replies: toNum(r[hReply]),
+      lang: String(r[hLang] || '').trim().toLowerCase(),
+      region: String(r[hRegion] || '').trim().toLowerCase(),
+      bio: String(r[hBio] || '').trim().toLowerCase(),
+      unique_id: hUid ? String(r[hUid] || '').trim() : '',
+      video_url: hVideo ? String(r[hVideo] || '').trim() : '',
+      created_at: hCreated ? String(r[hCreated] || '').trim() : '',
+    });
+  }
+}
+
+async function aggregateReportData(baseDir) {
   const rawPerf = [];
   const rawShipmentRows = [];
   for (const fn of PERF_FILES) {
@@ -273,38 +347,13 @@ function aggregateFromCsv(baseDir) {
   });
 
   const comments = [];
-  for (const fn of COMMENT_FILES) {
-    const full = path.join(baseDir, fn);
-    const text = fs.readFileSync(full, 'utf8');
-    const rows = parseCsv(text);
-    if (!rows.length) continue;
-    const headers = Object.keys(rows[0]);
-    const hText = pickHeader(headers, ['text']);
-    const hDigg = pickHeader(headers, ['digg', 'diggcount']);
-    const hReply = pickHeader(headers, ['reply', 'replycomment']);
-    const hLang = pickHeader(headers, ['language']);
-    const hRegion = pickHeader(headers, ['region']);
-    const hBio = pickHeader(headers, ['bio']);
-    const hUid = pickHeader(headers, ['uniqueid', 'unique']);
-    const hVideo = pickHeader(headers, ['videoweburl', 'video', 'url']);
-    const hCreated = pickHeader(headers, ['createtimeiso', 'createtime', 'time']);
-    for (const r of rows) {
-      const raw = String(r[hText] || '').trim();
-      if (!raw) continue;
-      comments.push({
-        text_norm: raw.toLowerCase(),
-        display_text: raw,
-        likes: toNum(r[hDigg]),
-        replies: toNum(r[hReply]),
-        lang: String(r[hLang] || '').trim().toLowerCase(),
-        region: String(r[hRegion] || '').trim().toLowerCase(),
-        bio: String(r[hBio] || '').trim().toLowerCase(),
-        unique_id: hUid ? String(r[hUid] || '').trim() : '',
-        video_url: hVideo ? String(r[hVideo] || '').trim() : '',
-        created_at: hCreated ? String(r[hCreated] || '').trim() : '',
-      });
-    }
+  const commentCsvTexts = await Promise.all(
+    COMMENT_SHEET_TABS.map((tab) => loadCommentSheetCsv(baseDir, tab)),
+  );
+  for (const csvText of commentCsvTexts) {
+    appendCommentsFromCsvText(csvText, comments);
   }
+  console.log(`[comments] 합계 ${comments.length}건 파싱 (저장 폼 표본 최대 ${MAX_COMMENT_SAMPLES_STORAGE}건)`);
 
   const posKw = ['love', 'amazing', 'good', 'great', 'need', 'want', 'beautiful', 'gorgeous', 'cute', 'glow', 'perfect', '좋', '짱'];
   const negKw = ['bad', 'hate', 'worse', 'awful', 'expensive', 'not good', 'terrible', 'ugly', '별로', '싫'];
@@ -586,11 +635,11 @@ async function main() {
   if (!url || !serviceKey) throw new Error('SUPABASE_URL/VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required');
 
   const baseDir = path.resolve(process.cwd(), 'tmp_reports');
-  for (const fn of [...PERF_FILES, ...COMMENT_FILES]) {
-    if (!fs.existsSync(path.join(baseDir, fn))) throw new Error(`Missing CSV: ${fn}`);
+  for (const fn of PERF_FILES) {
+    if (!fs.existsSync(path.join(baseDir, fn))) throw new Error(`Missing CSV (성과용): ${fn}`);
   }
 
-  const agg = aggregateFromCsv(baseDir);
+  const agg = await aggregateReportData(baseDir);
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
 
   const userId = await resolveAuthUserIdByEmail(admin, REPORT_EMAIL);
@@ -733,6 +782,7 @@ async function main() {
     order_number: orderNumber,
     summary: agg.summary,
     comment_summary: agg.commentSummary,
+    report_comment_samples_stored: agg.commentSamples.length,
   }, null, 2));
 }
 

@@ -569,7 +569,10 @@ export default function KocostarReportDeck({ campaign }) {
                     </div>
                   </div>
                 )) : (
-                  <p className="col-span-full text-sm text-slate-500 py-12 text-center">댓글 원문이 비어 있습니다. 스프레드시트 두 탭을 CSV로 저장해 `npm run import:kocostar-report`로 재임포트하세요.</p>
+                  <p className="col-span-full text-sm text-slate-500 py-12 text-center px-2">
+                    원문이 비어 있습니다. PC에서 <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px]">npm run import:kocostar-report</code>
+                    를 실행하면 공개 시트에서 최신 댓글을 받아 Supabase에 저장합니다.
+                  </p>
                 )}
               </div>
             </div>
