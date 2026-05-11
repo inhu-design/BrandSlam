@@ -4,7 +4,7 @@
  * - Body: { order_number: "BS-..." }
  * - 해당 order_number의 campaigns, orders 삭제 (서비스 롤)
  */
-import { supabase } from '../../server/lib/supabase-server.js';
+import { supabase } from '../lib/supabase-server.js';
 
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');

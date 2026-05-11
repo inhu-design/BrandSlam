@@ -5,10 +5,10 @@
  * - 주문 이메일과 로그인 사용자 이메일 일치 시 orders만 paid로 갱신 (campaigns는 PAYMENT_PENDING 유지 → 송장·캠페인 세팅 후 착수)
  */
 import { createClient } from '@supabase/supabase-js';
-import { supabase as supabaseAdmin } from '../../server/lib/supabase-server.js';
-import { buildCampaignRowsFromOrderItems } from '../../server/lib/build-campaign-rows-from-order-items.js';
-import { assertFramelessBankPayload } from '../../server/lib/custom-offers.js';
-import { assertDbCustomPaymentBankPayload } from '../../server/lib/db-custom-payment-offers.js';
+import { supabase as supabaseAdmin } from '../lib/supabase-server.js';
+import { buildCampaignRowsFromOrderItems } from '../lib/build-campaign-rows-from-order-items.js';
+import { assertFramelessBankPayload } from '../lib/custom-offers.js';
+import { assertDbCustomPaymentBankPayload } from '../lib/db-custom-payment-offers.js';
 
 const supabaseUrl = (process.env.SUPABASE_URL || '').trim();
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;

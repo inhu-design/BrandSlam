@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import Navbar from '../components/layout/Navbar'; 
 import Footer from '../components/layout/Footer';
+import KocostarReportDeck from '../components/dashboard/KocostarReportDeck.jsx';
 import AdminSupportInboxPanel from '../components/admin/AdminSupportInboxPanel';
 import AdminAllInvoicesPanel from '../components/admin/AdminAllInvoicesPanel';
 import { useSupportStaffUnread } from '../contexts/SupportStaffUnreadContext';
@@ -701,33 +702,50 @@ const buildLineItemsFromOrderSummary = (order) => {
   return lines.length ? lines : null;
 };
 
-const CampaignCard = ({ campaign, onClick, isActive }) => (
+const CampaignCard = ({ campaign, onClick, isActive, theme = 'dark' }) => {
+  const light = theme === 'light';
+  return (
   <div 
     onClick={onClick}
     className={`p-6 rounded-[2rem] border transition-all duration-500 cursor-pointer relative overflow-hidden group ${
-      isActive 
-      ? 'bg-gradient-to-br from-purple-900/40 to-blue-900/40 border-purple-500 shadow-[0_0_30px_rgba(168,85,247,0.2)]' 
-      : 'bg-white/5 border-white/5 hover:border-white/10'
+      light
+        ? (
+            isActive
+              ? 'bg-gradient-to-br from-indigo-50 to-violet-50 border-indigo-400 shadow-md ring-1 ring-indigo-200'
+              : 'bg-white border-slate-200 hover:border-slate-300 shadow-sm'
+          )
+        : (
+            isActive
+              ? 'bg-gradient-to-br from-purple-900/40 to-blue-900/40 border-purple-500 shadow-[0_0_30px_rgba(168,85,247,0.2)]' 
+              : 'bg-white/5 border-white/5 hover:border-white/10'
+          )
     }`}
   >
-    {isActive && <div className="absolute top-0 right-0 w-20 h-20 bg-purple-500/10 blur-2xl rounded-full"></div>}
+    {isActive && (
+      <div
+        className={`absolute top-0 right-0 w-20 h-20 rounded-full blur-2xl ${
+          light ? 'bg-indigo-300/30' : 'bg-purple-500/10'
+        }`}
+      />
+    )}
     <div className="flex justify-between items-start mb-4 relative z-10">
       <div className="min-w-0">
-        <span className="text-[10px] font-black text-cyan-400 mb-1 block tracking-[0.2em] uppercase">{campaign.plan} PLAN</span>
-        <h3 className="font-bold text-white text-base truncate pr-2">
+        <span className={`text-[10px] font-black mb-1 block tracking-[0.2em] uppercase ${light ? 'text-indigo-700' : 'text-cyan-400'}`}>{campaign.plan} PLAN</span>
+        <h3 className={`font-bold text-base truncate pr-2 ${light ? 'text-slate-900' : 'text-white'}`}>
           {campaign.product_name || campaign.order_summary?.plan_name || '상품명 미정'}
         </h3>
       </div>
     </div>
     <div className="flex items-center justify-between mt-4 relative z-10">
-        <div className="flex items-center gap-2 text-[10px] text-slate-500 font-medium uppercase tracking-widest">
+        <div className={`flex items-center gap-2 text-[10px] font-medium uppercase tracking-widest ${light ? 'text-slate-500' : 'text-slate-500'}`}>
             <Calendar size={12} />
             <span>{campaign.start_date || 'TBD'}</span>
         </div>
         <StatusBadge status={campaign.status} />
     </div>
   </div>
-);
+  );
+};
 
 // --- 데모용 예시 송장 (비로그인 사용자용, 계약 폼 없음) ---
 const DEMO_INVOICE_EXAMPLE = {
@@ -2544,784 +2562,9 @@ const CandidateList = ({
 };
 
 // --- Detail Component: Analytics (완료된 캠페인) ---
-const AnalyticsReport = ({ campaign }) => {
-    const fd = campaign?.setup_submission_summary?.form_data || {};
-    const reportSummary = fd?.report_summary || {};
-    const reportDataStudio = fd?.report_data_studio || {};
-    const reportNotion = fd?.report_notion || {};
-    const reportTopCreatorsRaw = Array.isArray(fd?.report_top_creators) ? fd.report_top_creators : [];
-    const reportTopPostsRaw = Array.isArray(fd?.report_top_posts) ? fd.report_top_posts : [];
-    const reportInsights = Array.isArray(fd?.report_insights) ? fd.report_insights : [];
-    const reportActions = Array.isArray(fd?.report_actions) ? fd.report_actions : [];
-
-    const fmt = (n) => Number(n || 0).toLocaleString();
-    const pct = (n) => `${Number(n || 0).toFixed(2)}%`;
-    const parseNum = (v) => Number(String(v ?? '').replace(/[^0-9]/g, '') || 0);
-    const analytics = campaign?.analytics || {};
-    const dailyViews = Array.isArray(analytics?.daily_views) ? analytics.daily_views : [];
-    const dates = Array.isArray(analytics?.dates) ? analytics.dates : [];
-    const maxDaily = Math.max(1, ...dailyViews);
-    const topLang = Array.isArray(reportSummary?.top_languages) ? reportSummary.top_languages : [];
-    const topRegions = Array.isArray(reportSummary?.top_regions) ? reportSummary.top_regions : [];
-    const quantSummary = reportDataStudio?.comment_quantitative_summary || {};
-    const qualitativeSummary = Array.isArray(reportDataStudio?.comment_qualitative_summary)
-      ? reportDataStudio.comment_qualitative_summary
-      : [];
-    const dataDrivenInsights = Array.isArray(reportDataStudio?.data_driven_insights)
-      ? reportDataStudio.data_driven_insights
-      : [];
-    const nextActionPlan = Array.isArray(reportDataStudio?.next_action_plan)
-      ? reportDataStudio.next_action_plan
-      : [];
-    const sentimentKeywords = Array.isArray(reportNotion?.sentiment_analysis?.representative_keywords)
-      ? reportNotion.sentiment_analysis.representative_keywords
-      : [];
-    const topicMatrix = Array.isArray(reportDataStudio?.comment_topic_matrix) ? reportDataStudio.comment_topic_matrix : [];
-    const userPersonas = Array.isArray(reportDataStudio?.user_personas) ? reportDataStudio.user_personas : [];
-    const langMarketMatrix = Array.isArray(reportNotion?.language_market_matrix) ? reportNotion.language_market_matrix : [];
-    const highIntentExamples = Array.isArray(reportNotion?.purchase_intent_signal_analysis?.high_intent_examples)
-      ? reportNotion.purchase_intent_signal_analysis.high_intent_examples
-      : [];
-    const midIntentExamples = Array.isArray(reportNotion?.purchase_intent_signal_analysis?.mid_intent_examples)
-      ? reportNotion.purchase_intent_signal_analysis.mid_intent_examples
-      : [];
-    const viralExamples = Array.isArray(reportNotion?.purchase_intent_signal_analysis?.viral_examples)
-      ? reportNotion.purchase_intent_signal_analysis.viral_examples
-      : [];
-    const strategyAssetDirection = Array.isArray(reportNotion?.strategy_asset_direction) ? reportNotion.strategy_asset_direction : [];
-    const insightStatements = dataDrivenInsights.length > 0 ? dataDrivenInsights : reportInsights;
-    const strategySummaryList = Array.isArray(reportNotion?.strategy_summary) ? reportNotion.strategy_summary : [];
-    const keyStatementClass = [
-        'from-fuchsia-500/12 via-indigo-500/10 to-cyan-500/12',
-        'from-cyan-500/12 via-blue-500/10 to-emerald-500/12',
-        'from-rose-500/12 via-fuchsia-500/10 to-indigo-500/12',
-        'from-emerald-500/12 via-cyan-500/10 to-blue-500/12',
-    ];
-    const fallbackCreators = Array.isArray(campaign?.creators) ? campaign.creators : [];
-    const fallbackPosts = Array.isArray(campaign?.contents) ? campaign.contents : [];
-
-    const reportTopCreators = reportTopCreatorsRaw.length > 0
-      ? reportTopCreatorsRaw
-      : fallbackCreators.slice(0, 10).map((c) => ({
-          name: c.name || '-',
-          platform: c.platform || '-',
-          views: parseNum(c.views),
-          likes: 0,
-          comments: 0,
-          shares: 0,
-          posts: 1,
-        }));
-
-    const reportTopPosts = reportTopPostsRaw.length > 0
-      ? reportTopPostsRaw
-      : fallbackPosts.slice(0, 12).map((c) => ({
-          name: c.creator || '-',
-          platform: 'POST',
-          views: parseNum(c.views),
-          likes: 0,
-          comments: 0,
-          shares: 0,
-          url: null,
-        }));
-
-    const summaryViews = parseNum(campaign.kpi_views) || Number(reportSummary.views || 0);
-    const summaryLikes = parseNum(campaign.kpi_likes) || Number(reportSummary.likes || 0);
-    const summaryComments = parseNum(campaign.kpi_comments) || Number(reportSummary.comments || 0);
-    const summaryShares = parseNum(campaign.kpi_shares) || Number(reportSummary.shares || 0);
-    const summaryPosts = Number(reportSummary.posts || campaign.content_count || reportTopPosts.length || 0);
-    const engagementPct = analytics?.engagement_rate
-      || (summaryViews > 0
-        ? `${(((summaryLikes + summaryComments + summaryShares) / summaryViews) * 100).toFixed(2)}%`
-        : pct(reportSummary.engagement_rate));
-    const reportDeckRef = useRef(null);
-
-    const dedupedReportTopCreators = [...reportTopCreators.reduce((acc, creator) => {
-      const name = String(creator?.name || '-').trim();
-      const key = name.toLowerCase();
-      const prev = acc.get(key) || {
-        name,
-        platformSet: new Set(),
-        views: 0,
-        likes: 0,
-        comments: 0,
-        shares: 0,
-        posts: 0,
-      };
-      String(creator?.platform || '-')
-        .split('/')
-        .map((x) => x.trim())
-        .filter(Boolean)
-        .forEach((platform) => prev.platformSet.add(platform));
-      prev.views += Number(creator?.views || 0);
-      prev.likes += Number(creator?.likes || 0);
-      prev.comments += Number(creator?.comments || 0);
-      prev.shares += Number(creator?.shares || 0);
-      prev.posts += Number(creator?.posts || 1);
-      acc.set(key, prev);
-      return acc;
-    }, new Map()).values()]
-      .map((creator) => ({
-        ...creator,
-        platform: [...creator.platformSet].sort().join('/'),
-      }))
-      .sort((a, b) => b.views - a.views);
-
-    const commentExampleSnippets = [
-      ...topicMatrix.flatMap((row) => Array.isArray(row?.evidence) ? row.evidence : []),
-      ...highIntentExamples,
-      ...midIntentExamples,
-      ...viralExamples,
-    ].filter(Boolean).slice(0, 10);
-
-    const userCharacteristicNotes = [
-      {
-        label: 'Creator-like bio',
-        value: reportDataStudio?.user_characteristics?.creator_like || 0,
-        help: '댓글 작성자 프로필에 UGC, creator, influencer, content 등 제작자 성향 단어가 감지된 수입니다.',
-      },
-      {
-        label: 'Shopper-like bio',
-        value: reportDataStudio?.user_characteristics?.shopper_like || 0,
-        help: '프로필에 shop, deal, coupon, save, sale 등 쇼핑·할인 탐색 성향 단어가 감지된 수입니다. 1 미만이면 해당 성향이 거의 없다는 뜻입니다.',
-      },
-      {
-        label: 'Skincare-interest bio',
-        value: reportDataStudio?.user_characteristics?.skincare_interest || 0,
-        help: '프로필에 skin, beauty, cosmetic, makeup, skincare 등 뷰티·스킨케어 관심 단어가 감지된 수입니다.',
-      },
-    ];
-
-    const scrollReportDeck = (direction) => {
-      const deck = reportDeckRef.current;
-      if (!deck) return;
-      deck.scrollBy({ left: direction * deck.clientWidth, behavior: 'smooth' });
-    };
-
-    return (
-        <div className="space-y-10 animate-fade-in-up report-light">
-            <style>{`
-              .report-light .report-shell { background: #f8fafc; color: #0f172a; }
-              .report-light .text-white { color: #0f172a !important; }
-              .report-light .text-slate-100, .report-light .text-slate-200, .report-light .text-slate-300 { color: #334155 !important; }
-              .report-light .text-slate-400, .report-light .text-slate-500 { color: #64748b !important; }
-              .report-light .border-white\\/10, .report-light .border-white\\/15, .report-light .border-white\\/20, .report-light .border-white\\/5 { border-color: #e2e8f0 !important; }
-              .report-light .bg-white\\/\\[0\\.03\\], .report-light .bg-white\\/\\[0\\.02\\], .report-light .bg-white\\/5 { background: #ffffff !important; }
-              .report-light .bg-black\\/20, .report-light .bg-black\\/25, .report-light .bg-black\\/30 { background: #f1f5f9 !important; }
-              .report-light .divide-white\\/5 > :not([hidden]) ~ :not([hidden]) { border-color: #e2e8f0 !important; }
-              .report-slide-deck { display: flex; gap: 1.25rem; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 1rem; }
-              .report-slide-deck > div { flex: 0 0 100%; scroll-snap-align: start; min-height: 620px; }
-              .report-slide-deck::-webkit-scrollbar { height: 10px; }
-              .report-slide-deck::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
-            `}</style>
-            <div className="report-shell bg-white backdrop-blur-xl p-6 md:p-8 rounded-[3rem] border border-slate-200 shadow-2xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-200/30 blur-[100px] rounded-full"></div>
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8 relative z-10">
-                    <h3 className="font-black text-white text-3xl md:text-4xl flex items-center gap-3 tracking-tight">
-                        <BarChart2 size={28} className="text-cyan-600" /> KOCOSTAR 캠페인 리포트
-                    </h3>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-[10px] font-black tracking-widest uppercase px-4 py-2 bg-cyan-50 border border-cyan-200 rounded-2xl text-cyan-700">
-                            Client-facing Report Deck
-                        </span>
-                    </div>
-                </div>
-
-                <div className="mb-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 rounded-[2rem] border border-cyan-100 bg-white p-5 shadow-sm relative z-10">
-                    <div>
-                        <p className="text-[11px] uppercase tracking-[0.22em] text-cyan-700 font-black mb-1">Ad-ready proof asset</p>
-                        <p className="text-sm md:text-base text-slate-700 font-semibold leading-relaxed">
-                            유료 광고 소재로 바로 보여줄 수 있도록, “브랜드가 맡기면 이런 수준의 댓글·성과 리포트를 받는다”는 메시지가 드러나게 정리했습니다.
-                        </p>
-                    </div>
-                    <div className="flex gap-2 shrink-0">
-                        <button type="button" onClick={() => scrollReportDeck(-1)} className="w-11 h-11 rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm flex items-center justify-center hover:bg-slate-50">
-                            <ChevronLeft size={20} />
-                        </button>
-                        <button type="button" onClick={() => scrollReportDeck(1)} className="w-11 h-11 rounded-full border border-slate-200 bg-slate-900 text-white shadow-sm flex items-center justify-center hover:bg-slate-800">
-                            <ChevronRight size={20} />
-                        </button>
-                    </div>
-                </div>
-
-                <div ref={reportDeckRef} className="report-slide-deck relative z-10">
-
-                <div className="mb-8 rounded-[2rem] p-6 border border-fuchsia-400/20 bg-gradient-to-r from-fuchsia-500/10 via-indigo-500/10 to-cyan-500/10 relative z-10">
-                    <p className="text-[11px] uppercase tracking-[0.25em] text-fuchsia-200 font-black mb-2">Executive Highlight</p>
-                    <p className="text-white text-lg md:text-2xl font-black leading-tight">
-                        누적 <span className="text-cyan-300">{fmt(summaryViews)}</span> 조회를 기반으로, 감성·구매의향·바이럴 신호를 한 화면에 통합한
-                        <span className="text-fuchsia-300"> Full-Funnel 분석 리포트</span>입니다.
-                    </p>
-                    <p className="text-slate-300 text-sm mt-3 leading-relaxed">
-                        상위 크리에이터 성과, 댓글 정량/정성 분석, 언어권 반응, 제품별 반응 비교, 다음 실행 전략까지 모두 포함해 즉시 실행 가능한 형태로 구성했습니다.
-                    </p>
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 relative z-10">
-                    <div className="p-5 bg-blue-500/5 rounded-2xl border border-blue-500/20">
-                        <p className="text-[10px] text-blue-300 font-black tracking-widest uppercase">Posts</p>
-                        <p className="text-2xl font-black text-white mt-1">{fmt(summaryPosts)}</p>
-                    </div>
-                    <div className="p-5 bg-purple-500/5 rounded-2xl border border-purple-500/20">
-                        <p className="text-[10px] text-purple-300 font-black tracking-widest uppercase">Views</p>
-                        <p className="text-2xl font-black text-white mt-1">{fmt(summaryViews)}</p>
-                    </div>
-                    <div className="p-5 bg-rose-500/5 rounded-2xl border border-rose-500/20">
-                        <p className="text-[10px] text-rose-300 font-black tracking-widest uppercase">Likes</p>
-                        <p className="text-2xl font-black text-white mt-1">{fmt(summaryLikes)}</p>
-                    </div>
-                    <div className="p-5 bg-emerald-500/5 rounded-2xl border border-emerald-500/20">
-                        <p className="text-[10px] text-emerald-300 font-black tracking-widest uppercase">Engagement</p>
-                        <p className="text-2xl font-black text-white mt-1">{engagementPct}</p>
-                    </div>
-                </div>
-
-                <div className="bg-white rounded-[2rem] border border-cyan-100 p-6 md:p-8 mb-8 relative z-10 shadow-sm">
-                    <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-2 mb-6">
-                        <div>
-                            <p className="text-[11px] font-black tracking-[0.22em] text-cyan-700 uppercase">Daily View Trend</p>
-                            <h4 className="text-2xl md:text-3xl font-black text-slate-950 mt-1">일별 조회수 추이</h4>
-                        </div>
-                        <p className="text-xs text-slate-500 font-semibold">가장 높은 일별 피크를 기준으로 막대 높이를 환산했습니다.</p>
-                    </div>
-                    <div className="flex h-80 relative items-end pb-14 pl-12 gap-4 rounded-2xl bg-slate-50 border border-slate-100 px-5 pt-6">
-                        <div className="absolute top-6 left-4 h-[calc(100%-5rem)] flex flex-col justify-between text-[10px] text-slate-500 font-black uppercase tracking-[0.15em]">
-                            <span>{fmt(maxDaily)}K</span>
-                            <span>{fmt(Math.round(maxDaily * 0.66))}K</span>
-                            <span>{fmt(Math.round(maxDaily * 0.33))}K</span>
-                            <span>0</span>
-                        </div>
-                        {dailyViews.map((views, idx) => (
-                            <div key={`${dates[idx] || idx}`} className="flex-1 flex flex-col justify-end group relative h-full">
-                                <div
-                                    className="w-full bg-gradient-to-t from-cyan-700 to-cyan-400 hover:from-cyan-900 hover:to-sky-400 transition-all duration-500 rounded-t-xl relative shadow-[0_10px_25px_rgba(8,145,178,0.25)]"
-                                    style={{ height: `${Math.max(6, (Number(views || 0) / maxDaily) * 100)}%` }}
-                                >
-                                    <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-950 text-white text-[10px] font-black px-2.5 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-all whitespace-nowrap z-20 shadow-2xl">
-                                        {fmt(views)}K
-                                    </div>
-                                </div>
-                                <div className="absolute -bottom-9 left-1/2 -translate-x-1/2 text-[10px] font-black text-slate-600 tracking-tighter whitespace-nowrap uppercase">
-                                    {dates[idx]}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 relative z-10">
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-                        <h4 className="text-sm font-black uppercase tracking-widest text-slate-200 mb-5">Comment Sentiment</h4>
-                        <div className="space-y-4">
-                            <div>
-                                <div className="flex justify-between text-xs mb-1"><span className="text-emerald-300 font-bold">긍정</span><span className="text-slate-300">{pct(reportSummary.positive_pct)}</span></div>
-                                <div className="h-2 rounded-full bg-white/10 overflow-hidden"><div className="h-full bg-emerald-400" style={{ width: `${Math.min(100, Number(reportSummary.positive_pct || 0))}%` }} /></div>
-                            </div>
-                            <div>
-                                <div className="flex justify-between text-xs mb-1"><span className="text-sky-300 font-bold">중립</span><span className="text-slate-300">{pct(reportSummary.neutral_pct)}</span></div>
-                                <div className="h-2 rounded-full bg-white/10 overflow-hidden"><div className="h-full bg-sky-400" style={{ width: `${Math.min(100, Number(reportSummary.neutral_pct || 0))}%` }} /></div>
-                            </div>
-                            <div>
-                                <div className="flex justify-between text-xs mb-1"><span className="text-rose-300 font-bold">부정</span><span className="text-slate-300">{pct(reportSummary.negative_pct)}</span></div>
-                                <div className="h-2 rounded-full bg-white/10 overflow-hidden"><div className="h-full bg-rose-400" style={{ width: `${Math.min(100, Number(reportSummary.negative_pct || 0))}%` }} /></div>
-                            </div>
-                        </div>
-                        <div className="mt-6 grid grid-cols-2 gap-4 text-xs">
-                            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
-                                <p className="text-slate-500 uppercase tracking-widest">구매의도</p>
-                                <p className="text-white font-black mt-1">{pct(reportSummary.purchase_intent_pct)}</p>
-                            </div>
-                            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
-                                <div className="flex items-center gap-1.5">
-                                    <p className="text-slate-500 uppercase tracking-widest">바이럴 신호</p>
-                                    <span className="relative group inline-flex">
-                                        <span className="w-4 h-4 rounded-full bg-slate-900 text-white text-[10px] font-black flex items-center justify-center cursor-help">?</span>
-                                        <span className="pointer-events-none absolute left-1/2 top-6 z-30 w-72 -translate-x-1/2 rounded-xl bg-slate-950 px-3 py-2 text-[11px] leading-relaxed text-white opacity-0 shadow-2xl transition-opacity group-hover:opacity-100">
-                                            친구 태그, 공유, 가족/지인에게 보여주고 싶다는 댓글처럼 콘텐츠 확산 가능성을 암시하는 표현의 비중입니다.
-                                        </span>
-                                    </span>
-                                </div>
-                                <p className="text-white font-black mt-1">{pct(reportSummary.viral_signal_pct)}</p>
-                            </div>
-                        </div>
-                        {topLang.length > 0 ? (
-                            <div className="mt-5 flex flex-wrap gap-2">
-                                {topLang.map(([lang, cnt]) => (
-                                    <span key={lang} className="px-2.5 py-1 rounded-full text-[10px] font-bold border border-white/20 text-slate-300 bg-white/5">
-                                        {String(lang).toUpperCase()} · {cnt}
-                                    </span>
-                                ))}
-                            </div>
-                        ) : null}
-                    </div>
-
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-                        <h4 className="text-sm font-black uppercase tracking-widest text-slate-200 mb-5">Top 10 Creators</h4>
-                        <div className="space-y-2">
-                            {(dedupedReportTopCreators.slice(0, 10)).map((c, idx) => {
-                                const v = Number(c?.views || 0);
-                                const l = Number(c?.likes || 0);
-                                const cm = Number(c?.comments || 0);
-                                const sh = Number(c?.shares || 0);
-                                const er = v > 0 ? (((l + cm + sh) / v) * 100).toFixed(2) : '0.00';
-                                return (
-                                    <div key={`${c?.name || idx}-${idx}`} className="grid grid-cols-12 gap-2 items-center rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2.5 text-xs">
-                                        <div className="col-span-1 text-slate-500 font-black">{idx + 1}</div>
-                                        <div className="col-span-5 text-white font-bold truncate">{c?.name || '-'}</div>
-                                        <div className="col-span-2 text-cyan-300 font-bold">{fmt(v)}</div>
-                                        <div className="col-span-2 text-slate-400">{c?.platform || '-'}</div>
-                                        <div className="col-span-2 text-emerald-300 font-bold">{er}%</div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8 relative z-10">
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-                        <h4 className="text-sm font-black uppercase tracking-widest text-slate-200 mb-4">핵심 인사이트</h4>
-                        <ul className="space-y-2 text-sm text-slate-300">
-                            {(reportInsights.length > 0 ? reportInsights : [
-                                `총 ${fmt(summaryPosts)}개 포스팅에서 ${fmt(summaryViews)} 조회를 확보했습니다.`,
-                                `좋아요+댓글+공유 기반 참여율은 ${engagementPct}입니다.`,
-                                `댓글 감성은 긍정 ${pct(reportSummary.positive_pct)} / 부정 ${pct(reportSummary.negative_pct)}로 안정적입니다.`,
-                            ]).map((x, idx) => (
-                                <li key={`insight-${idx}`} className="rounded-xl bg-white/[0.02] border border-white/10 px-3 py-2">{x}</li>
-                            ))}
-                        </ul>
-                    </div>
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-                        <h4 className="text-sm font-black uppercase tracking-widest text-slate-200 mb-4">추천 액션</h4>
-                        <ul className="space-y-2 text-sm text-slate-300">
-                            {(reportActions.length > 0 ? reportActions : [
-                                '상위 조회 콘텐츠 포맷을 다음 물량 가이드의 기본 템플릿으로 고정',
-                                '구매의도 댓글이 붙은 영상에 링크 고정/프로필 CTA 재강화',
-                                '언어 비중 상위 국가 중심으로 차기 시딩 크리에이터를 재배치',
-                            ]).map((x, idx) => (
-                                <li key={`action-${idx}`} className="rounded-xl bg-white/[0.02] border border-white/10 px-3 py-2">{x}</li>
-                            ))}
-                        </ul>
-                    </div>
-                </div>
-
-                <div className="col-span-1 md:col-span-3 mt-8 border-t border-white/5 pt-8 relative z-10">
-                    <h4 className="text-lg font-black text-white mb-6 flex items-center gap-3 tracking-tighter">
-                        <Trophy size={20} className="text-yellow-400"/> Best Performing Content
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                        {(reportTopPosts.slice(0, 15)).map((p, idx) => (
-                            <a
-                                key={`${p?.url || idx}-${idx}`}
-                                href={p?.url || '#'}
-                                target={p?.url ? '_blank' : undefined}
-                                rel={p?.url ? 'noreferrer' : undefined}
-                                className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 hover:bg-white/[0.06] transition-colors"
-                            >
-                                <p className="text-[10px] font-black text-yellow-300 tracking-widest mb-2">TOP {idx + 1}</p>
-                                <p className="text-white font-bold text-sm truncate">{p?.name || '-'}</p>
-                                <p className="text-slate-400 text-xs mt-1">{p?.platform || '-'}</p>
-                                <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
-                                    <div className="rounded-lg bg-white/5 px-2 py-1"><span className="text-slate-500">Views</span><p className="text-cyan-300 font-bold">{fmt(p?.views)}</p></div>
-                                    <div className="rounded-lg bg-white/5 px-2 py-1"><span className="text-slate-500">Likes</span><p className="text-rose-300 font-bold">{fmt(p?.likes)}</p></div>
-                                    <div className="rounded-lg bg-white/5 px-2 py-1"><span className="text-slate-500">Comments</span><p className="text-emerald-300 font-bold">{fmt(p?.comments)}</p></div>
-                                    <div className="rounded-lg bg-white/5 px-2 py-1"><span className="text-slate-500">Shares</span><p className="text-purple-300 font-bold">{fmt(p?.shares)}</p></div>
-                                </div>
-                            </a>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="mt-8 border-t border-white/5 pt-8 space-y-6 relative z-10">
-                    <h4 className="text-xl font-black text-white tracking-tight">성과 분석 상세 섹션</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-                            <p className="text-[10px] text-slate-500 uppercase tracking-widest">포스팅 개수</p>
-                            <p className="text-xl font-black text-white mt-1">{fmt(reportDataStudio?.overview_cards?.posting_count || summaryPosts)}</p>
-                        </div>
-                        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-                            <p className="text-[10px] text-slate-500 uppercase tracking-widest">누적 뷰</p>
-                            <p className="text-xl font-black text-white mt-1">{fmt(reportDataStudio?.overview_cards?.cumulative_views || summaryViews)}</p>
-                        </div>
-                        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-                            <p className="text-[10px] text-slate-500 uppercase tracking-widest">단일 조회 최대값</p>
-                            <p className="text-xl font-black text-white mt-1">{fmt(reportDataStudio?.overview_cards?.max_single_view || 0)}</p>
-                        </div>
-                        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-                            <p className="text-[10px] text-slate-500 uppercase tracking-widest">배송도달율</p>
-                            <p className="text-xl font-black text-white mt-1">{pct(reportDataStudio?.overview_cards?.shipping_reach_rate || 0)}</p>
-                        </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 overflow-x-auto">
-                        <h5 className="text-sm font-black text-white mb-4 uppercase tracking-widest">리포트 표 (Top Posts)</h5>
-                        <table className="w-full text-xs text-left min-w-[760px]">
-                            <thead className="text-slate-400 border-b border-white/10">
-                                <tr>
-                                    <th className="py-2 pr-3">#</th>
-                                    <th className="py-2 pr-3">Creator</th>
-                                    <th className="py-2 pr-3">Platform</th>
-                                    <th className="py-2 pr-3">Upload Day</th>
-                                    <th className="py-2 pr-3">Views</th>
-                                    <th className="py-2 pr-3">Likes</th>
-                                    <th className="py-2 pr-3">Comments</th>
-                                    <th className="py-2 pr-3">Shares</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-white/5">
-                                {((reportDataStudio?.report_table || []).slice(0, 20)).map((r, idx) => (
-                                    <tr key={`tbl-${idx}`}>
-                                        <td className="py-2 pr-3 text-slate-500">{r.rank || idx + 1}</td>
-                                        <td className="py-2 pr-3 text-white font-semibold">{r.creator || '-'}</td>
-                                        <td className="py-2 pr-3 text-slate-300">{r.platform || '-'}</td>
-                                        <td className="py-2 pr-3 text-slate-400">{r.upload_day || '-'}</td>
-                                        <td className="py-2 pr-3 text-cyan-300">{fmt(r.views)}</td>
-                                        <td className="py-2 pr-3 text-rose-300">{fmt(r.likes)}</td>
-                                        <td className="py-2 pr-3 text-emerald-300">{fmt(r.comments)}</td>
-                                        <td className="py-2 pr-3 text-purple-300">{fmt(r.shares)}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-                            <h5 className="text-sm font-black text-white mb-3 uppercase tracking-widest">주요 키워드/언급</h5>
-                            <div className="space-y-2">
-                                {((reportDataStudio?.keyword_mentions || []).slice(0, 8)).map((k, idx) => (
-                                    <div key={`kw-${idx}`} className="flex items-center justify-between rounded-lg bg-white/[0.02] border border-white/10 px-3 py-2 text-xs">
-                                        <span className="text-slate-200 font-semibold">{k.keyword}</span>
-                                        <span className="text-cyan-300 font-black">{fmt(k.mentions)}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-                            <h5 className="text-sm font-black text-white mb-3 uppercase tracking-widest">댓글단 유저 특성</h5>
-                            <p className="text-xs text-slate-500 mb-3 leading-relaxed">
-                                댓글 작성자의 프로필 소개문(bio)에 들어간 키워드를 기준으로 성향을 자동 분류한 보조 지표입니다.
-                            </p>
-                            <div className="grid grid-cols-1 gap-2 text-xs">
-                                {userCharacteristicNotes.map((note) => (
-                                    <div key={note.label} className="rounded-lg bg-white/[0.02] border border-white/10 px-3 py-2">
-                                        <div className="flex justify-between gap-3">
-                                            <span className="text-slate-300 font-black">{note.label}</span>
-                                            <span className="text-white font-bold">{fmt(note.value)}</span>
-                                        </div>
-                                        <p className="mt-1 text-[11px] leading-relaxed text-slate-500">{note.help}</p>
-                                    </div>
-                                ))}
-                            </div>
-                            <div className="mt-3 flex flex-wrap gap-2">
-                                {((reportDataStudio?.user_characteristics?.top_languages || []).slice(0, 6)).map(([lang, cnt]) => (
-                                    <span key={`ulang-${lang}`} className="px-2 py-1 rounded-md border border-white/15 text-[10px] text-slate-300">{String(lang).toUpperCase()} {cnt}</span>
-                                ))}
-                            </div>
-                            <div className="mt-2 flex flex-wrap gap-2">
-                                {(topRegions.slice(0, 6)).map(([region, cnt]) => (
-                                    <span key={`uregion-${region}`} className="px-2 py-1 rounded-md border border-white/15 text-[10px] text-cyan-200">{String(region).toUpperCase()} {cnt}</span>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-                            <h5 className="text-sm font-black text-white mb-3 uppercase tracking-widest">댓글 정량 요약</h5>
-                            <div className="space-y-2 text-xs">
-                                <div className="flex justify-between rounded-lg bg-white/[0.02] px-3 py-2"><span className="text-slate-300">총 댓글</span><span className="text-white font-black">{fmt(quantSummary.total_comments || reportSummary.total_comments)}</span></div>
-                                <div className="flex justify-between rounded-lg bg-white/[0.02] px-3 py-2"><span className="text-slate-300">댓글 좋아요</span><span className="text-cyan-300 font-black">{fmt(quantSummary.total_comment_likes || reportSummary.total_comment_likes)}</span></div>
-                                <div className="flex justify-between rounded-lg bg-white/[0.02] px-3 py-2"><span className="text-slate-300">댓글 답글</span><span className="text-fuchsia-300 font-black">{fmt(quantSummary.total_comment_replies || reportSummary.total_comment_replies)}</span></div>
-                                <div className="flex justify-between rounded-lg bg-white/[0.02] px-3 py-2"><span className="text-slate-300">구매의향</span><span className="text-emerald-300 font-black">{pct(quantSummary.purchase_intent_pct || reportSummary.purchase_intent_pct)}</span></div>
-                                <div className="flex justify-between rounded-lg bg-white/[0.02] px-3 py-2">
-                                    <span className="text-slate-300 flex items-center gap-1.5">
-                                        바이럴 신호
-                                        <span className="relative group inline-flex">
-                                            <span className="w-4 h-4 rounded-full bg-slate-900 text-white text-[10px] font-black flex items-center justify-center cursor-help">?</span>
-                                            <span className="pointer-events-none absolute left-0 top-6 z-30 w-72 rounded-xl bg-slate-950 px-3 py-2 text-[11px] leading-relaxed text-white opacity-0 shadow-2xl transition-opacity group-hover:opacity-100">
-                                                친구 태그, 공유 요청, 가족/지인 언급처럼 자연 확산을 만들 수 있는 댓글 키워드를 집계한 비율입니다.
-                                            </span>
-                                        </span>
-                                    </span>
-                                    <span className="text-purple-300 font-black">{pct(quantSummary.viral_signal_pct || reportSummary.viral_signal_pct)}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="rounded-2xl border border-cyan-200 bg-cyan-50 p-5 shadow-sm">
-                            <p className="text-[10px] font-black tracking-[0.22em] text-cyan-700 uppercase mb-1">Strongest selling point</p>
-                            <h5 className="text-xl font-black text-slate-950 mb-3 tracking-tight">댓글 분석: 이 리포트의 핵심 강점</h5>
-                            <p className="text-xs text-slate-600 leading-relaxed mb-4">
-                                단순 조회수 리포트가 아니라, 실제 고객 댓글에서 감성·구매 의도·바이럴 가능성·개선 포인트를 뽑아 다음 실행 전략으로 연결합니다.
-                            </p>
-                            <ul className="space-y-3 text-xs text-slate-300">
-                                {(qualitativeSummary.length > 0 ? qualitativeSummary : [
-                                    '긍정/중립 비중이 높아 전반적인 제품 수용도가 양호합니다.',
-                                    '구매처·가격 문의 비중이 존재하여 전환형 CTA를 강화할 여지가 있습니다.',
-                                ]).map((x, idx) => (
-                                    <li key={`qual-${idx}`} className={`rounded-xl border border-white/15 bg-gradient-to-r ${keyStatementClass[idx % keyStatementClass.length]} px-4 py-3`}>
-                                        <p className="text-[10px] uppercase tracking-[0.22em] font-black text-white/70 mb-1">Key Message {idx + 1}</p>
-                                        <p className="text-sm leading-relaxed text-white font-semibold">{x}</p>
-                                    </li>
-                                ))}
-                            </ul>
-                            {commentExampleSnippets.length > 0 ? (
-                                <div className="mt-5">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">실제 댓글 예시</p>
-                                    <div className="grid grid-cols-1 gap-2">
-                                        {commentExampleSnippets.slice(0, 6).map((text, idx) => (
-                                            <blockquote key={`comment-example-${idx}`} className="rounded-xl border border-cyan-100 bg-white px-3 py-2 text-xs text-slate-700 leading-relaxed">
-                                                “{text}”
-                                            </blockquote>
-                                        ))}
-                                    </div>
-                                </div>
-                            ) : null}
-                        </div>
-                        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-                            <h5 className="text-sm font-black text-white mb-3 uppercase tracking-widest">다음 액션 플랜</h5>
-                            <ul className="space-y-2.5 text-xs text-slate-300">
-                                {(nextActionPlan.length > 0 ? nextActionPlan : reportActions).map((x, idx) => (
-                                    <li key={`plan-${idx}`} className="rounded-xl border border-cyan-300/20 bg-cyan-500/5 px-3.5 py-3 flex items-start gap-2.5">
-                                        <span className="mt-0.5 w-5 h-5 rounded-full bg-cyan-300/20 border border-cyan-300/30 text-cyan-100 text-[10px] font-black flex items-center justify-center shrink-0">{idx + 1}</span>
-                                        <span className="text-sm leading-relaxed text-slate-100 font-semibold">{x}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-fuchsia-400/20 bg-gradient-to-r from-fuchsia-500/10 via-indigo-500/10 to-cyan-500/10 p-5">
-                        <h5 className="text-base font-black text-white mb-3 tracking-tight">댓글 데이터 정량/정성 분석 매트릭스</h5>
-                        <div className="space-y-3">
-                            {topicMatrix.map((row, idx) => (
-                                <div key={`topic-matrix-${idx}`} className="rounded-xl border border-white/15 bg-black/25 p-4">
-                                    <div className="flex flex-wrap items-center gap-2 mb-2">
-                                        <span className="text-sm font-black text-cyan-200">{row.topic}</span>
-                                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-fuchsia-500/20 border border-fuchsia-300/30 text-fuchsia-100 font-black">{row.intensity}</span>
-                                    </div>
-                                    <p className="text-[11px] text-slate-200 leading-relaxed"><span className="font-black text-white">인사이트:</span> {row.insight}</p>
-                                    <div className="mt-2 flex flex-wrap gap-2">
-                                        {(row.evidence || []).map((e, eIdx) => (
-                                            <span key={`topic-evi-${idx}-${eIdx}`} className="text-[10px] px-2 py-1 rounded-md bg-white/[0.06] border border-white/20 text-slate-200">{e}</span>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                <div className="mt-8 border-t border-white/5 pt-8 space-y-6 relative z-10">
-                    <h4 className="text-xl font-black text-white tracking-tight">심층 인사이트 섹션</h4>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-                            <h5 className="text-sm font-black text-white mb-3">감정분석</h5>
-                            <p className="text-xs text-slate-300 leading-relaxed">
-                                긍정 {pct(reportNotion?.sentiment_analysis?.positive_pct || reportSummary.positive_pct)} ·
-                                중립 {pct(reportNotion?.sentiment_analysis?.neutral_pct || reportSummary.neutral_pct)} ·
-                                부정 {pct(reportNotion?.sentiment_analysis?.negative_pct || reportSummary.negative_pct)}
-                            </p>
-                            <div className="mt-3 flex flex-wrap gap-2">
-                                {sentimentKeywords.slice(0, 6).map((k, idx) => (
-                                    <span key={`senti-kw-${idx}`} className="px-2 py-1 rounded-md bg-white/[0.03] border border-white/15 text-[10px] text-fuchsia-200">
-                                        {k.keyword}: {fmt(k.mentions)}
-                                    </span>
-                                ))}
-                            </div>
-                        </div>
-                        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-                            <h5 className="text-sm font-black text-white mb-3">제품별 반응 비교</h5>
-                            <div className="text-xs text-slate-300 space-y-1">
-                                <p>Lip mask views: {fmt(reportNotion?.product_reaction_comparison?.lip_mask?.views || 0)}</p>
-                                <p>Face mask views: {fmt(reportNotion?.product_reaction_comparison?.face_mask?.views || 0)}</p>
-                                <p>Others views: {fmt(reportNotion?.product_reaction_comparison?.others?.views || 0)}</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 text-xs">
-                        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-                            <h6 className="text-slate-100 font-black mb-2">언어별 반응 분석</h6>
-                            {((reportNotion?.language_reaction_analysis || []).slice(0, 6)).map(([lang, cnt]) => (
-                                <p key={`lang-${lang}`} className="text-slate-300">{String(lang).toUpperCase()} · {cnt}</p>
-                            ))}
-                        </div>
-                        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-                            <h6 className="text-slate-100 font-black mb-2">구매 의향 신호 분석</h6>
-                            <p className="text-slate-300">구매의향 비율: {pct(reportNotion?.purchase_intent_signal_analysis?.purchase_intent_pct || reportSummary.purchase_intent_pct)}</p>
-                            <p className="text-slate-500 mt-2">{reportNotion?.purchase_intent_signal_analysis?.prompt || '구매처/가격/링크 질문 비중'}</p>
-                            {highIntentExamples.length > 0 ? (
-                                <div className="mt-3">
-                                    <p className="text-[10px] text-emerald-300 font-black uppercase tracking-widest mb-1">High Intent</p>
-                                    {highIntentExamples.slice(0, 4).map((t, idx) => <p key={`hi-${idx}`} className="text-slate-200">- {t}</p>)}
-                                </div>
-                            ) : null}
-                            {midIntentExamples.length > 0 ? (
-                                <div className="mt-3">
-                                    <p className="text-[10px] text-cyan-300 font-black uppercase tracking-widest mb-1">Mid Intent</p>
-                                    {midIntentExamples.slice(0, 4).map((t, idx) => <p key={`mi-${idx}`} className="text-slate-200">- {t}</p>)}
-                                </div>
-                            ) : null}
-                            {viralExamples.length > 0 ? (
-                                <div className="mt-3">
-                                    <p className="text-[10px] text-fuchsia-300 font-black uppercase tracking-widest mb-1">Viral Signal</p>
-                                    {viralExamples.slice(0, 4).map((t, idx) => <p key={`vi-${idx}`} className="text-slate-200">- {t}</p>)}
-                                </div>
-                            ) : null}
-                        </div>
-                        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-                            <h6 className="text-slate-100 font-black mb-2">바이럴 포인트 분석</h6>
-                            {((reportNotion?.viral_point_analysis || []).slice(0, 5)).map((v, idx) => (
-                                <div key={`viral-${idx}`} className="mb-1.5 rounded-lg bg-white/[0.03] border border-white/10 px-2 py-1.5">
-                                    <p className="text-slate-200 font-semibold">
-                                        {v?.rank ? `${v.rank}위` : `TOP ${idx + 1}`} · {v?.trigger || v?.keyword || '-'}
-                                    </p>
-                                    <p className="text-slate-400 text-[11px]">{v?.evidence || (v?.mentions ? `언급 ${fmt(v.mentions)}회` : '')}</p>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {langMarketMatrix.length > 0 ? (
-                        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 overflow-x-auto">
-                            <h5 className="text-sm font-black text-white mb-3 uppercase tracking-widest">언어별 시장 가능성 매트릭스</h5>
-                            <table className="w-full min-w-[700px] text-xs">
-                                <thead className="text-slate-400 border-b border-white/10">
-                                    <tr>
-                                        <th className="py-2 pr-3 text-left">언어권</th>
-                                        <th className="py-2 pr-3 text-left">비율</th>
-                                        <th className="py-2 pr-3 text-left">주요 반응</th>
-                                        <th className="py-2 pr-3 text-left">시장 가능성</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-white/5">
-                                    {langMarketMatrix.map((row, idx) => (
-                                        <tr key={`lang-matrix-${idx}`}>
-                                            <td className="py-2 pr-3 text-white font-semibold">{row.language}</td>
-                                            <td className="py-2 pr-3 text-cyan-300 font-black">{row.ratio}</td>
-                                            <td className="py-2 pr-3 text-slate-300">{row.reaction}</td>
-                                            <td className="py-2 pr-3 text-fuchsia-200">{row.market_potential}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    ) : null}
-
-                    <div className="rounded-2xl border border-white/10 bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-fuchsia-500/10 p-5">
-                        <h5 className="text-sm font-black text-white mb-3 uppercase tracking-widest">데이터 기반 핵심 인사이트</h5>
-                        <div className="space-y-3">
-                            {insightStatements.length > 0 ? (
-                                <div className="rounded-xl border border-fuchsia-300/25 bg-black/30 px-4 py-4">
-                                    <p className="text-[10px] uppercase tracking-[0.2em] text-fuchsia-200 font-black mb-1">Most Critical Insight</p>
-                                    <p className="text-base md:text-lg leading-snug text-white font-black">{insightStatements[0]}</p>
-                                </div>
-                            ) : null}
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                                {insightStatements.slice(1).map((x, idx) => (
-                                    <div key={`ddi-${idx}`} className={`rounded-xl border border-white/15 bg-gradient-to-r ${keyStatementClass[idx % keyStatementClass.length]} px-4 py-3`}>
-                                        <p className="text-[10px] uppercase tracking-[0.2em] text-white/70 font-black mb-1">Insight {idx + 2}</p>
-                                        <p className="text-sm text-white leading-relaxed font-semibold">{x}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-                            <h5 className="text-sm font-black text-white mb-3">콘텐츠 포맷별 반응 힌트</h5>
-                            <div className="grid grid-cols-1 gap-2.5">
-                                {(reportNotion?.content_format_hints || []).map((x, idx) => (
-                                    <div key={`fmt-${idx}`} className="rounded-lg border border-white/15 bg-gradient-to-r from-purple-500/10 to-cyan-500/10 px-3 py-2.5">
-                                        <p className="text-[10px] uppercase tracking-[0.18em] text-cyan-200 font-black mb-1">Format Hint {idx + 1}</p>
-                                        <p className="text-sm text-white leading-relaxed font-semibold">{x}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-                            <h5 className="text-sm font-black text-white mb-3">개선 및 보완 포인트</h5>
-                            <ul className="space-y-2 text-xs text-slate-300">
-                                {(reportNotion?.improvements_and_complements || []).map((x, idx) => (
-                                    <li key={`imp-${idx}`} className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
-                                        {typeof x === 'string'
-                                            ? `- ${x}`
-                                            : (
-                                                <div className="space-y-1">
-                                                    <p className="text-white font-semibold">{x.problem || '이슈'}</p>
-                                                    <p className="text-slate-400">근거: {x.evidence || '-'}</p>
-                                                    <p className="text-cyan-200">액션: {x.action || '-'}</p>
-                                                </div>
-                                            )}
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-                            <h5 className="text-sm font-black text-white mb-3">모집 전략 추천</h5>
-                            <div className="space-y-2.5">
-                                {(reportNotion?.recruitment_strategy || []).map((x, idx) => (
-                                    <div key={`rec-${idx}`} className="rounded-lg border border-cyan-300/25 bg-cyan-500/5 px-3 py-2.5">
-                                        <p className="text-[10px] uppercase tracking-[0.18em] text-cyan-200 font-black mb-1">Priority {idx + 1}</p>
-                                        <p className="text-sm text-white font-semibold leading-relaxed">{x}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-                            <h5 className="text-sm font-black text-white mb-3">전략 요약</h5>
-                            <div className="space-y-2.5">
-                                {strategySummaryList.map((x, idx) => (
-                                    <div key={`sum-${idx}`} className={`rounded-lg border border-white/15 bg-gradient-to-r ${keyStatementClass[idx % keyStatementClass.length]} px-3 py-2.5`}>
-                                        <p className="text-[10px] uppercase tracking-[0.18em] text-white/70 font-black mb-1">Summary {idx + 1}</p>
-                                        <p className="text-sm text-white font-semibold leading-relaxed">{x}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-
-                    {userPersonas.length > 0 ? (
-                        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-                            <h5 className="text-sm font-black text-white mb-3 uppercase tracking-widest">댓글 유저 핵심 특성 3가지</h5>
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-                                {userPersonas.map((p, idx) => (
-                                    <div key={`persona-${idx}`} className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
-                                        <p className="text-white font-black text-sm leading-snug mb-2">{p.title}</p>
-                                        <div className="flex flex-wrap gap-1 mb-2">
-                                            {(p.traits || []).map((t, tIdx) => (
-                                                <span key={`pt-${idx}-${tIdx}`} className="text-[10px] px-2 py-1 rounded-md border border-white/15 text-cyan-200">{t}</span>
-                                            ))}
-                                        </div>
-                                        <p className="text-xs text-slate-300 leading-relaxed">{p.analysis}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    ) : null}
-
-                    {strategyAssetDirection.length > 0 ? (
-                        <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/5 p-5">
-                            <h5 className="text-sm font-black text-white mb-3 uppercase tracking-widest">핵심 자산별 실행 방향</h5>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                {strategyAssetDirection.map((row, idx) => (
-                                    <div key={`asset-dir-${idx}`} className="rounded-xl border border-emerald-300/20 bg-black/20 p-3">
-                                        <p className="text-emerald-300 text-[11px] font-black uppercase tracking-wider">{row.asset}</p>
-                                        <p className="text-slate-200 text-xs mt-2 leading-relaxed">{row.direction}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    ) : null}
-                </div>
-                </div>
-            </div>
-        </div>
-    );
-};
+const AnalyticsReport = ({ campaign }) => (
+    <KocostarReportDeck campaign={campaign} />
+);
 
 // --- Detail Component: Ongoing Campaign (업로드 중) ---
 const OngoingCampaign = ({ campaign }) => {
@@ -7122,28 +6365,28 @@ export default function Dashboard() {
     [campaigns],
   );
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#020617]"><div className="w-12 h-12 border-4 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin"></div></div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><div className="w-12 h-12 border-4 border-slate-200 border-t-cyan-500 rounded-full animate-spin"></div></div>;
 
   return (
-    <div className="min-h-screen bg-[#020617] text-white flex flex-col selection:bg-cyan-500/30">
+    <div className={`min-h-screen flex flex-col ${isAdminUser ? 'bg-[#020617] text-white selection:bg-cyan-500/30' : 'bg-slate-50 text-slate-900 selection:bg-cyan-200/50'}`}>
       <Navbar />
       
       <div className="flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-40 pb-32">
         {isDemoMode && (
-            <div className="mb-10 p-5 bg-gradient-to-r from-purple-900/40 to-blue-900/40 border border-purple-500/30 rounded-3xl flex items-center gap-4 text-purple-200 text-sm shadow-[0_0_20px_rgba(168,85,247,0.1)] animate-fade-in-down relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-1 h-full bg-purple-500 animate-pulse"></div>
-                <AlertCircle size={20} className="text-purple-400 shrink-0" />
-                <span className="font-light tracking-tight">현재 시스템 체험을 위한 <b className="font-black text-white uppercase tracking-widest underline decoration-purple-500 underline-offset-4">Demo Mode</b>가 활성화되어 있습니다. 실제 캠페인 계약 시 실시간 데이터 피드가 전송됩니다.</span>
+            <div className={`mb-10 p-5 rounded-3xl flex items-center gap-4 text-sm shadow-sm animate-fade-in-down relative overflow-hidden border ${isAdminUser ? 'bg-gradient-to-r from-purple-900/40 to-blue-900/40 border-purple-500/30 text-purple-200 shadow-[0_0_20px_rgba(168,85,247,0.1)]' : 'bg-purple-50 border-purple-200 text-purple-950'}`}>
+                <div className={`absolute top-0 left-0 w-1 h-full animate-pulse ${isAdminUser ? 'bg-purple-500' : 'bg-purple-600'}`}></div>
+                <AlertCircle size={20} className={`${isAdminUser ? 'text-purple-400 shrink-0' : 'text-purple-600 shrink-0'}`} />
+                <span className={`font-light tracking-tight ${isAdminUser ? '' : 'text-purple-950'}`}>현재 시스템 체험을 위한 <b className={`font-black uppercase tracking-widest underline decoration-purple-500 underline-offset-4 ${isAdminUser ? 'text-white' : 'text-purple-900'}`}>Demo Mode</b>가 활성화되어 있습니다. 실제 캠페인 계약 시 실시간 데이터 피드가 전송됩니다.</span>
             </div>
         )}
 
         {!isAdminUser && user?.email?.toLowerCase().trim() === CUSTOM_OFFER_FRAMELESS_EMAIL && (
-          <div className="mb-10 p-6 md:p-8 rounded-[2rem] border border-emerald-500/35 bg-gradient-to-br from-emerald-950/50 to-slate-900/80 shadow-[0_0_40px_rgba(16,185,129,0.12)]">
+          <div className="mb-10 p-6 md:p-8 rounded-[2rem] border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 shadow-sm">
             <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
               <div>
-                <p className="text-[10px] font-black tracking-[0.25em] uppercase text-emerald-400/90 mb-2">개인 맞춤 결제</p>
-                <h2 className="text-xl md:text-2xl font-black text-white mb-2">The Frameless 맞춤 견적</h2>
-                <p className="text-sm text-slate-400 leading-relaxed max-w-xl">
+                <p className="text-[10px] font-black tracking-[0.25em] uppercase text-emerald-800 mb-2">개인 맞춤 결제</p>
+                <h2 className="text-xl md:text-2xl font-black text-emerald-950 mb-2">The Frameless 맞춤 견적</h2>
+                <p className="text-sm text-emerald-900/90 leading-relaxed max-w-xl">
                   {FRAMELESS_OFFER_PRICING.visitQty > 0 ? (
                     <>
                       시딩 35,000원 × {FRAMELESS_OFFER_PRICING.seedingQty}건 · 방문형 시딩 240,000원 ×{' '}
@@ -7156,32 +6399,32 @@ export default function Dashboard() {
                     </>
                   )}
                 </p>
-                <ul className="mt-4 space-y-2 text-sm text-slate-300">
+                <ul className="mt-4 space-y-2 text-sm text-emerald-900/95">
                   <li className="flex justify-between gap-4 max-w-md">
                     <span>시딩(건당) × {FRAMELESS_OFFER_PRICING.seedingQty}건 · 공급가</span>
-                    <span className="font-mono text-white">
+                    <span className="font-mono text-emerald-950">
                       {(FRAMELESS_OFFER_PRICING.seedingUnitPrice * FRAMELESS_OFFER_PRICING.seedingQty).toLocaleString()}원
                     </span>
                   </li>
                   {FRAMELESS_OFFER_PRICING.visitQty > 0 ? (
                     <li className="flex justify-between gap-4 max-w-md">
                       <span>방문형 시딩(건당) × {FRAMELESS_OFFER_PRICING.visitQty}건 · 공급가</span>
-                      <span className="font-mono text-white">
+                      <span className="font-mono text-emerald-950">
                         {(FRAMELESS_OFFER_PRICING.visitUnitPrice * FRAMELESS_OFFER_PRICING.visitQty).toLocaleString()}원
                       </span>
                     </li>
                   ) : null}
-                  <li className="flex justify-between gap-4 max-w-md border-t border-white/10 pt-2 mt-2"><span className="text-emerald-200/90">부가세(10%)</span><span className="font-mono text-emerald-200">{getFramelessOfferTotals().vat.toLocaleString()}원</span></li>
-                  <li className="flex justify-between gap-4 max-w-md text-lg font-black text-white">
+                  <li className="flex justify-between gap-4 max-w-md border-t border-emerald-200/80 pt-2 mt-2"><span className="text-emerald-800 font-medium">부가세(10%)</span><span className="font-mono text-emerald-950">{getFramelessOfferTotals().vat.toLocaleString()}원</span></li>
+                  <li className="flex justify-between gap-4 max-w-md text-lg font-black text-emerald-950">
                     <span>{paidOrders.length > 0 ? '확정 계약(VAT 포함)' : '결제 예정(VAT 포함)'}</span>
-                    <span className="text-emerald-400">{getFramelessOfferTotals().total.toLocaleString()}원</span>
+                    <span className="text-emerald-700">{getFramelessOfferTotals().total.toLocaleString()}원</span>
                   </li>
                 </ul>
               </div>
               {paidOrders.length > 0 ? (
-                <div className="shrink-0 max-w-xs rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-6 py-4 text-sm text-emerald-100/95 leading-relaxed">
+                <div className="shrink-0 max-w-xs rounded-2xl border border-emerald-200 bg-emerald-100/60 px-6 py-4 text-sm text-emerald-950 leading-relaxed">
                   결제가 완료된 계약입니다. 시딩 {FRAMELESS_OFFER_PRICING.seedingQty}건 · VAT 포함{' '}
-                  <span className="font-black text-white">{getFramelessOfferTotals().total.toLocaleString()}원</span>으로 진행 중입니다.
+                  <span className="font-black text-emerald-950">{getFramelessOfferTotals().total.toLocaleString()}원</span>으로 진행 중입니다.
                 </div>
               ) : (
                 <button
@@ -7198,7 +6441,7 @@ export default function Dashboard() {
 
         {!isDemoMode && user && myCustomPaymentOffers.length > 0 && (
           <div className="mb-10 space-y-4">
-            <p className="text-[10px] font-black tracking-[0.25em] uppercase text-sky-400/90 px-1">개인 결제창</p>
+            <p className={`text-[10px] font-black tracking-[0.25em] uppercase px-1 ${isAdminUser ? 'text-sky-400/90' : 'text-sky-700'}`}>개인 결제창</p>
             {myCustomPaymentOffers.map((offer) => {
               const t = computeDbOfferTotals(offer);
               const seedLine = `${offer.seeding_line_label || '시딩(건당)'} × ${Number(offer.seeding_qty) || 0}건 · 공급가`;
@@ -7208,21 +6451,21 @@ export default function Dashboard() {
               return (
                 <div
                   key={offer.id}
-                  className="p-6 md:p-8 rounded-[2rem] border border-sky-500/35 bg-gradient-to-br from-sky-950/45 to-slate-900/80 shadow-[0_0_32px_rgba(14,165,233,0.1)]"
+                  className={`p-6 md:p-8 rounded-[2rem] border shadow-sm ${isAdminUser ? 'border-sky-500/35 bg-gradient-to-br from-sky-950/45 to-slate-900/80 shadow-[0_0_32px_rgba(14,165,233,0.1)]' : 'border-sky-200 bg-gradient-to-br from-sky-50 to-cyan-50'}`}
                 >
                   <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
                     <div>
-                      <h2 className="text-xl md:text-2xl font-black text-white mb-2">
+                      <h2 className={`text-xl md:text-2xl font-black mb-2 ${isAdminUser ? 'text-white' : 'text-slate-900'}`}>
                         {offer.title?.trim() || '맞춤 견적 결제'}
                       </h2>
-                      <p className="text-sm text-slate-400 leading-relaxed max-w-xl">
+                      <p className={`text-sm leading-relaxed max-w-xl ${isAdminUser ? 'text-slate-400' : 'text-sky-950/85'}`}>
                         관리자가 귀하의 계정으로만 발급한 결제창입니다. 시딩·방문 라인의 단가·수량은 공용 요금제와 별도이며, 아래는 부가세 포함 총액입니다.
                       </p>
-                      <ul className="mt-4 space-y-2 text-sm text-slate-300">
+                      <ul className={`mt-4 space-y-2 text-sm ${isAdminUser ? 'text-slate-300' : 'text-slate-800'}`}>
                         {(Number(offer.seeding_qty) || 0) > 0 && (
                           <li className="flex justify-between gap-4 max-w-md">
                             <span>{seedLine}</span>
-                            <span className="font-mono text-white">{seedSupply.toLocaleString()}원</span>
+                            <span className={`font-mono ${isAdminUser ? 'text-white' : 'text-slate-900'}`}>{seedSupply.toLocaleString()}원</span>
                           </li>
                         )}
                         {visitQty > 0 && (
@@ -7230,16 +6473,16 @@ export default function Dashboard() {
                             <span>
                               {offer.visit_line_label || '방문형 시딩(건당)'} × {visitQty}건 · 공급가
                             </span>
-                            <span className="font-mono text-white">{visitSupply.toLocaleString()}원</span>
+                            <span className={`font-mono ${isAdminUser ? 'text-white' : 'text-slate-900'}`}>{visitSupply.toLocaleString()}원</span>
                           </li>
                         )}
-                        <li className="flex justify-between gap-4 max-w-md border-t border-white/10 pt-2 mt-2">
-                          <span className="text-sky-200/90">부가세</span>
-                          <span className="font-mono text-sky-200">{t.vat.toLocaleString()}원</span>
+                        <li className={`flex justify-between gap-4 max-w-md border-t pt-2 mt-2 ${isAdminUser ? 'border-white/10' : 'border-sky-200'}`}>
+                          <span className={isAdminUser ? 'text-sky-200/90' : 'text-sky-800'}>부가세</span>
+                          <span className={`font-mono ${isAdminUser ? 'text-sky-200' : 'text-sky-950'}`}>{t.vat.toLocaleString()}원</span>
                         </li>
-                        <li className="flex justify-between gap-4 max-w-md text-lg font-black text-white">
+                        <li className={`flex justify-between gap-4 max-w-md text-lg font-black ${isAdminUser ? 'text-white' : 'text-slate-900'}`}>
                           <span>결제 예정(VAT 포함)</span>
-                          <span className="text-sky-400">{t.total.toLocaleString()}원</span>
+                          <span className={isAdminUser ? 'text-sky-400' : 'text-sky-700'}>{t.total.toLocaleString()}원</span>
                         </li>
                       </ul>
                     </div>
@@ -7935,11 +7178,11 @@ export default function Dashboard() {
         )}
 
         {user && !user?.user_metadata?.password_set && (
-            <div className="mb-10 p-5 bg-white/[0.03] border border-white/10 rounded-3xl flex flex-col sm:flex-row sm:items-center gap-4 text-slate-300 text-sm animate-fade-in-down">
-                <Lock size={22} className="text-purple-400 shrink-0" />
+            <div className={`mb-10 p-5 rounded-3xl flex flex-col sm:flex-row sm:items-center gap-4 text-sm animate-fade-in-down border ${isAdminUser ? 'bg-white/[0.03] border-white/10 text-slate-300' : 'bg-white border border-slate-200 text-slate-700 shadow-sm'}`}>
+                <Lock size={22} className={`shrink-0 ${isAdminUser ? 'text-purple-400' : 'text-purple-600'}`} />
                 <div className="flex-1">
-                    <p className="font-medium text-white">다음부터는 비밀번호로 빠르게 로그인할 수 있어요.</p>
-                    <p className="text-slate-500 text-xs mt-0.5">한 번만 설정하면, 이메일+비밀번호만으로 바로 들어올 수 있습니다.</p>
+                    <p className={`font-medium ${isAdminUser ? 'text-white' : 'text-slate-900'}`}>다음부터는 비밀번호로 빠르게 로그인할 수 있어요.</p>
+                    <p className={`text-xs mt-0.5 ${isAdminUser ? 'text-slate-500' : 'text-slate-500'}`}>한 번만 설정하면, 이메일+비밀번호만으로 바로 들어올 수 있습니다.</p>
                 </div>
                 <button
                     onClick={() => navigate('/set-password?from=/dashboard')}
@@ -7953,10 +7196,10 @@ export default function Dashboard() {
         {!isAdminUser && (
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-12 gap-8 relative z-10">
             <div>
-                <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight mb-3 leading-tight">
+                <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight mb-3 leading-tight">
                     {user ? `${user.email.split('@')[0]}님의 대시보드` : '대시보드'}
                 </h1>
-                <p className="text-slate-400 font-light text-base md:text-lg tracking-tight max-w-2xl">
+                <p className="text-slate-600 font-light text-base md:text-lg tracking-tight max-w-2xl">
                   캠페인 진행 단계와 결과를 한곳에서 확인할 수 있습니다.
                 </p>
             </div>
@@ -7964,24 +7207,24 @@ export default function Dashboard() {
                 <button 
                     type="button"
                     onClick={() => setIsPasswordMode(true)}
-                    className="flex items-center gap-3 px-6 py-3 bg-white/5 border border-white/10 rounded-2xl text-xs font-bold hover:bg-white/10 transition-all shadow-xl text-slate-200"
+                    className="flex items-center gap-3 px-6 py-3 bg-white border border-slate-200 rounded-2xl text-xs font-bold hover:bg-slate-50 transition-all shadow-md text-slate-800"
                 >
-                    <Settings size={18} className="text-slate-400" /> 비밀번호·계정 설정
+                    <Settings size={18} className="text-slate-500" /> 비밀번호·계정 설정
                 </button>
             )}
         </div>
         )}
 
         {user && paidOrders.length > 0 && (
-          <div className="mb-10 p-6 bg-white/[0.03] border border-white/10 rounded-2xl relative z-10">
-            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-              <CreditCard size={20} className="text-purple-400" /> 결제 내역
+          <div className={`mb-10 p-6 rounded-2xl relative z-10 border ${isAdminUser ? 'bg-white/[0.03] border-white/10' : 'bg-white border-slate-200 shadow-sm'}`}>
+            <h2 className={`text-lg font-bold mb-4 flex items-center gap-2 ${isAdminUser ? 'text-white' : 'text-slate-900'}`}>
+              <CreditCard size={20} className="text-purple-500" /> 결제 내역
             </h2>
             <p className="text-slate-500 text-sm mb-4">KG이니시스 승인 건은 아래와 같습니다. 통합내역조회는 PG사 반영 후 일정이 소요될 수 있습니다.</p>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-white/10 text-slate-500 font-medium">
+                  <tr className={`border-b font-medium ${isAdminUser ? 'border-white/10 text-slate-500' : 'border-slate-200 text-slate-500'}`}>
                     <th className="py-3 pr-4">주문번호</th>
                     <th className="py-3 pr-4">상품명</th>
                     <th className="py-3 pr-4">결제금액</th>
@@ -7990,13 +7233,13 @@ export default function Dashboard() {
                 </thead>
                 <tbody>
                   {paidOrders.map((o) => (
-                    <tr key={o.order_number} className="border-b border-white/5 hover:bg-white/[0.03]">
-                      <td className="py-3 pr-4 font-mono text-slate-300">{o.order_number}</td>
-                      <td className="py-3 pr-4 text-white">{o.plan_name}</td>
-                      <td className="py-3 pr-4 text-purple-400 font-semibold">
+                    <tr key={o.order_number} className={`border-b ${isAdminUser ? 'border-white/5 hover:bg-white/[0.03]' : 'border-slate-100 hover:bg-slate-50'}`}>
+                      <td className={`py-3 pr-4 font-mono ${isAdminUser ? 'text-slate-300' : 'text-slate-600'}`}>{o.order_number}</td>
+                      <td className={`py-3 pr-4 ${isAdminUser ? 'text-white' : 'text-slate-900'}`}>{o.plan_name}</td>
+                      <td className="py-3 pr-4 text-purple-600 font-semibold">
                         {displayPaidOrderPlanPriceForViewer(o, user?.email).toLocaleString()}원
                       </td>
-                      <td className="py-3 text-slate-400">{o.created_at ? new Date(o.created_at).toLocaleString('ko-KR') : '-'}</td>
+                      <td className="py-3 text-slate-500">{o.created_at ? new Date(o.created_at).toLocaleString('ko-KR') : '-'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -8011,60 +7254,11 @@ export default function Dashboard() {
             <div className="w-full lg:w-1/4 space-y-10 sticky top-40">
                 <div className="space-y-6">
                     <div className="flex items-center justify-between px-2">
-                        <h2 className="text-sm font-bold text-slate-300">캠페인 목록</h2>
-                        <span className="text-xs font-semibold bg-white/5 text-slate-300 px-3 py-1 rounded-full border border-white/10">
-                          {isAdminUser ? `보이는 ${filteredCampaigns.length}개 / 전체 ${campaigns.length}개` : `${campaigns.length}개`}
+                        <h2 className="text-sm font-bold text-slate-800">캠페인 목록</h2>
+                        <span className="text-xs font-semibold bg-slate-100 text-slate-700 px-3 py-1 rounded-full border border-slate-200">
+                          {`${campaigns.length}개`}
                         </span>
                     </div>
-                    {isAdminUser && (
-                        <div className="p-4 rounded-2xl border border-cyan-500/25 bg-cyan-500/[0.06] space-y-3">
-                            <p className="text-xs font-bold text-cyan-100">목록만 좁히기</p>
-                            <p className="text-[11px] text-slate-400 leading-relaxed">위 운영 센터 표를 눌러도 같은 필터가 걸립니다. 여기서 직접 고를 수도 있습니다.</p>
-                            <input
-                                value={adminSearch}
-                                onChange={(e) => setAdminSearch(e.target.value)}
-                                placeholder="주문번호, 브랜드, 이메일 중 아무거나 입력"
-                                className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder-slate-500"
-                            />
-                            <div className="grid grid-cols-1 gap-2">
-                                <select value={adminFilterCustomer} onChange={(e) => setAdminFilterCustomer(e.target.value)} className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white">
-                                    <option value="all" className="bg-white text-slate-900">고객 이메일 — 전체</option>
-                                    {adminCustomerOptions.map((v) => <option key={v} value={v} className="bg-white text-slate-900">{v}</option>)}
-                                </select>
-                                <select value={adminFilterBrand} onChange={(e) => setAdminFilterBrand(e.target.value)} className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white">
-                                    <option value="all" className="bg-white text-slate-900">브랜드 — 전체</option>
-                                    {adminBrandOptions.map((v) => <option key={v} value={v} className="bg-white text-slate-900">{v}</option>)}
-                                </select>
-                                <select value={adminFilterPlan} onChange={(e) => setAdminFilterPlan(e.target.value)} className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white">
-                                    <option value="all" className="bg-white text-slate-900">상품 유형 — 전체</option>
-                                    {adminPlanOptions.map((v) => <option key={v} value={v} className="bg-white text-slate-900">{v}</option>)}
-                                </select>
-                                <select value={adminFilterStatus} onChange={(e) => setAdminFilterStatus(e.target.value)} className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white">
-                                    <option value="all" className="bg-white text-slate-900">진행 단계 — 전체</option>
-                                    {adminStatusOptions.map((v) => <option key={v} value={v} className="bg-white text-slate-900">{v}</option>)}
-                                </select>
-                                <select value={adminFilterDelivery} onChange={(e) => setAdminFilterDelivery(e.target.value)} className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white">
-                                    <option value="all" className="bg-white text-slate-900">인플루언서 명단 — 조건 없음</option>
-                                    <option value="linked" className="bg-white text-slate-900">명단이 붙은 캠페인만</option>
-                                    <option value="with_creators" className="bg-white text-slate-900">명단에 사람이 있는 캠페인만</option>
-                                </select>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setAdminFilterCustomer('all');
-                                    setAdminFilterBrand('all');
-                                    setAdminFilterPlan('all');
-                                    setAdminFilterStatus('all');
-                                    setAdminFilterDelivery('all');
-                                    setAdminSearch('');
-                                }}
-                                className="w-full px-3 py-2.5 rounded-xl text-xs font-bold bg-white/10 border border-white/15 text-slate-200 hover:bg-white/15 transition-all"
-                            >
-                                모두 풀고 처음부터
-                            </button>
-                        </div>
-                    )}
                     <div className="space-y-4">
                         {filteredCampaigns.map(campaign => (
                             <CampaignCard 
@@ -8072,20 +7266,20 @@ export default function Dashboard() {
                                 campaign={campaign} 
                                 isActive={selectedCampaignId === campaign.id}
                                 onClick={() => setSelectedCampaignId(campaign.id)}
+                                theme="light"
                             />
                         ))}
                     </div>
-                    <div onClick={goToPricing} className="p-8 rounded-[2.5rem] border-2 border-dashed border-white/5 text-center hover:border-purple-500/50 hover:bg-purple-500/5 transition-all cursor-pointer group relative overflow-hidden">
-                        <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center mx-auto mb-4 text-slate-500 group-hover:text-purple-400 transition-all duration-500 border border-white/5 group-hover:rotate-180">
+                    <div onClick={goToPricing} className="p-8 rounded-[2.5rem] border-2 border-dashed border-slate-300 text-center hover:border-purple-400 hover:bg-purple-50 transition-all cursor-pointer group relative overflow-hidden bg-white shadow-sm">
+                        <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-slate-600 group-hover:text-purple-600 transition-all duration-500 border border-slate-200 group-hover:rotate-180">
                             <Package size={24} />
                         </div>
-                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest group-hover:text-white transition-colors">Start New Campaign</p>
+                        <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest group-hover:text-purple-800 transition-colors">Start New Campaign</p>
                     </div>
                 </div>
                 
-                {!isAdminUser && (
-                <div className="space-y-4 pt-10 border-t border-white/5">
-                    <h2 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] px-2">Performance Boost</h2>
+                <div className="space-y-4 pt-10 border-t border-slate-200">
+                    <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] px-2">Performance Boost</h2>
                     
                     {[
                         { icon: TrendingUp, title: "KOL BOOSTING", desc: "고성과 인플루언서 추가 섭외" },
@@ -8094,60 +7288,57 @@ export default function Dashboard() {
                         <div 
                             key={idx}
                             onClick={handleSparkAdsClick}
-                            className="bg-white/5 p-6 rounded-[2rem] border border-white/5 cursor-not-allowed group opacity-60"
+                            className="bg-slate-100/80 p-6 rounded-[2rem] border border-slate-200 cursor-not-allowed group opacity-70"
                         >
                             <div className="flex items-center gap-4 mb-3">
-                                <div className="w-10 h-10 rounded-xl bg-black flex items-center justify-center text-slate-700 shadow-xl border border-white/5"><item.icon size={18} /></div>
-                                <span className="font-black text-slate-500 text-xs tracking-tighter uppercase">{item.title}</span>
+                                <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-slate-500 shadow-sm border border-slate-200"><item.icon size={18} /></div>
+                                <span className="font-black text-slate-600 text-xs tracking-tighter uppercase">{item.title}</span>
                             </div>
-                            <p className="text-[10px] text-slate-700 leading-relaxed mb-4 font-medium tracking-tight">{item.desc}</p>
-                            <span className="text-[9px] font-black text-slate-800 flex items-center gap-2 uppercase tracking-[0.2em] italic">Locked / Coming Soon</span>
+                            <p className="text-[10px] text-slate-600 leading-relaxed mb-4 font-medium tracking-tight">{item.desc}</p>
+                            <span className="text-[9px] font-black text-slate-700 flex items-center gap-2 uppercase tracking-[0.2em] italic">Locked / Coming Soon</span>
                         </div>
                     ))}
                 </div>
-                )}
             </div>
 
             {/* Main Content Area */}
             <div className="w-full lg:w-3/4">
                 {filteredCampaigns.length === 0 && !isDemoMode ? (
-                    // [신규] 구매 유도 빈 화면 (Empty State CTA)
-                    <div className="bg-white/5 backdrop-blur-2xl p-8 md:p-12 rounded-[4rem] border border-white/10 shadow-[0_0_100px_rgba(0,0,0,0.5)] min-h-[700px] flex flex-col items-center justify-center relative overflow-hidden text-center animate-fade-in-up">
-                        <div className="w-32 h-32 bg-gradient-to-br from-purple-500/10 to-blue-500/10 rounded-full flex items-center justify-center mb-8 border border-white/10 shadow-[0_0_50px_rgba(168,85,247,0.1)]">
-                            <Package size={48} className="text-purple-400 opacity-80" />
+                    <div className="bg-white p-8 md:p-12 rounded-[4rem] border border-slate-200 shadow-xl min-h-[560px] flex flex-col items-center justify-center relative overflow-hidden text-center animate-fade-in-up">
+                        <div className="w-32 h-32 bg-gradient-to-br from-purple-100 to-indigo-100 rounded-full flex items-center justify-center mb-8 border border-purple-100">
+                            <Package size={48} className="text-purple-600 opacity-90" />
                         </div>
-                        <h2 className="text-3xl md:text-4xl font-black text-white tracking-tighter mb-4">진행 중인 캠페인이 없습니다</h2>
-                        <p className="text-slate-400 mb-12 text-lg font-light tracking-tight max-w-md">
+                        <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tighter mb-4">진행 중인 캠페인이 없습니다</h2>
+                        <p className="text-slate-600 mb-12 text-lg font-light tracking-tight max-w-md">
                             글로벌 인플루언서와 함께하는 첫 번째 브랜드 캠페인을 런칭하고 실시간 데이터 인사이트를 경험해보세요.
                         </p>
                         <button 
                             onClick={goToPricing} 
-                            className="px-10 py-5 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-2xl font-black text-lg shadow-[0_0_30px_rgba(168,85,247,0.4)] hover:scale-105 transition-all uppercase tracking-widest flex items-center gap-3"
+                            className="px-10 py-5 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-2xl font-black text-lg shadow-lg hover:scale-105 transition-all uppercase tracking-widest flex items-center gap-3"
                         >
                             <Zap size={24} /> Start New Campaign
                         </button>
                     </div>
                 ) : !selectedCampaign ? (
-                    <div className="rounded-[4rem] border border-white/10 bg-slate-900/60 px-8 py-16 text-center text-slate-300 text-sm min-h-[400px] flex flex-col items-center justify-center">
-                      <p className="font-bold text-white mb-2">표시할 캠페인을 찾지 못했습니다</p>
-                      <p className="text-slate-400 max-w-md leading-relaxed">
+                    <div className="rounded-[4rem] border border-slate-200 bg-white px-8 py-16 text-center text-sm min-h-[400px] flex flex-col items-center justify-center shadow-lg">
+                      <p className="font-bold text-slate-900 mb-2">표시할 캠페인을 찾지 못했습니다</p>
+                      <p className="text-slate-600 max-w-md leading-relaxed">
                         목록이 갱신되는 중이거나 필터 때문에 선택이 풀렸을 수 있습니다. 왼쪽 목록에서 캠페인을 다시 눌러 주세요.
                       </p>
                     </div>
                 ) : (
-                    // 기존 Campaign Detail 컨테이너
-                    <div className="bg-white/5 backdrop-blur-2xl p-8 md:p-12 rounded-[4rem] border border-white/10 shadow-[0_0_100px_rgba(0,0,0,0.5)] min-h-[900px] relative overflow-hidden">
-                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent"></div>
-                        <div className="flex flex-col md:flex-row md:items-center justify-between mb-12 pb-10 border-b border-white/5 gap-8 relative z-10">
+                    <div className="bg-white p-6 md:p-10 rounded-[3rem] border border-slate-200 shadow-xl min-h-[480px] relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-70"></div>
+                        <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 pb-8 border-b border-slate-200 gap-6 relative z-10">
                             <div>
-                                <div className="flex items-center gap-4 mb-3">
-                                    <h2 className="text-3xl md:text-5xl font-black text-white tracking-tighter uppercase leading-none">
+                                <div className="flex items-center gap-4 mb-3 flex-wrap">
+                                    <h2 className="text-2xl md:text-5xl font-black text-slate-900 tracking-tighter uppercase leading-none">
                                       {selectedCampaign?.product_name || selectedCampaign?.order_summary?.plan_name || 'Campaign'}
                                     </h2>
-                                    <span className="text-[10px] font-black px-4 py-1.5 bg-cyan-500/10 text-cyan-400 rounded-full border border-cyan-400/20 tracking-widest uppercase">{selectedCampaign?.plan}</span>
+                                    <span className="text-[10px] font-black px-4 py-1.5 bg-cyan-50 text-cyan-800 rounded-full border border-cyan-200 tracking-widest uppercase">{selectedCampaign?.plan}</span>
                                 </div>
-                                <p className="text-slate-500 text-lg font-light flex items-center gap-3 tracking-tight">
-                                    <span className={`w-3 h-3 rounded-full ${selectedCampaign?.status === CampaignStatus.COMPLETED ? 'bg-slate-700 shadow-none' : 'bg-cyan-400 animate-pulse shadow-[0_0_10px_rgba(34,211,238,0.8)]'}`}></span>
+                                <p className="text-slate-600 text-lg font-light flex items-center gap-3 tracking-tight">
+                                    <span className={`w-3 h-3 rounded-full ${selectedCampaign?.status === CampaignStatus.COMPLETED ? 'bg-slate-400 shadow-none' : 'bg-cyan-500 animate-pulse shadow-[0_0_10px_rgba(6,182,212,0.6)]'}`}></span>
                                     {getCampaignProgressSubtitle(selectedCampaign?.status)}
                                 </p>
                             </div>

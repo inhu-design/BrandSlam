@@ -1,7 +1,7 @@
 {
   "name": "brand-slam",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0511.2",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -4,7 +4,7 @@
  * Body 예시 및 상태 전이는 docs/cpm-review-api-contract.md 참고
  */
 import { createHash, timingSafeEqual } from 'crypto';
-import { supabase } from '../../server/lib/supabase-server.js';
+import { supabase } from '../lib/supabase-server.js';
 
 function safeEqual(a, b) {
   const ba = Buffer.from(String(a || ''), 'utf8');

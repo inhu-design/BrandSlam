@@ -3,8 +3,8 @@
  * - 이니시스가 결제 완료 후 이 URL로 POST
  * - resultCode "00" 또는 "0000" 등 성공 시 orders만 paid로 갱신 (campaigns는 PAYMENT_PENDING 유지 → 송장·캠페인 세팅 후 착수)
  */
-import { supabase } from '../../server/lib/supabase-server.js';
-import { buildCampaignRowsFromOrderItems } from '../../server/lib/build-campaign-rows-from-order-items.js';
+import { supabase } from '../lib/supabase-server.js';
+import { buildCampaignRowsFromOrderItems } from '../lib/build-campaign-rows-from-order-items.js';
 
 const baseUrl = (process.env.INICIS_RETURN_BASE_URL || 'https://www.slam-global.com').replace(/\/$/, '');
 
@@ -134,7 +134,7 @@ export default async function handler(req, res) {
     success: isSuccess ? '1' : '0',
   });
   if (body.resultMsg) q.set('msg', body.resultMsg);
-  const resultPath = orderId.startsWith('CPM-') ? '/cpm/result' : '/checkout/result';
+  const resultPath = (orderId || '').startsWith('CPM-') ? '/cpm/result' : '/checkout/result';
   res.setHeader('Location', `${baseUrl}${resultPath}?${q.toString()}`);
   return res.status(302).end();
 }

@@ -1,7 +1,7 @@
 /**
  * GET /api/cpm/rate-cards — 공개 가능한 카드 목록(JSON)
  */
-import { supabase } from '../../server/lib/supabase-server.js';
+import { supabase } from '../lib/supabase-server.js';
 
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');

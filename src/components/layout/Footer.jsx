@@ -271,7 +271,6 @@ const Footer = () => {
     {
       title: "Product",
       items: [
-        { name: "CPM 레이트카드", path: "/cpm" },
         { name: "고객 사례", path: "/#cases" },
         { name: "프로세스", path: "/#process" },
         { name: "요금제", path: "/#pricing" }

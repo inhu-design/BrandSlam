@@ -48,7 +48,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Invalid CPM' });
       }
       const budgetNum = Number(budget);
-      const impressions = BigInt(Math.floor(budgetNum * 1000 / cpm));
+      const impressions = BigInt(Math.floor(budgetNum * 1000 / cpm_scaled));
       const impressionsSafe = impressions <= 0n ? 1n : impressions;
       return res.status(200).json({
         budget_krw: String(budget),

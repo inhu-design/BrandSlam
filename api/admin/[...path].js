@@ -16,6 +16,7 @@ import impersonateLogin from '../../server/admin-handlers/impersonate-login.js';
 import campaignCreate from '../../server/admin-handlers/campaign-create.js';
 import campaignDelete from '../../server/admin-handlers/campaign-delete.js';
 import adminSession from '../../server/admin-handlers/admin-session.js';
+import { segmentsAfterNamespace } from '../../server/lib/api-catch-all-segments.js';
 
 const handlers = {
   'dashboard-overview': dashboardOverview,
@@ -34,35 +35,8 @@ const handlers = {
   'admin-session': adminSession,
 };
 
-/**
- * 비-Next(Vite 등)에서 Vercel은 catch-all 쿼리 키를 `path`가 아니라 `...path`로 넣는다.
- * @see https://github.com/vercel/community/discussions/947
- */
-function segmentsFromQuery(query) {
-  const q = query || {};
-  const p = q.path ?? q['...path'];
-  if (p == null || p === '') return [];
-  return Array.isArray(p) ? p : [p];
-}
-
-function segmentsFromUrl(req) {
-  try {
-    const raw = req.url || '/';
-    const pathOnly = raw.split('?')[0] || '/';
-    const parts = pathOnly.split('/').filter(Boolean);
-    const adminIdx = parts.indexOf('admin');
-    if (adminIdx < 0 || adminIdx >= parts.length - 1) return [];
-    return parts.slice(adminIdx + 1);
-  } catch {
-    return [];
-  }
-}
-
 export default async function handler(req, res) {
-  let segments = segmentsFromQuery(req.query || {});
-  if (segments.length === 0) {
-    segments = segmentsFromUrl(req);
-  }
+  const segments = segmentsAfterNamespace(req, 'admin');
   if (segments.length !== 1) {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     return res.status(404).json({ error: 'Not found' });

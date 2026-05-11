@@ -3,8 +3,8 @@
  * Body: { sku, budget_krw } 또는 { sku, target_impressions } — 서버가 레이트카드 플로어와 일치 검증 후 견적
  */
 import { randomUUID } from 'crypto';
-import { supabase } from '../../server/lib/supabase-server.js';
-import { getBearerUser } from '../../server/lib/cpm-auth.js';
+import { supabase } from '../lib/supabase-server.js';
+import { getBearerUser } from '../lib/cpm-auth.js';
 
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');

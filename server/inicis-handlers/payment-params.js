@@ -5,10 +5,10 @@
  * - SignKey는 서버에만 두고, signature/verification/mKey만 반환
  */
 import { createHash } from 'crypto';
-import { supabase } from '../../server/lib/supabase-server.js';
-import { assertFramelessOfferPrice } from '../../server/lib/custom-offers.js';
-import { assertDbCustomPaymentOfferPrice } from '../../server/lib/db-custom-payment-offers.js';
-import { assertCpmOrderPrice } from '../../server/lib/assert-cpm-order-price.js';
+import { supabase } from '../lib/supabase-server.js';
+import { assertFramelessOfferPrice } from '../lib/custom-offers.js';
+import { assertDbCustomPaymentOfferPrice } from '../lib/db-custom-payment-offers.js';
+import { assertCpmOrderPrice } from '../lib/assert-cpm-order-price.js';
 
 const INICIS_MID = process.env.INICIS_MID || '';
 const INICIS_SIGNKEY = process.env.INICIS_SIGNKEY || '';
