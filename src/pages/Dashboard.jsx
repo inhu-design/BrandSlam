@@ -143,6 +143,13 @@ const nonemptyFollower = (v) => {
   return s === '' ? null : s;
 };
 
+const nonemptyMetric = (v) => {
+  if (v == null) return null;
+  const s = String(v).trim();
+  if (s === '' || s === '-') return null;
+  return s;
+};
+
 /**
  * Supabase 행 / test-influencers.json / sns_channels 배열 / 레거시 handle·platform 을 합쳐
  * TikTok·인스타 4필드를 채움 (한쪽만 있으면 한쪽만, 둘 다 있으면 둘 다).
@@ -440,6 +447,13 @@ const toDisplayCreator = (r, idx) => {
     status: 'Pending Review',
     contact: '-',
     visit_date: m.visit_date || trimOrNull(r.visit_date) || null,
+    posting_tiktok_url: trimOrNull(r.posting_tiktok_url),
+    posting_instagram_url: trimOrNull(r.posting_instagram_url),
+    metric_views: nonemptyMetric(r.metric_views),
+    metric_likes: nonemptyMetric(r.metric_likes),
+    metric_comments: nonemptyMetric(r.metric_comments),
+    metric_saves: nonemptyMetric(r.metric_saves),
+    metric_shares: nonemptyMetric(r.metric_shares),
     _identifier: `${(m.name || r.name || '').trim()}`,
     is_new_replacement: !!(r.is_new_replacement || r.is_replacement),
   };
@@ -2566,22 +2580,148 @@ const AnalyticsReport = ({ campaign }) => (
     <KocostarReportDeck campaign={campaign} />
 );
 
-// --- Detail Component: Ongoing Campaign (업로드 중) ---
-const OngoingCampaign = ({ campaign }) => {
-    return (
+// --- Detail Component: Ongoing Campaign (업로드 · 트래킹) — 링크 납품 캠페인은 엑셀·DB 포스팅 메타 반영 ---
+const parseMetricNumber = (v) => {
+  if (v == null || v === '') return 0;
+  const s = String(v).replace(/,/g, '').trim();
+  const n = Number(s);
+  return Number.isFinite(n) ? n : 0;
+};
+
+const formatMetricDash = (n) => (n > 0 ? n.toLocaleString('en-US') : '—');
+
+/** linked_delivery_candidates(납품 행) → 업로드/트래킹 UI용 creators·contents·KPI */
+const buildOngoingFromLinkedDelivery = (candidates) => {
+  const rows = Array.isArray(candidates) ? candidates : [];
+  const creators = rows.map((c, idx) => {
+    const tt = trimOrNull(c.posting_tiktok_url);
+    const ig = trimOrNull(c.posting_instagram_url);
+    const hasPost = !!(tt || ig);
+    const mv = nonemptyMetric(c.metric_views);
+    const viewsDisp = mv || '—';
+    let platform = c.platform || 'SNS';
+    if (tt && ig) platform = 'TikTok · IG';
+    else if (tt) platform = 'TikTok';
+    else if (ig) platform = 'Instagram';
+    return {
+      id: c.id || idx + 1,
+      name: c.name,
+      platform,
+      status: hasPost ? 'Uploaded' : 'Pending',
+      views: viewsDisp,
+      metric_views: mv,
+      posting_tiktok_url: tt,
+      posting_instagram_url: ig,
+      metric_likes: c.metric_likes,
+      metric_comments: c.metric_comments,
+      metric_saves: c.metric_saves,
+      metric_shares: c.metric_shares,
+    };
+  });
+
+  const contents = [];
+  let k = 0;
+  for (const c of creators) {
+    if (c.posting_tiktok_url) {
+      k += 1;
+      contents.push({
+        id: k,
+        creator: c.name,
+        views: c.metric_views || '—',
+        platform: 'TikTok',
+        post_url: c.posting_tiktok_url,
+        thumbnail_url: null,
+      });
+    }
+    if (c.posting_instagram_url) {
+      k += 1;
+      contents.push({
+        id: k,
+        creator: c.name,
+        views: c.metric_views || '—',
+        platform: 'Instagram',
+        post_url: c.posting_instagram_url,
+        thumbnail_url: null,
+      });
+    }
+  }
+
+  const vSum = rows.reduce((acc, r) => acc + parseMetricNumber(r.metric_views), 0);
+  const lSum = rows.reduce((acc, r) => acc + parseMetricNumber(r.metric_likes), 0);
+  const cSum = rows.reduce((acc, r) => acc + parseMetricNumber(r.metric_comments), 0);
+  const shSum = rows.reduce((acc, r) => acc + parseMetricNumber(r.metric_shares), 0);
+
+  return {
+    creators,
+    contents,
+    kpi_views: formatMetricDash(vSum),
+    kpi_likes: formatMetricDash(lSum),
+    kpi_comments: formatMetricDash(cSum),
+    kpi_shares: formatMetricDash(shSum),
+  };
+};
+
+const OngoingCampaign = ({ campaign, user }) => {
+  const useLinked =
+    campaignMatchesLinkedDeliveryList(campaign, user) &&
+    Array.isArray(campaign.linked_delivery_candidates) &&
+    campaign.linked_delivery_candidates.length > 0;
+
+  const derived = useMemo(() => {
+    if (!useLinked) {
+      return {
+        creators: campaign.creators || [],
+        contents: campaign.contents || [],
+        kpi_views: campaign.kpi_views,
+        kpi_likes: campaign.kpi_likes,
+        kpi_comments: campaign.kpi_comments,
+        kpi_shares: campaign.kpi_shares,
+      };
+    }
+    return buildOngoingFromLinkedDelivery(campaign.linked_delivery_candidates);
+  }, [
+    useLinked,
+    campaign.creators,
+    campaign.contents,
+    campaign.kpi_views,
+    campaign.kpi_likes,
+    campaign.kpi_comments,
+    campaign.kpi_shares,
+    campaign.linked_delivery_candidates,
+  ]);
+
+  const { creators, contents, kpi_views, kpi_likes, kpi_comments, kpi_shares } = derived;
+
+  const sortedCreators = useMemo(() => {
+    if (!useLinked) return creators;
+    const copy = [...creators];
+    copy.sort((a, b) => {
+      if (a.status === b.status) return (a.name || '').localeCompare(b.name || '');
+      return a.status === 'Uploaded' ? -1 : 1;
+    });
+    return copy;
+  }, [creators, useLinked]);
+
+  return (
         <div className="space-y-10 animate-fade-in-up">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                <MetricCard icon={Eye} label="Views" value={campaign.kpi_views} color="bg-blue-600/20 text-blue-400" />
-                <MetricCard icon={Heart} label="Likes" value={campaign.kpi_likes} color="bg-red-600/20 text-red-400" />
-                <MetricCard icon={MessageCircle} label="Comments" value={campaign.kpi_comments} color="bg-emerald-600/20 text-emerald-400" />
-                <MetricCard icon={Share2} label="Shares" value={campaign.kpi_shares} color="bg-purple-600/20 text-purple-400" />
+                <MetricCard icon={Eye} label="Views" value={kpi_views} color="bg-blue-600/20 text-blue-400" />
+                <MetricCard icon={Heart} label="Likes" value={kpi_likes} color="bg-red-600/20 text-red-400" />
+                <MetricCard icon={MessageCircle} label="Comments" value={kpi_comments} color="bg-emerald-600/20 text-emerald-400" />
+                <MetricCard icon={Share2} label="Shares" value={kpi_shares} color="bg-purple-600/20 text-purple-400" />
             </div>
 
             <div className="bg-white/5 backdrop-blur-md rounded-[2.5rem] border border-white/10 overflow-hidden shadow-2xl">
                 <div className="px-8 py-6 border-b border-white/5 bg-white/5">
                     <h3 className="font-black text-white flex items-center gap-3 tracking-tighter">
-                        <Users size={20} className="text-cyan-400"/> Engagement Top 10 Creators
+                        <Users size={20} className="text-cyan-400"/>
+                        {useLinked ? '콘텐츠 업로드 · 트래킹 (납품 명단 기준)' : 'Engagement Top 10 Creators'}
                     </h3>
+                    {useLinked ? (
+                        <p className="text-slate-500 text-xs font-medium mt-2">
+                            엑셀·관리자 반영 게시 URL 및 지표가 있으면 아래에 표시됩니다. (SUPABASE에 posting 컬럼 마이그레이션 필요)
+                        </p>
+                    ) : null}
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
@@ -2589,13 +2729,23 @@ const OngoingCampaign = ({ campaign }) => {
                             <tr>
                                 <th className="px-8 py-5">Rank</th>
                                 <th className="px-8 py-5">Creator</th>
-                                <th className="px-8 py-5">Views</th>
+                                {useLinked ? (
+                                  <>
+                                    <th className="px-8 py-5">게시 링크</th>
+                                    <th className="px-8 py-5">Views</th>
+                                  </>
+                                ) : null}
+                                {!useLinked ? <th className="px-8 py-5">Views</th> : null}
                                 <th className="px-8 py-5">Status</th>
-                                <th className="px-8 py-5 text-right">Optimization</th>
+                                {!useLinked ? (
+                                  <th className="px-8 py-5 text-right">Optimization</th>
+                                ) : (
+                                  <th className="px-8 py-5 text-right"> </th>
+                                )}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
-                            {(campaign.creators || []).map((creator, idx) => (
+                            {(useLinked ? sortedCreators : creators).map((creator, idx) => (
                                 <tr key={creator.id} className="hover:bg-white/5 transition-all">
                                     <td className="px-8 py-5 font-black text-slate-700 w-16">{idx + 1}</td>
                                     <td className="px-8 py-5">
@@ -2604,23 +2754,61 @@ const OngoingCampaign = ({ campaign }) => {
                                             <span className="text-[9px] font-black text-cyan-400 border border-cyan-400/30 px-2 py-0.5 rounded-full uppercase tracking-widest">{creator.platform}</span>
                                         </div>
                                     </td>
-                                    <td className="px-8 py-5 font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 text-lg">{creator.views}</td>
+                                    {useLinked ? (
+                                      <>
+                                        <td className="px-8 py-5 align-top">
+                                            <div className="flex flex-col gap-2 min-w-[8rem]">
+                                                {creator.posting_tiktok_url ? (
+                                                  <a
+                                                    href={creator.posting_tiktok_url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-1.5 text-[11px] font-bold text-sky-300 hover:text-sky-200 underline-offset-4 hover:underline"
+                                                  >
+                                                    <ExternalLink size={12} /> TikTok
+                                                  </a>
+                                                ) : null}
+                                                {creator.posting_instagram_url ? (
+                                                  <a
+                                                    href={creator.posting_instagram_url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-1.5 text-[11px] font-bold text-pink-300 hover:text-pink-200 underline-offset-4 hover:underline"
+                                                  >
+                                                    <ExternalLink size={12} /> Instagram
+                                                  </a>
+                                                ) : null}
+                                                {!creator.posting_tiktok_url && !creator.posting_instagram_url ? (
+                                                  <span className="text-slate-600 text-xs font-medium">—</span>
+                                                ) : null}
+                                            </div>
+                                        </td>
+                                        <td className="px-8 py-5 font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 text-lg">{creator.views}</td>
+                                      </>
+                                    ) : null}
+                                    {!useLinked ? (
+                                      <td className="px-8 py-5 font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 text-lg">{creator.views}</td>
+                                    ) : null}
                                     <td className="px-8 py-5">
                                         <span className={`text-[10px] px-3 py-1 rounded-full border font-black uppercase tracking-widest ${
                                             creator.status === 'Uploaded' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-slate-500/10 text-slate-500 border-white/5'
                                         }`}>
-                                            {creator.status}
+                                            {creator.status === 'Uploaded' ? '업로드됨' : '대기'}
                                         </span>
                                     </td>
                                     <td className="px-8 py-5 text-right">
+                                        {useLinked ? (
+                                          <span className="text-slate-600 text-[10px] font-bold uppercase tracking-widest"> </span>
+                                        ) : (
                                         <div className="flex justify-end gap-3">
-                                            <button className="text-[10px] font-black tracking-widest uppercase px-3 py-1.5 bg-gradient-to-r from-purple-600/20 to-blue-600/20 text-purple-400 rounded-xl hover:shadow-[0_0_15px_rgba(168,85,247,0.3)] border border-purple-500/20 transition-all flex items-center gap-2">
+                                            <button type="button" className="text-[10px] font-black tracking-widest uppercase px-3 py-1.5 bg-gradient-to-r from-purple-600/20 to-blue-600/20 text-purple-400 rounded-xl hover:shadow-[0_0_15px_rgba(168,85,247,0.3)] border border-purple-500/20 transition-all flex items-center gap-2">
                                                 <Zap size={12} /> Spark Ads
                                             </button>
-                                            <button className="text-[10px] font-black tracking-widest uppercase px-3 py-1.5 bg-pink-500/10 text-pink-400 rounded-xl border border-pink-500/20 transition-all flex items-center gap-2">
+                                            <button type="button" className="text-[10px] font-black tracking-widest uppercase px-3 py-1.5 bg-pink-500/10 text-pink-400 rounded-xl border border-pink-500/20 transition-all flex items-center gap-2">
                                                 <Gift size={12} /> Reward
                                             </button>
                                         </div>
+                                        )}
                                     </td>
                                 </tr>
                             ))}
@@ -2631,31 +2819,46 @@ const OngoingCampaign = ({ campaign }) => {
 
             <div className="bg-white/5 backdrop-blur-md rounded-[2.5rem] border border-white/10 p-10 shadow-2xl">
                 <h3 className="font-black text-white mb-10 flex items-center gap-3 tracking-tighter">
-                    <PlayCircle size={24} className="text-purple-400"/> Content Gallery (Auto-Feed)
+                    <PlayCircle size={24} className="text-purple-400"/> {useLinked ? '게시물 링크 모음' : 'Content Gallery (Auto-Feed)'}
                 </h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                    {(campaign.contents || []).map((content, idx) => (
-                        <div key={idx} className="relative aspect-[9/16] rounded-2xl overflow-hidden bg-white/5 group cursor-pointer border border-white/10 shadow-xl transition-all hover:scale-[1.05]">
-                            {content.thumbnail_url ? (
+                    {contents.map((content) => (
+                        <div key={content.id} className="relative aspect-[9/16] rounded-2xl overflow-hidden bg-white/5 group cursor-pointer border border-white/10 shadow-xl transition-all hover:scale-[1.02]">
+                            {content.post_url ? (
+                              <a
+                                href={content.post_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center bg-gradient-to-b from-slate-900/90 to-slate-950 hover:from-indigo-950/95 hover:to-slate-950 transition-colors"
+                              >
+                                <ExternalLink size={22} className="text-cyan-400 mb-3 opacity-90" />
+                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">{content.platform}</span>
+                                <span className="text-white text-xs font-bold leading-snug line-clamp-3">{content.creator}</span>
+                              </a>
+                            ) : content.thumbnail_url ? (
                                 <img src={content.thumbnail_url} alt="Thumbnail" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
                             ) : (
                                 <div className="w-full h-full flex items-center justify-center bg-white/5 text-slate-700 text-[10px] font-black uppercase tracking-widest">No Signal</div>
                             )}
-                            <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md text-white text-[9px] font-black px-3 py-1 rounded-full border border-white/10 tracking-widest uppercase truncate max-w-[85%]">
+                            <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md text-white text-[9px] font-black px-3 py-1 rounded-full border border-white/10 tracking-widest uppercase truncate max-w-[85%] pointer-events-none">
                                 {content.creator}
                             </div>
-                            <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black via-black/20 to-transparent p-4">
+                            <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black via-black/20 to-transparent p-4 pointer-events-none">
                                 <p className="text-white text-xs font-black flex items-center gap-2 tracking-tight uppercase italic">
-                                    <Eye size={12} className="text-cyan-400" /> {content.views || '0'} VIEWS
+                                    <Eye size={12} className="text-cyan-400" /> {content.views || '—'} VIEWS
                                 </p>
                             </div>
                         </div>
                     ))}
                 </div>
+                {useLinked && contents.length === 0 ? (
+                  <p className="text-slate-500 text-sm text-center py-6">아직 반영된 게시 URL이 없습니다. 엑셀을 업데이트한 뒤 `npm run import:welcos` 로 다시 넣어 주세요.</p>
+                ) : null}
             </div>
         </div>
     );
 };
+
 
 // --- 착수 단계 (캠페인 세팅 완료 후) ---
 const KICKOFF_STEPS = [
@@ -5442,7 +5645,7 @@ const CampaignDetail = ({ campaign, isDemoMode, user, isAdminUser = false, onCam
       return <AnalyticsReport campaign={campaign} />;
   }
 
-  return <OngoingCampaign campaign={campaign} />;
+  return <OngoingCampaign campaign={campaign} user={user} />;
 };
 
 /**

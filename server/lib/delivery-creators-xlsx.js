@@ -24,6 +24,55 @@ function trimCell(v) {
   return s === '' ? null : s;
 }
 
+/** 한 셀에 `...?lang=eshttps://...` 처럼 URL이 붙은 경우 분리 */
+function splitHttpsChunks(s) {
+  if (s == null || s === '') return [];
+  return String(s)
+    .split(/(?=https:\/\/)/i)
+    .map((x) => x.trim())
+    .filter(Boolean);
+}
+
+function postingTiktokFromRow(row) {
+  const raw = pickCell(
+    row,
+    'Posting URL (TT)',
+    'Posting URL(TT)',
+    'posting_url_tt',
+    'Posting URL TT',
+    'posting_tiktok_url',
+  );
+  if (raw == null || String(raw).trim() === '' || String(raw).trim() === '-') return null;
+  const chunks = splitHttpsChunks(raw);
+  if (chunks.length === 0) return trimCell(raw);
+  const hit = chunks.find((u) => /tiktok\.com|vt\.tiktok\.com/i.test(u));
+  return trimCell(hit || chunks[0]);
+}
+
+function postingInstagramFromRow(row) {
+  const raw = pickCell(
+    row,
+    'Posting URL (IG)',
+    'Posting URL(IG)',
+    'posting_url_ig',
+    'Posting URL IG',
+    'posting_instagram_url',
+  );
+  if (raw == null || String(raw).trim() === '' || String(raw).trim() === '-') return null;
+  const chunks = splitHttpsChunks(raw);
+  if (chunks.length === 0) return trimCell(raw);
+  const hit = chunks.find((u) => /instagram\.com/i.test(u));
+  return trimCell(hit || chunks[0]);
+}
+
+function metricCell(row, ...keys) {
+  const v = pickCell(row, ...keys);
+  if (v == null || v === '') return null;
+  const s = String(v).trim();
+  if (s === '' || s === '-') return null;
+  return s;
+}
+
 /**
  * @param {Buffer|Uint8Array} buffer
  * @param {{ sheetIndex?: number }} [opts]
@@ -85,6 +134,14 @@ export function parseDeliveryCreatorsWorkbook(buffer, opts = {}) {
     const visit_date =
       visitDateRaw != null && String(visitDateRaw).trim() !== '' ? String(visitDateRaw).trim() : null;
 
+    const posting_tiktok_url = postingTiktokFromRow(row);
+    const posting_instagram_url = postingInstagramFromRow(row);
+    const metric_views = metricCell(row, 'Views', 'views');
+    const metric_likes = metricCell(row, 'Likes♥', 'Likes', 'likes');
+    const metric_comments = metricCell(row, 'Comments', 'comments');
+    const metric_saves = metricCell(row, 'Saves', 'saves');
+    const metric_shares = metricCell(row, 'share', 'Share', 'shares', 'Shares');
+
     rows.push({
       name: String(name).trim(),
       shipping_country: shippingCountry || null,
@@ -93,6 +150,13 @@ export function parseDeliveryCreatorsWorkbook(buffer, opts = {}) {
       instagram_url: instagramUrl,
       instagram_follower: instagramFollower,
       visit_date,
+      posting_tiktok_url,
+      posting_instagram_url,
+      metric_views,
+      metric_likes,
+      metric_comments,
+      metric_saves,
+      metric_shares,
     });
   }
 
@@ -121,6 +185,13 @@ export function toDbInsertRows(parsedRows, listSlug, opts = {}) {
     if (r.visit_date != null && String(r.visit_date).trim() !== '') {
       base.visit_date = r.visit_date;
     }
+    if (r.posting_tiktok_url) base.posting_tiktok_url = r.posting_tiktok_url;
+    if (r.posting_instagram_url) base.posting_instagram_url = r.posting_instagram_url;
+    if (r.metric_views) base.metric_views = r.metric_views;
+    if (r.metric_likes) base.metric_likes = r.metric_likes;
+    if (r.metric_comments) base.metric_comments = r.metric_comments;
+    if (r.metric_saves) base.metric_saves = r.metric_saves;
+    if (r.metric_shares) base.metric_shares = r.metric_shares;
     return base;
   });
 }

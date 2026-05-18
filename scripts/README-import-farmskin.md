@@ -55,6 +55,7 @@ $env:SUPABASE_SERVICE_ROLE_KEY="서비스롤-키"; npm run import:welcos -- "C:\
 ```
 
 - `list_slug = BS-MX-WELCOS` 행만 삭제 후 다시 삽입합니다. (`test-influencers.json` 은 건드리지 않습니다.)
+- 게시 URL·Views 등: Supabase에 **`supabase-migration-admin-delivery-posting-metrics.sql`** 을 적용한 뒤, 엑셀의 `Posting URL (TT)` / `(IG)` / `Views` … 컬럼이 함께 저장·대시보드에 반영됩니다.
 
 ---
 
