@@ -20,7 +20,7 @@
 |------|------|
 | `supabase-migration-delivery-creators.sql` | 납품 인플루언서 풀 + `creator_drops` |
 | `supabase-migration-admin-delivery-visit-date.sql` | `admin_delivery_creators.visit_date` (웰코스 MX Visit 리스트 등) |
-| `supabase-migration-admin-delivery-posting-metrics.sql` | `admin_delivery_creators` 게시 URL(TT/IG)·Views 등 (업로드·트래킹 대시보드) |
+| `supabase-migration-admin-delivery-companion-spark.sql` | `companion_info`, `spark_ads` (웰코스 엑셀 동반자·Spark) |
 | `supabase-migration-creator-drops-limit.sql` | (선택) BS-US-FARMSKIN 드랍 15명 DB 제한 |
 | `supabase-migration-checkout-drafts.sql` | 카드 결제: 결제 전 `orders` 대신 임시 저장용 `checkout_drafts` (결제 API 필수) |
 

@@ -141,6 +141,8 @@ export function parseDeliveryCreatorsWorkbook(buffer, opts = {}) {
     const metric_comments = metricCell(row, 'Comments', 'comments');
     const metric_saves = metricCell(row, 'Saves', 'saves');
     const metric_shares = metricCell(row, 'share', 'Share', 'shares', 'Shares');
+    const companion_info = metricCell(row, '동반자 정보', 'companion_info', 'Companion', '동반자');
+    const spark_ads = metricCell(row, 'spark ads', 'Spark ads', 'Spark Ads', 'spark_ads');
 
     rows.push({
       name: String(name).trim(),
@@ -157,6 +159,8 @@ export function parseDeliveryCreatorsWorkbook(buffer, opts = {}) {
       metric_comments,
       metric_saves,
       metric_shares,
+      companion_info,
+      spark_ads,
     });
   }
 
@@ -192,6 +196,8 @@ export function toDbInsertRows(parsedRows, listSlug, opts = {}) {
     if (r.metric_comments) base.metric_comments = r.metric_comments;
     if (r.metric_saves) base.metric_saves = r.metric_saves;
     if (r.metric_shares) base.metric_shares = r.metric_shares;
+    if (r.companion_info) base.companion_info = r.companion_info;
+    if (r.spark_ads) base.spark_ads = r.spark_ads;
     return base;
   });
 }

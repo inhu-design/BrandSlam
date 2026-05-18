@@ -91,6 +91,26 @@ const ensureAbsoluteUrl = (url) => {
   return `https://${s}`;
 };
 
+/** 엑셀 spark ads: URL이면 링크, 아니면 문구 그대로 */
+const renderSparkAdsCell = (raw) => {
+  const t = trimOrNull(raw);
+  if (!t) return <span className="text-slate-600 text-xs font-medium">—</span>;
+  if (/^https?:\/\//i.test(t)) {
+    return (
+      <a
+        href={ensureAbsoluteUrl(t)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-300 hover:text-amber-200"
+      >
+        <ExternalLink size={12} className="shrink-0" />
+        링크
+      </a>
+    );
+  }
+  return <span className="text-slate-300 text-sm leading-snug whitespace-pre-wrap break-words max-w-[14rem]">{t}</span>;
+};
+
 /** SNS 채널 단일 항목 */
 const toSnsChannel = (platform, url, followers) => ({
   platform,
@@ -454,6 +474,8 @@ const toDisplayCreator = (r, idx) => {
     metric_comments: nonemptyMetric(r.metric_comments),
     metric_saves: nonemptyMetric(r.metric_saves),
     metric_shares: nonemptyMetric(r.metric_shares),
+    companion_info: trimOrNull(r.companion_info),
+    spark_ads: trimOrNull(r.spark_ads),
     _identifier: `${(m.name || r.name || '').trim()}`,
     is_new_replacement: !!(r.is_new_replacement || r.is_replacement),
   };
@@ -1594,8 +1616,10 @@ const CandidateList = ({
                     'instagram_url',
                     'instagram_followers',
                     'visit_date',
+                    'companion_info',
                     'posting_tiktok_url',
                     'posting_instagram_url',
+                    'spark_ads',
                     'metric_views',
                 ]
                 : ['name', 'shipping_country', 'instagram_url', 'instagram_followers', 'tiktok_url', 'tiktok_followers'];
@@ -1614,8 +1638,10 @@ const CandidateList = ({
                             m.instagram_url || '',
                             m.instagram_follower ?? '',
                             c.visit_date || m.visit_date || '',
+                            c.companion_info || '',
                             c.posting_tiktok_url || '',
                             c.posting_instagram_url || '',
+                            c.spark_ads || '',
                             c.metric_views || '',
                         ]
                             .map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`)
@@ -1825,10 +1851,10 @@ const CandidateList = ({
     const allCandidates = useMemo(() => candidates || [], [candidates]);
     const isDeliveryTestView = isDeliveryTest;
     const useVisitSplitLayout = isDeliveryTestView && deliveryTableLayout === 'visit_split';
-    /** Visit 분할: 이름·SNS·팔로워·Visit·게시물·조회수·(드랍) */
-    const deliveryTestTableColSpan = useVisitSplitLayout ? 7 : 5;
-    /** 확정/드랍 표: 드랍 열 없음 */
-    const deliveryTestConfirmedColSpan = useVisitSplitLayout ? 6 : 4;
+    /** Visit: 이름·SNS·팔로워·Visit·동반자·TT·IG·spark·조회수·(드랍) */
+    const deliveryTestTableColSpan = useVisitSplitLayout ? 10 : 5;
+    /** 확정/드랍 표 (드랍 열 없음) */
+    const deliveryTestConfirmedColSpan = useVisitSplitLayout ? 9 : 4;
 
     // 정렬: 이름 ABC순 | 팔로워 수 | 신규 교체 우선
     const [sortBy, setSortBy] = useState('name'); // 'name' | 'followers' | 'new_first'
@@ -1964,9 +1990,13 @@ const CandidateList = ({
                         </div>
                     </td>
                     <td className="px-8 py-6 text-slate-300 align-top whitespace-nowrap">{visitLabel}</td>
+                    <td className="px-8 py-6 text-slate-300 align-top text-sm max-w-[12rem]">
+                        <span className="whitespace-pre-wrap break-words">
+                          {trimOrNull(creator.companion_info) || '—'}
+                        </span>
+                    </td>
                     <td className="px-8 py-6 align-top">
-                        <div className="flex flex-col gap-2 min-w-[6rem]">
-                            {trimOrNull(creator.posting_tiktok_url) ? (
+                        {trimOrNull(creator.posting_tiktok_url) ? (
                                 <a
                                     href={ensureAbsoluteUrl(creator.posting_tiktok_url)}
                                     target="_blank"
@@ -1974,10 +2004,14 @@ const CandidateList = ({
                                     className="text-[11px] font-bold text-sky-300 hover:text-sky-200 flex items-center gap-1.5"
                                 >
                                     <ExternalLink size={12} className="shrink-0" />
-                                    TikTok 게시물
+                                    링크
                                 </a>
-                            ) : null}
-                            {trimOrNull(creator.posting_instagram_url) ? (
+                        ) : (
+                                <span className="text-slate-600 text-xs font-medium">—</span>
+                        )}
+                    </td>
+                    <td className="px-8 py-6 align-top">
+                        {trimOrNull(creator.posting_instagram_url) ? (
                                 <a
                                     href={ensureAbsoluteUrl(creator.posting_instagram_url)}
                                     target="_blank"
@@ -1985,14 +2019,13 @@ const CandidateList = ({
                                     className="text-[11px] font-bold text-pink-300 hover:text-pink-200 flex items-center gap-1.5"
                                 >
                                     <ExternalLink size={12} className="shrink-0" />
-                                    Instagram 게시물
+                                    링크
                                 </a>
-                            ) : null}
-                            {!trimOrNull(creator.posting_tiktok_url) && !trimOrNull(creator.posting_instagram_url) ? (
+                        ) : (
                                 <span className="text-slate-600 text-xs font-medium">—</span>
-                            ) : null}
-                        </div>
+                        )}
                     </td>
+                    <td className="px-8 py-6 align-top">{renderSparkAdsCell(creator.spark_ads)}</td>
                     <td className="px-8 py-6 text-slate-300 align-top whitespace-nowrap text-sm font-medium">
                         {nonemptyMetric(creator.metric_views) || '—'}
                     </td>
@@ -2202,7 +2235,10 @@ const CandidateList = ({
                                                 <th className="px-8 py-5">SNS 주소</th>
                                                 <th className="px-8 py-5">팔로워 수</th>
                                                 <th className="px-8 py-5">Visit date</th>
-                                                <th className="px-8 py-5">게시물</th>
+                                                <th className="px-8 py-5">동반자 정보</th>
+                                                <th className="px-8 py-5">Posting URL (TT)</th>
+                                                <th className="px-8 py-5">Posting URL (IG)</th>
+                                                <th className="px-8 py-5">spark ads</th>
                                                 <th className="px-8 py-5">조회수</th>
                                             </>
                                         ) : (
@@ -2258,7 +2294,10 @@ const CandidateList = ({
                                                 <th className="px-8 py-5">SNS 주소</th>
                                                 <th className="px-8 py-5">팔로워 수</th>
                                                 <th className="px-8 py-5">Visit date</th>
-                                                <th className="px-8 py-5">게시물</th>
+                                                <th className="px-8 py-5">동반자 정보</th>
+                                                <th className="px-8 py-5">Posting URL (TT)</th>
+                                                <th className="px-8 py-5">Posting URL (IG)</th>
+                                                <th className="px-8 py-5">spark ads</th>
                                                 <th className="px-8 py-5">조회수</th>
                                             </>
                                         ) : (
@@ -2431,7 +2470,10 @@ const CandidateList = ({
                                         <th className="px-8 py-5">SNS 주소</th>
                                         <th className="px-8 py-5">팔로워 수</th>
                                         <th className="px-8 py-5">Visit date</th>
-                                        <th className="px-8 py-5">게시물</th>
+                                        <th className="px-8 py-5">동반자 정보</th>
+                                        <th className="px-8 py-5">Posting URL (TT)</th>
+                                        <th className="px-8 py-5">Posting URL (IG)</th>
+                                        <th className="px-8 py-5">spark ads</th>
                                         <th className="px-8 py-5">조회수</th>
                                         <th className="px-8 py-5 min-w-[4rem] text-right whitespace-nowrap">드랍</th>
                                     </>
@@ -2669,6 +2711,8 @@ const buildOngoingFromLinkedDelivery = (candidates) => {
       metric_comments: c.metric_comments,
       metric_saves: c.metric_saves,
       metric_shares: c.metric_shares,
+      companion_info: trimOrNull(c.companion_info),
+      spark_ads: trimOrNull(c.spark_ads),
     };
   });
 
@@ -2784,7 +2828,10 @@ const OngoingCampaign = ({ campaign, user }) => {
                                 <th className="px-8 py-5">Creator</th>
                                 {useLinked ? (
                                   <>
-                                    <th className="px-8 py-5">게시 링크</th>
+                                    <th className="px-8 py-5">동반자 정보</th>
+                                    <th className="px-8 py-5">Posting URL (TT)</th>
+                                    <th className="px-8 py-5">Posting URL (IG)</th>
+                                    <th className="px-8 py-5">spark ads</th>
                                     <th className="px-8 py-5">Views</th>
                                   </>
                                 ) : null}
@@ -2809,33 +2856,38 @@ const OngoingCampaign = ({ campaign, user }) => {
                                     </td>
                                     {useLinked ? (
                                       <>
+                                        <td className="px-8 py-5 align-top text-sm text-slate-300 max-w-[10rem]">
+                                          <span className="whitespace-pre-wrap break-words">{creator.companion_info || '—'}</span>
+                                        </td>
                                         <td className="px-8 py-5 align-top">
-                                            <div className="flex flex-col gap-2 min-w-[8rem]">
-                                                {creator.posting_tiktok_url ? (
+                                            {creator.posting_tiktok_url ? (
                                                   <a
                                                     href={creator.posting_tiktok_url}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="inline-flex items-center gap-1.5 text-[11px] font-bold text-sky-300 hover:text-sky-200 underline-offset-4 hover:underline"
                                                   >
-                                                    <ExternalLink size={12} /> TikTok
+                                                    <ExternalLink size={12} /> 링크
                                                   </a>
-                                                ) : null}
-                                                {creator.posting_instagram_url ? (
+                                            ) : (
+                                              <span className="text-slate-600 text-xs">—</span>
+                                            )}
+                                        </td>
+                                        <td className="px-8 py-5 align-top">
+                                            {creator.posting_instagram_url ? (
                                                   <a
                                                     href={creator.posting_instagram_url}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="inline-flex items-center gap-1.5 text-[11px] font-bold text-pink-300 hover:text-pink-200 underline-offset-4 hover:underline"
                                                   >
-                                                    <ExternalLink size={12} /> Instagram
+                                                    <ExternalLink size={12} /> 링크
                                                   </a>
-                                                ) : null}
-                                                {!creator.posting_tiktok_url && !creator.posting_instagram_url ? (
-                                                  <span className="text-slate-600 text-xs font-medium">—</span>
-                                                ) : null}
-                                            </div>
+                                            ) : (
+                                              <span className="text-slate-600 text-xs">—</span>
+                                            )}
                                         </td>
+                                        <td className="px-8 py-5 align-top">{renderSparkAdsCell(creator.spark_ads)}</td>
                                         <td className="px-8 py-5 font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 text-lg">{creator.views}</td>
                                       </>
                                     ) : null}
