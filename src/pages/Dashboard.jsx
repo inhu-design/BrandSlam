@@ -5449,7 +5449,7 @@ const CampaignDetail = ({ campaign, isDemoMode, user, isAdminUser = false, onCam
  * 고객 계정: campaigns 행( select('*') )만 받아 설정·명단·주문 요약을 붙인다.
  * My Campaign 첫 페인트 후 백그라운드에서 호출해 로딩 체감을 줄인다.
  */
-async function enrichNonAdminDashboardCampaigns(rows, user) {
+async function enrichNonAdminDashboardCampaigns(rows, user, accessToken = null) {
   let campaignList = Array.isArray(rows) ? [...rows] : [];
   if (campaignList.length === 0) return [];
 
@@ -5605,6 +5605,36 @@ async function enrichNonAdminDashboardCampaigns(rows, user) {
     }
     return { ...c, linked_delivery_candidates: list };
   });
+
+  const token = typeof accessToken === 'string' ? accessToken.trim() : '';
+  if (token && campaignList.length > 0) {
+    for (let i = 0; i < campaignList.length; i++) {
+      const c = campaignList[i];
+      const cur = c.linked_delivery_candidates;
+      if (Array.isArray(cur) && cur.length > 0) continue;
+      const slug = resolveLinkedDeliveryListSlug(c, user);
+      if (!slug) continue;
+      try {
+        const r = await fetch(
+          `${window.location.origin}/api/my-campaign-delivery-creators?campaign_id=${encodeURIComponent(c.id)}`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        if (!r.ok) continue;
+        const j = await r.json();
+        const raw = Array.isArray(j?.creators) ? j.creators : [];
+        if (raw.length === 0) continue;
+        let list = raw.map((row, idx) => toDisplayCreator(row, idx));
+        const effectiveSlug = (j?.list_slug && String(j.list_slug).trim()) || slug;
+        if (effectiveSlug === LINKED_LIST_SLUG_FARMSKIN && isTroublessPdrnSunscreenCampaign(c)) {
+          list = finalizeTroublessPdrnScale50DisplayCreators(list);
+        }
+        campaignList[i] = { ...c, linked_delivery_candidates: list };
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
   campaignList = campaignList.map((c) =>
     c.order_number && orderSummaryByNumber[c.order_number]
       ? { ...c, order_summary: orderSummaryByNumber[c.order_number], setup_submission_summary: setupByCampaignId[c.id] || null }
@@ -5835,7 +5865,7 @@ export default function Dashboard() {
             setLoading(false);
           }
 
-          void enrichNonAdminDashboardCampaigns(baseRows, user)
+          void enrichNonAdminDashboardCampaigns(baseRows, user, token0)
             .then((enriched) => {
               if (!Array.isArray(enriched)) return;
               if (enriched.length > 0) {
@@ -6360,23 +6390,35 @@ export default function Dashboard() {
 
   const selectedCampaign = filteredCampaigns.find(c => c.id === selectedCampaignId) || null;
 
+  /** 고객: 완료 캠페인(성과 리포트 덱)만 흰 패널 — 진행 중은 다크 패널 */
+  const customerMainReportDeck =
+    !isAdminUser && selectedCampaign?.status === CampaignStatus.COMPLETED;
+
   const adminOngoingCampaigns = useMemo(
     () => campaigns.filter((c) => String(c.status || '') !== CampaignStatus.COMPLETED),
     [campaigns],
   );
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><div className="w-12 h-12 border-4 border-slate-200 border-t-cyan-500 rounded-full animate-spin"></div></div>;
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#020617]">
+        <div className="w-12 h-12 border-4 border-white/10 border-t-cyan-500 rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
-    <div className={`min-h-screen flex flex-col ${isAdminUser ? 'bg-[#020617] text-white selection:bg-cyan-500/30' : 'bg-slate-50 text-slate-900 selection:bg-cyan-200/50'}`}>
+    <div className="min-h-screen flex flex-col bg-[#020617] text-white selection:bg-cyan-500/30">
       <Navbar />
       
       <div className="flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-40 pb-32">
         {isDemoMode && (
-            <div className={`mb-10 p-5 rounded-3xl flex items-center gap-4 text-sm shadow-sm animate-fade-in-down relative overflow-hidden border ${isAdminUser ? 'bg-gradient-to-r from-purple-900/40 to-blue-900/40 border-purple-500/30 text-purple-200 shadow-[0_0_20px_rgba(168,85,247,0.1)]' : 'bg-purple-50 border-purple-200 text-purple-950'}`}>
-                <div className={`absolute top-0 left-0 w-1 h-full animate-pulse ${isAdminUser ? 'bg-purple-500' : 'bg-purple-600'}`}></div>
-                <AlertCircle size={20} className={`${isAdminUser ? 'text-purple-400 shrink-0' : 'text-purple-600 shrink-0'}`} />
-                <span className={`font-light tracking-tight ${isAdminUser ? '' : 'text-purple-950'}`}>현재 시스템 체험을 위한 <b className={`font-black uppercase tracking-widest underline decoration-purple-500 underline-offset-4 ${isAdminUser ? 'text-white' : 'text-purple-900'}`}>Demo Mode</b>가 활성화되어 있습니다. 실제 캠페인 계약 시 실시간 데이터 피드가 전송됩니다.</span>
+            <div
+              className={`mb-10 p-5 rounded-3xl flex items-center gap-4 text-sm animate-fade-in-down relative overflow-hidden border bg-gradient-to-r from-purple-900/40 to-blue-900/40 border-purple-500/30 text-purple-200 shadow-[0_0_20px_rgba(168,85,247,0.1)]`}
+            >
+                <div className={`absolute top-0 left-0 w-1 h-full animate-pulse bg-purple-500`}></div>
+                <AlertCircle size={20} className={`text-purple-400 shrink-0`} />
+                <span className={`font-light tracking-tight`}>현재 시스템 체험을 위한 <b className={`font-black uppercase tracking-widest underline decoration-purple-500 underline-offset-4 text-white`}>Demo Mode</b>가 활성화되어 있습니다. 실제 캠페인 계약 시 실시간 데이터 피드가 전송됩니다.</span>
             </div>
         )}
 
@@ -6441,7 +6483,7 @@ export default function Dashboard() {
 
         {!isDemoMode && user && myCustomPaymentOffers.length > 0 && (
           <div className="mb-10 space-y-4">
-            <p className={`text-[10px] font-black tracking-[0.25em] uppercase px-1 ${isAdminUser ? 'text-sky-400/90' : 'text-sky-700'}`}>개인 결제창</p>
+            <p className="text-[10px] font-black tracking-[0.25em] uppercase px-1 text-sky-400/90">개인 결제창</p>
             {myCustomPaymentOffers.map((offer) => {
               const t = computeDbOfferTotals(offer);
               const seedLine = `${offer.seeding_line_label || '시딩(건당)'} × ${Number(offer.seeding_qty) || 0}건 · 공급가`;
@@ -6451,21 +6493,21 @@ export default function Dashboard() {
               return (
                 <div
                   key={offer.id}
-                  className={`p-6 md:p-8 rounded-[2rem] border shadow-sm ${isAdminUser ? 'border-sky-500/35 bg-gradient-to-br from-sky-950/45 to-slate-900/80 shadow-[0_0_32px_rgba(14,165,233,0.1)]' : 'border-sky-200 bg-gradient-to-br from-sky-50 to-cyan-50'}`}
+                  className="p-6 md:p-8 rounded-[2rem] border border-sky-500/35 bg-gradient-to-br from-sky-950/45 to-slate-900/80 shadow-[0_0_32px_rgba(14,165,233,0.1)]"
                 >
                   <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
                     <div>
-                      <h2 className={`text-xl md:text-2xl font-black mb-2 ${isAdminUser ? 'text-white' : 'text-slate-900'}`}>
+                      <h2 className="text-xl md:text-2xl font-black mb-2 text-white">
                         {offer.title?.trim() || '맞춤 견적 결제'}
                       </h2>
-                      <p className={`text-sm leading-relaxed max-w-xl ${isAdminUser ? 'text-slate-400' : 'text-sky-950/85'}`}>
+                      <p className="text-sm leading-relaxed max-w-xl text-slate-400">
                         관리자가 귀하의 계정으로만 발급한 결제창입니다. 시딩·방문 라인의 단가·수량은 공용 요금제와 별도이며, 아래는 부가세 포함 총액입니다.
                       </p>
-                      <ul className={`mt-4 space-y-2 text-sm ${isAdminUser ? 'text-slate-300' : 'text-slate-800'}`}>
+                      <ul className="mt-4 space-y-2 text-sm text-slate-300">
                         {(Number(offer.seeding_qty) || 0) > 0 && (
                           <li className="flex justify-between gap-4 max-w-md">
                             <span>{seedLine}</span>
-                            <span className={`font-mono ${isAdminUser ? 'text-white' : 'text-slate-900'}`}>{seedSupply.toLocaleString()}원</span>
+                            <span className="font-mono text-white">{seedSupply.toLocaleString()}원</span>
                           </li>
                         )}
                         {visitQty > 0 && (
@@ -6473,16 +6515,16 @@ export default function Dashboard() {
                             <span>
                               {offer.visit_line_label || '방문형 시딩(건당)'} × {visitQty}건 · 공급가
                             </span>
-                            <span className={`font-mono ${isAdminUser ? 'text-white' : 'text-slate-900'}`}>{visitSupply.toLocaleString()}원</span>
+                            <span className="font-mono text-white">{visitSupply.toLocaleString()}원</span>
                           </li>
                         )}
-                        <li className={`flex justify-between gap-4 max-w-md border-t pt-2 mt-2 ${isAdminUser ? 'border-white/10' : 'border-sky-200'}`}>
-                          <span className={isAdminUser ? 'text-sky-200/90' : 'text-sky-800'}>부가세</span>
-                          <span className={`font-mono ${isAdminUser ? 'text-sky-200' : 'text-sky-950'}`}>{t.vat.toLocaleString()}원</span>
+                        <li className="flex justify-between gap-4 max-w-md border-t pt-2 mt-2 border-white/10">
+                          <span className="text-sky-200/90">부가세</span>
+                          <span className="font-mono text-sky-200">{t.vat.toLocaleString()}원</span>
                         </li>
-                        <li className={`flex justify-between gap-4 max-w-md text-lg font-black ${isAdminUser ? 'text-white' : 'text-slate-900'}`}>
+                        <li className="flex justify-between gap-4 max-w-md text-lg font-black text-white">
                           <span>결제 예정(VAT 포함)</span>
-                          <span className={isAdminUser ? 'text-sky-400' : 'text-sky-700'}>{t.total.toLocaleString()}원</span>
+                          <span className="text-sky-400">{t.total.toLocaleString()}원</span>
                         </li>
                       </ul>
                     </div>
@@ -7178,11 +7220,11 @@ export default function Dashboard() {
         )}
 
         {user && !user?.user_metadata?.password_set && (
-            <div className={`mb-10 p-5 rounded-3xl flex flex-col sm:flex-row sm:items-center gap-4 text-sm animate-fade-in-down border ${isAdminUser ? 'bg-white/[0.03] border-white/10 text-slate-300' : 'bg-white border border-slate-200 text-slate-700 shadow-sm'}`}>
-                <Lock size={22} className={`shrink-0 ${isAdminUser ? 'text-purple-400' : 'text-purple-600'}`} />
+            <div className="mb-10 p-5 rounded-3xl flex flex-col sm:flex-row sm:items-center gap-4 text-sm animate-fade-in-down border bg-white/[0.03] border-white/10 text-slate-300">
+                <Lock size={22} className="shrink-0 text-purple-400" />
                 <div className="flex-1">
-                    <p className={`font-medium ${isAdminUser ? 'text-white' : 'text-slate-900'}`}>다음부터는 비밀번호로 빠르게 로그인할 수 있어요.</p>
-                    <p className={`text-xs mt-0.5 ${isAdminUser ? 'text-slate-500' : 'text-slate-500'}`}>한 번만 설정하면, 이메일+비밀번호만으로 바로 들어올 수 있습니다.</p>
+                    <p className="font-medium text-white">다음부터는 비밀번호로 빠르게 로그인할 수 있어요.</p>
+                    <p className="text-xs mt-0.5 text-slate-500">한 번만 설정하면, 이메일+비밀번호만으로 바로 들어올 수 있습니다.</p>
                 </div>
                 <button
                     onClick={() => navigate('/set-password?from=/dashboard')}
@@ -7196,10 +7238,10 @@ export default function Dashboard() {
         {!isAdminUser && (
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-12 gap-8 relative z-10">
             <div>
-                <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight mb-3 leading-tight">
+                <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight mb-3 leading-tight">
                     {user ? `${user.email.split('@')[0]}님의 대시보드` : '대시보드'}
                 </h1>
-                <p className="text-slate-600 font-light text-base md:text-lg tracking-tight max-w-2xl">
+                <p className="text-slate-400 font-light text-base md:text-lg tracking-tight max-w-2xl">
                   캠페인 진행 단계와 결과를 한곳에서 확인할 수 있습니다.
                 </p>
             </div>
@@ -7207,24 +7249,24 @@ export default function Dashboard() {
                 <button 
                     type="button"
                     onClick={() => setIsPasswordMode(true)}
-                    className="flex items-center gap-3 px-6 py-3 bg-white border border-slate-200 rounded-2xl text-xs font-bold hover:bg-slate-50 transition-all shadow-md text-slate-800"
+                    className="flex items-center gap-3 px-6 py-3 bg-white/5 border border-white/10 rounded-2xl text-xs font-bold hover:bg-white/10 transition-all text-slate-200"
                 >
-                    <Settings size={18} className="text-slate-500" /> 비밀번호·계정 설정
+                    <Settings size={18} className="text-slate-400" /> 비밀번호·계정 설정
                 </button>
             )}
         </div>
         )}
 
         {user && paidOrders.length > 0 && (
-          <div className={`mb-10 p-6 rounded-2xl relative z-10 border ${isAdminUser ? 'bg-white/[0.03] border-white/10' : 'bg-white border-slate-200 shadow-sm'}`}>
-            <h2 className={`text-lg font-bold mb-4 flex items-center gap-2 ${isAdminUser ? 'text-white' : 'text-slate-900'}`}>
+          <div className="mb-10 p-6 rounded-2xl relative z-10 border bg-white/[0.03] border-white/10">
+            <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-white">
               <CreditCard size={20} className="text-purple-500" /> 결제 내역
             </h2>
             <p className="text-slate-500 text-sm mb-4">KG이니시스 승인 건은 아래와 같습니다. 통합내역조회는 PG사 반영 후 일정이 소요될 수 있습니다.</p>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className={`border-b font-medium ${isAdminUser ? 'border-white/10 text-slate-500' : 'border-slate-200 text-slate-500'}`}>
+                  <tr className="border-b font-medium border-white/10 text-slate-500">
                     <th className="py-3 pr-4">주문번호</th>
                     <th className="py-3 pr-4">상품명</th>
                     <th className="py-3 pr-4">결제금액</th>
@@ -7233,10 +7275,10 @@ export default function Dashboard() {
                 </thead>
                 <tbody>
                   {paidOrders.map((o) => (
-                    <tr key={o.order_number} className={`border-b ${isAdminUser ? 'border-white/5 hover:bg-white/[0.03]' : 'border-slate-100 hover:bg-slate-50'}`}>
-                      <td className={`py-3 pr-4 font-mono ${isAdminUser ? 'text-slate-300' : 'text-slate-600'}`}>{o.order_number}</td>
-                      <td className={`py-3 pr-4 ${isAdminUser ? 'text-white' : 'text-slate-900'}`}>{o.plan_name}</td>
-                      <td className="py-3 pr-4 text-purple-600 font-semibold">
+                    <tr key={o.order_number} className="border-b border-white/5 hover:bg-white/[0.03]">
+                      <td className="py-3 pr-4 font-mono text-slate-300">{o.order_number}</td>
+                      <td className="py-3 pr-4 text-white">{o.plan_name}</td>
+                      <td className="py-3 pr-4 text-purple-400 font-semibold">
                         {displayPaidOrderPlanPriceForViewer(o, user?.email).toLocaleString()}원
                       </td>
                       <td className="py-3 text-slate-500">{o.created_at ? new Date(o.created_at).toLocaleString('ko-KR') : '-'}</td>
@@ -7254,8 +7296,8 @@ export default function Dashboard() {
             <div className="w-full lg:w-1/4 space-y-10 sticky top-40">
                 <div className="space-y-6">
                     <div className="flex items-center justify-between px-2">
-                        <h2 className="text-sm font-bold text-slate-800">캠페인 목록</h2>
-                        <span className="text-xs font-semibold bg-slate-100 text-slate-700 px-3 py-1 rounded-full border border-slate-200">
+                        <h2 className="text-sm font-bold text-slate-200">캠페인 목록</h2>
+                        <span className="text-xs font-semibold bg-white/10 text-slate-200 px-3 py-1 rounded-full border border-white/10">
                           {`${campaigns.length}개`}
                         </span>
                     </div>
@@ -7266,19 +7308,19 @@ export default function Dashboard() {
                                 campaign={campaign} 
                                 isActive={selectedCampaignId === campaign.id}
                                 onClick={() => setSelectedCampaignId(campaign.id)}
-                                theme="light"
+                                theme="dark"
                             />
                         ))}
                     </div>
-                    <div onClick={goToPricing} className="p-8 rounded-[2.5rem] border-2 border-dashed border-slate-300 text-center hover:border-purple-400 hover:bg-purple-50 transition-all cursor-pointer group relative overflow-hidden bg-white shadow-sm">
-                        <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-slate-600 group-hover:text-purple-600 transition-all duration-500 border border-slate-200 group-hover:rotate-180">
+                    <div onClick={goToPricing} className="p-8 rounded-[2.5rem] border-2 border-dashed border-white/15 text-center hover:border-purple-400/60 hover:bg-purple-500/10 transition-all cursor-pointer group relative overflow-hidden bg-white/[0.03]">
+                        <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-4 text-slate-300 group-hover:text-purple-300 transition-all duration-500 border border-white/10 group-hover:rotate-180">
                             <Package size={24} />
                         </div>
-                        <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest group-hover:text-purple-800 transition-colors">Start New Campaign</p>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-purple-200 transition-colors">Start New Campaign</p>
                     </div>
                 </div>
                 
-                <div className="space-y-4 pt-10 border-t border-slate-200">
+                <div className="space-y-4 pt-10 border-t border-white/10">
                     <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] px-2">Performance Boost</h2>
                     
                     {[
@@ -7288,14 +7330,14 @@ export default function Dashboard() {
                         <div 
                             key={idx}
                             onClick={handleSparkAdsClick}
-                            className="bg-slate-100/80 p-6 rounded-[2rem] border border-slate-200 cursor-not-allowed group opacity-70"
+                            className="bg-white/[0.03] p-6 rounded-[2rem] border border-white/10 cursor-not-allowed group opacity-70"
                         >
                             <div className="flex items-center gap-4 mb-3">
-                                <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-slate-500 shadow-sm border border-slate-200"><item.icon size={18} /></div>
-                                <span className="font-black text-slate-600 text-xs tracking-tighter uppercase">{item.title}</span>
+                                <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-slate-500 border border-white/10"><item.icon size={18} /></div>
+                                <span className="font-black text-slate-400 text-xs tracking-tighter uppercase">{item.title}</span>
                             </div>
-                            <p className="text-[10px] text-slate-600 leading-relaxed mb-4 font-medium tracking-tight">{item.desc}</p>
-                            <span className="text-[9px] font-black text-slate-700 flex items-center gap-2 uppercase tracking-[0.2em] italic">Locked / Coming Soon</span>
+                            <p className="text-[10px] text-slate-500 leading-relaxed mb-4 font-medium tracking-tight">{item.desc}</p>
+                            <span className="text-[9px] font-black text-slate-500 flex items-center gap-2 uppercase tracking-[0.2em] italic">Locked / Coming Soon</span>
                         </div>
                     ))}
                 </div>
@@ -7304,12 +7346,12 @@ export default function Dashboard() {
             {/* Main Content Area */}
             <div className="w-full lg:w-3/4">
                 {filteredCampaigns.length === 0 && !isDemoMode ? (
-                    <div className="bg-white p-8 md:p-12 rounded-[4rem] border border-slate-200 shadow-xl min-h-[560px] flex flex-col items-center justify-center relative overflow-hidden text-center animate-fade-in-up">
-                        <div className="w-32 h-32 bg-gradient-to-br from-purple-100 to-indigo-100 rounded-full flex items-center justify-center mb-8 border border-purple-100">
-                            <Package size={48} className="text-purple-600 opacity-90" />
+                    <div className="rounded-[4rem] border border-white/10 bg-white/[0.04] p-8 md:p-12 shadow-inner min-h-[560px] flex flex-col items-center justify-center relative overflow-hidden text-center animate-fade-in-up">
+                        <div className="w-32 h-32 bg-gradient-to-br from-purple-500/20 to-indigo-500/20 rounded-full flex items-center justify-center mb-8 border border-white/10">
+                            <Package size={48} className="text-purple-300 opacity-90" />
                         </div>
-                        <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tighter mb-4">진행 중인 캠페인이 없습니다</h2>
-                        <p className="text-slate-600 mb-12 text-lg font-light tracking-tight max-w-md">
+                        <h2 className="text-3xl md:text-4xl font-black text-white tracking-tighter mb-4">진행 중인 캠페인이 없습니다</h2>
+                        <p className="text-slate-400 mb-12 text-lg font-light tracking-tight max-w-md">
                             글로벌 인플루언서와 함께하는 첫 번째 브랜드 캠페인을 런칭하고 실시간 데이터 인사이트를 경험해보세요.
                         </p>
                         <button 
@@ -7320,25 +7362,51 @@ export default function Dashboard() {
                         </button>
                     </div>
                 ) : !selectedCampaign ? (
-                    <div className="rounded-[4rem] border border-slate-200 bg-white px-8 py-16 text-center text-sm min-h-[400px] flex flex-col items-center justify-center shadow-lg">
-                      <p className="font-bold text-slate-900 mb-2">표시할 캠페인을 찾지 못했습니다</p>
-                      <p className="text-slate-600 max-w-md leading-relaxed">
+                    <div className="rounded-[4rem] border border-white/10 bg-white/[0.04] px-8 py-16 text-center text-sm min-h-[400px] flex flex-col items-center justify-center shadow-inner">
+                      <p className="font-bold text-white mb-2">표시할 캠페인을 찾지 못했습니다</p>
+                      <p className="text-slate-400 max-w-md leading-relaxed">
                         목록이 갱신되는 중이거나 필터 때문에 선택이 풀렸을 수 있습니다. 왼쪽 목록에서 캠페인을 다시 눌러 주세요.
                       </p>
                     </div>
                 ) : (
-                    <div className="bg-white p-6 md:p-10 rounded-[3rem] border border-slate-200 shadow-xl min-h-[480px] relative overflow-hidden">
-                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-70"></div>
-                        <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 pb-8 border-b border-slate-200 gap-6 relative z-10">
+                    <div
+                      className={
+                        customerMainReportDeck
+                          ? 'bg-white p-6 md:p-10 rounded-[3rem] border border-slate-200 shadow-xl min-h-[480px] relative overflow-hidden text-slate-900'
+                          : 'rounded-[3rem] border border-white/10 bg-white/[0.04] p-6 md:p-10 shadow-inner min-h-[480px] relative overflow-hidden'
+                      }
+                    >
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-70" />
+                        <div
+                          className={`flex flex-col md:flex-row md:items-center justify-between mb-8 pb-8 gap-6 relative z-10 border-b ${
+                            customerMainReportDeck ? 'border-slate-200' : 'border-white/10'
+                          }`}
+                        >
                             <div>
                                 <div className="flex items-center gap-4 mb-3 flex-wrap">
-                                    <h2 className="text-2xl md:text-5xl font-black text-slate-900 tracking-tighter uppercase leading-none">
+                                    <h2
+                                      className={`text-2xl md:text-5xl font-black tracking-tighter uppercase leading-none ${
+                                        customerMainReportDeck ? 'text-slate-900' : 'text-white'
+                                      }`}
+                                    >
                                       {selectedCampaign?.product_name || selectedCampaign?.order_summary?.plan_name || 'Campaign'}
                                     </h2>
-                                    <span className="text-[10px] font-black px-4 py-1.5 bg-cyan-50 text-cyan-800 rounded-full border border-cyan-200 tracking-widest uppercase">{selectedCampaign?.plan}</span>
+                                    <span
+                                      className={`text-[10px] font-black px-4 py-1.5 rounded-full border tracking-widest uppercase ${
+                                        customerMainReportDeck
+                                          ? 'bg-cyan-50 text-cyan-800 border-cyan-200'
+                                          : 'bg-cyan-500/10 text-cyan-200 border-cyan-500/30'
+                                      }`}
+                                    >
+                                      {selectedCampaign?.plan}
+                                    </span>
                                 </div>
-                                <p className="text-slate-600 text-lg font-light flex items-center gap-3 tracking-tight">
-                                    <span className={`w-3 h-3 rounded-full ${selectedCampaign?.status === CampaignStatus.COMPLETED ? 'bg-slate-400 shadow-none' : 'bg-cyan-500 animate-pulse shadow-[0_0_10px_rgba(6,182,212,0.6)]'}`}></span>
+                                <p
+                                  className={`text-lg font-light flex items-center gap-3 tracking-tight ${
+                                    customerMainReportDeck ? 'text-slate-600' : 'text-slate-400'
+                                  }`}
+                                >
+                                    <span className={`w-3 h-3 rounded-full ${selectedCampaign?.status === CampaignStatus.COMPLETED ? 'bg-slate-400 shadow-none' : 'bg-cyan-500 animate-pulse shadow-[0_0_10px_rgba(6,182,212,0.6)]'}`} />
                                     {getCampaignProgressSubtitle(selectedCampaign?.status)}
                                 </p>
                             </div>
