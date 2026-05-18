@@ -1587,7 +1587,17 @@ const CandidateList = ({
             const filtered = (candidates || []).filter((c) => !droppedIds.has(normalizeDropIdentifier(c._identifier || c.name)));
             const useSplit = deliveryTableLayout === 'visit_split';
             const headers = useSplit
-                ? ['name', 'tiktok_url', 'tiktok_followers', 'instagram_url', 'instagram_followers', 'visit_date']
+                ? [
+                    'name',
+                    'tiktok_url',
+                    'tiktok_followers',
+                    'instagram_url',
+                    'instagram_followers',
+                    'visit_date',
+                    'posting_tiktok_url',
+                    'posting_instagram_url',
+                    'metric_views',
+                ]
                 : ['name', 'shipping_country', 'instagram_url', 'instagram_followers', 'tiktok_url', 'tiktok_followers'];
             const csv = [
                 headers.join(','),
@@ -1604,6 +1614,9 @@ const CandidateList = ({
                             m.instagram_url || '',
                             m.instagram_follower ?? '',
                             c.visit_date || m.visit_date || '',
+                            c.posting_tiktok_url || '',
+                            c.posting_instagram_url || '',
+                            c.metric_views || '',
                         ]
                             .map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`)
                             .join(',');
@@ -1812,8 +1825,10 @@ const CandidateList = ({
     const allCandidates = useMemo(() => candidates || [], [candidates]);
     const isDeliveryTestView = isDeliveryTest;
     const useVisitSplitLayout = isDeliveryTestView && deliveryTableLayout === 'visit_split';
-    const deliveryTestTableColSpan = 5;
-    const deliveryTestConfirmedColSpan = 4;
+    /** Visit 분할: 이름·SNS·팔로워·Visit·게시물·조회수·(드랍) */
+    const deliveryTestTableColSpan = useVisitSplitLayout ? 7 : 5;
+    /** 확정/드랍 표: 드랍 열 없음 */
+    const deliveryTestConfirmedColSpan = useVisitSplitLayout ? 6 : 4;
 
     // 정렬: 이름 ABC순 | 팔로워 수 | 신규 교체 우선
     const [sortBy, setSortBy] = useState('name'); // 'name' | 'followers' | 'new_first'
@@ -1949,6 +1964,38 @@ const CandidateList = ({
                         </div>
                     </td>
                     <td className="px-8 py-6 text-slate-300 align-top whitespace-nowrap">{visitLabel}</td>
+                    <td className="px-8 py-6 align-top">
+                        <div className="flex flex-col gap-2 min-w-[6rem]">
+                            {trimOrNull(creator.posting_tiktok_url) ? (
+                                <a
+                                    href={ensureAbsoluteUrl(creator.posting_tiktok_url)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[11px] font-bold text-sky-300 hover:text-sky-200 flex items-center gap-1.5"
+                                >
+                                    <ExternalLink size={12} className="shrink-0" />
+                                    TikTok 게시물
+                                </a>
+                            ) : null}
+                            {trimOrNull(creator.posting_instagram_url) ? (
+                                <a
+                                    href={ensureAbsoluteUrl(creator.posting_instagram_url)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[11px] font-bold text-pink-300 hover:text-pink-200 flex items-center gap-1.5"
+                                >
+                                    <ExternalLink size={12} className="shrink-0" />
+                                    Instagram 게시물
+                                </a>
+                            ) : null}
+                            {!trimOrNull(creator.posting_tiktok_url) && !trimOrNull(creator.posting_instagram_url) ? (
+                                <span className="text-slate-600 text-xs font-medium">—</span>
+                            ) : null}
+                        </div>
+                    </td>
+                    <td className="px-8 py-6 text-slate-300 align-top whitespace-nowrap text-sm font-medium">
+                        {nonemptyMetric(creator.metric_views) || '—'}
+                    </td>
                 </>
             );
         }
@@ -2155,6 +2202,8 @@ const CandidateList = ({
                                                 <th className="px-8 py-5">SNS 주소</th>
                                                 <th className="px-8 py-5">팔로워 수</th>
                                                 <th className="px-8 py-5">Visit date</th>
+                                                <th className="px-8 py-5">게시물</th>
+                                                <th className="px-8 py-5">조회수</th>
                                             </>
                                         ) : (
                                             <>
@@ -2209,6 +2258,8 @@ const CandidateList = ({
                                                 <th className="px-8 py-5">SNS 주소</th>
                                                 <th className="px-8 py-5">팔로워 수</th>
                                                 <th className="px-8 py-5">Visit date</th>
+                                                <th className="px-8 py-5">게시물</th>
+                                                <th className="px-8 py-5">조회수</th>
                                             </>
                                         ) : (
                                             <>
@@ -2380,6 +2431,8 @@ const CandidateList = ({
                                         <th className="px-8 py-5">SNS 주소</th>
                                         <th className="px-8 py-5">팔로워 수</th>
                                         <th className="px-8 py-5">Visit date</th>
+                                        <th className="px-8 py-5">게시물</th>
+                                        <th className="px-8 py-5">조회수</th>
                                         <th className="px-8 py-5 min-w-[4rem] text-right whitespace-nowrap">드랍</th>
                                     </>
                                 ) : (
