@@ -723,6 +723,10 @@ export default function Checkout() {
   const invoicePreviewRef = useRef(null);
   const payInicisPopupsRef = useRef([]);
   const payWindowMonitorRef = useRef(null);
+  const inicisLayerPollRef = useRef(null);
+  const pendingInicisOidRef = useRef(null);
+  const inicisCancelHandledRef = useRef(false);
+  const runInicisCanceledFlowRef = useRef(() => Promise.resolve());
   const inicisUnpatchWindowOpenRef = useRef(() => {});
   const checkoutResumeHydratedForUserRef = useRef(null);
   const prevCheckoutUserIdRef = useRef(undefined);
@@ -815,7 +819,23 @@ export default function Checkout() {
     body.classList.remove('modal-open');
     html.classList.remove('modal-open');
     const clearScrollLock = (el) => {
-      ['overflow', 'padding-right', 'position', 'top', 'left', 'right', 'bottom', 'width', 'height', 'touch-action'].forEach((prop) => {
+      [
+        'overflow',
+        'padding-right',
+        'position',
+        'top',
+        'left',
+        'right',
+        'bottom',
+        'width',
+        'height',
+        'max-height',
+        'touch-action',
+        'overscroll-behavior',
+        '-webkit-overflow-scrolling',
+        'pointer-events',
+        'user-select',
+      ].forEach((prop) => {
         try {
           el.style.removeProperty(prop);
         } catch {
@@ -825,7 +845,31 @@ export default function Checkout() {
     };
     clearScrollLock(body);
     clearScrollLock(html);
+    document.documentElement.removeAttribute('scroll-lock');
+    document.body.removeAttribute('scroll-lock');
     document.querySelectorAll('.modal-backdrop').forEach((el) => el.remove());
+  };
+
+  /** 이니시스가 남기는 폼·iframe·레이어 잔여 DOM 제거 (취소 후 스크롤 락 방지) */
+  const stripInicisLeftovers = () => {
+    document.getElementById('inicis-pay-form')?.remove();
+    ['#inicisModal', '#inicisDiv', '#inicis_support', '#inicis-fake-popup'].forEach((sel) => {
+      try {
+        document.querySelector(sel)?.remove();
+      } catch {
+        /* ignore */
+      }
+    });
+    document.querySelectorAll('iframe').forEach((ifr) => {
+      const src = `${ifr.getAttribute('src') || ''}${ifr.getAttribute('name') || ''}${ifr.id || ''}`;
+      if (/inicis|stdpay|INIStd/i.test(src)) {
+        try {
+          ifr.remove();
+        } catch {
+          /* ignore */
+        }
+      }
+    });
   };
 
   const cleanupInicisPayUi = () => {
@@ -836,10 +880,12 @@ export default function Checkout() {
     } catch {
       /* 이니시스 내부 정리 실패 시에도 스크롤 복구는 진행 */
     }
+    stripInicisLeftovers();
     restorePageScroll();
     window.setTimeout(restorePageScroll, 0);
     window.setTimeout(restorePageScroll, 120);
     window.setTimeout(restorePageScroll, 400);
+    window.setTimeout(restorePageScroll, 800);
   };
 
   useEffect(() => {
@@ -903,6 +949,11 @@ export default function Checkout() {
       if (e.data?.type === 'INICIS_PAYMENT_SUCCESS' && e.data?.order_number) {
         paymentInProgressRef.current = false;
         setSubmitting(false);
+        pendingInicisOidRef.current = null;
+        if (inicisLayerPollRef.current) {
+          window.clearInterval(inicisLayerPollRef.current);
+          inicisLayerPollRef.current = null;
+        }
         inicisUnpatchWindowOpenRef.current();
         cleanupInicisPayUi();
         if (payWindowMonitorRef.current) {
@@ -917,6 +968,7 @@ export default function Checkout() {
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- 결제 성공 시 DOM 정리; cleanupInicisPayUi 매 렌더 갱신, user.id만 구독
   }, [user?.id]);
 
   useEffect(() => {
@@ -925,9 +977,14 @@ export default function Checkout() {
         window.clearInterval(payWindowMonitorRef.current);
         payWindowMonitorRef.current = null;
       }
+      if (inicisLayerPollRef.current) {
+        window.clearInterval(inicisLayerPollRef.current);
+        inicisLayerPollRef.current = null;
+      }
       inicisUnpatchWindowOpenRef.current();
       cleanupInicisPayUi();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- 언마운트 시 1회 정리만 필요
   }, []);
 
   useEffect(() => {
@@ -938,10 +995,7 @@ export default function Checkout() {
     };
     const handlePopState = () => {
       if (paymentInProgressRef.current) {
-        inicisUnpatchWindowOpenRef.current();
-        cleanupInicisPayUi();
-        paymentInProgressRef.current = false;
-        setSubmitting(false);
+        void runInicisCanceledFlowRef.current();
       } else {
         restorePageScroll();
       }
@@ -1058,6 +1112,64 @@ export default function Checkout() {
     }
   };
 
+  /** 카드 결제 취소·창 닫기: 이니시스 잔여 DOM·스크롤 락 해제 후 안내하고 체크아웃 첫 단계로 복귀 */
+  const runInicisCanceledFlow = async () => {
+    if (inicisCancelHandledRef.current) return;
+    inicisCancelHandledRef.current = true;
+    const oid = pendingInicisOidRef.current;
+    pendingInicisOidRef.current = null;
+
+    if (inicisLayerPollRef.current) {
+      window.clearInterval(inicisLayerPollRef.current);
+      inicisLayerPollRef.current = null;
+    }
+    if (payWindowMonitorRef.current) {
+      window.clearInterval(payWindowMonitorRef.current);
+      payWindowMonitorRef.current = null;
+    }
+
+    inicisUnpatchWindowOpenRef.current();
+    cleanupInicisPayUi();
+    payInicisPopupsRef.current = [];
+    paymentInProgressRef.current = false;
+    setSubmitting(false);
+
+    if (oid) await rollbackOrder(oid);
+    if (user?.id) clearCheckoutResume(user.id);
+
+    window.scrollTo(0, 0);
+    requestAnimationFrame(() => {
+      restorePageScroll();
+      window.scrollTo(0, 0);
+    });
+
+    alert('결제를 취소하셨습니다. 처음 화면으로 돌아갑니다.');
+
+    restorePageScroll();
+    window.scrollTo(0, 0);
+
+    if (isCheckoutCustomPayment) {
+      setCurrentStep(1);
+      setFurthestStepReached(1);
+    } else {
+      setCurrentStep(0);
+      setFurthestStepReached(0);
+    }
+    setOrderNumber('');
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        restorePageScroll();
+        stripInicisLeftovers();
+        window.scrollTo(0, 0);
+      });
+    });
+
+    inicisCancelHandledRef.current = false;
+  };
+
+  runInicisCanceledFlowRef.current = runInicisCanceledFlow;
+
   const handleInicisPayment = async (inicisMethod = 'card') => {
     if (paymentInProgressRef.current || !hasCartItems) return;
     paymentInProgressRef.current = true;
@@ -1066,6 +1178,8 @@ export default function Checkout() {
     const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
     const orderNum = `BS-${datePart}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
     setOrderNumber(orderNum);
+    pendingInicisOidRef.current = orderNum;
+    inicisCancelHandledRef.current = false;
 
     const goodname = lineItems.map((li) => `${li.plan.name} x ${li.qty}`).join(', ').slice(0, 40);
     const planSummary = lineItems.map((li) => `${li.plan.name} x ${li.qty}`).join(', ');
@@ -1137,6 +1251,7 @@ export default function Checkout() {
       params = await res.json();
       if (!res.ok || params.error) {
         paymentInProgressRef.current = false;
+        pendingInicisOidRef.current = null;
         setSubmitting(false);
         alert(params.error || '결제 정보 생성에 실패했습니다. 다시 시도해 주세요.');
         return;
@@ -1144,6 +1259,7 @@ export default function Checkout() {
     } catch (e) {
       console.error('[카드결제] 결제 파라미터 요청 실패', e);
       paymentInProgressRef.current = false;
+      pendingInicisOidRef.current = null;
       setSubmitting(false);
       const isLocal = /localhost|127\.0\.0\.1/.test(window.location.origin);
       const msg = isLocal
@@ -1208,12 +1324,34 @@ export default function Checkout() {
           if (popups.some((p) => !p.closed)) return;
           window.clearInterval(payWindowMonitorRef.current);
           payWindowMonitorRef.current = null;
-          payInicisPopupsRef.current = [];
-          paymentInProgressRef.current = false;
-          setSubmitting(false);
-          unpatchInicisWindowOpen();
-          cleanupInicisPayUi();
-          setCurrentStep((s) => (s === 5 ? 5 : Math.max(s, 4)));
+          void runInicisCanceledFlow();
+        }, 400);
+      };
+
+      const startInicisLayerEndPoll = () => {
+        if (inicisLayerPollRef.current) {
+          window.clearInterval(inicisLayerPollRef.current);
+          inicisLayerPollRef.current = null;
+        }
+        let sawInicisHostUi = false;
+        const layerSelector =
+          'iframe[src*="inicis"], iframe[src*="stdpay"], iframe[src*="Inicis"], [id*="INIStd"], [id*="inicis"]';
+        inicisLayerPollRef.current = window.setInterval(() => {
+          if (!paymentInProgressRef.current) {
+            if (inicisLayerPollRef.current) {
+              window.clearInterval(inicisLayerPollRef.current);
+              inicisLayerPollRef.current = null;
+            }
+            return;
+          }
+          const layer = document.querySelector(layerSelector);
+          if (layer) sawInicisHostUi = true;
+          const popupsOpen = payInicisPopupsRef.current.some((w) => w && !w.closed);
+          if (sawInicisHostUi && !layer && !popupsOpen) {
+            window.clearInterval(inicisLayerPollRef.current);
+            inicisLayerPollRef.current = null;
+            void runInicisCanceledFlow();
+          }
         }, 400);
       };
 
@@ -1228,17 +1366,16 @@ export default function Checkout() {
           }
           queueMicrotask(scheduleUnpatchWindowOpen);
           startPayWindowMonitor();
+          startInicisLayerEndPoll();
           setSubmitting(false);
           window.setTimeout(() => {
-            if (!paymentInProgressRef.current || payInicisPopupsRef.current.length > 0) return;
+            if (!paymentInProgressRef.current || inicisCancelHandledRef.current) return;
+            if (payInicisPopupsRef.current.some((w) => w && !w.closed)) return;
             const maybeInicisLayer = document.querySelector(
               'iframe[src*="inicis"], iframe[src*="stdpay"], iframe[src*="Inicis"], [id*="inicis"], [id*="INIStd"]',
             );
             if (maybeInicisLayer) return;
-            paymentInProgressRef.current = false;
-            unpatchInicisWindowOpen();
-            cleanupInicisPayUi();
-            setSubmitting(false);
+            void runInicisCanceledFlow();
           }, 4500);
         };
         requestAnimationFrame(() => {
@@ -1258,6 +1395,11 @@ export default function Checkout() {
     } catch (e) {
       unpatchInicisWindowOpen();
       console.error(e);
+      if (inicisLayerPollRef.current) {
+        window.clearInterval(inicisLayerPollRef.current);
+        inicisLayerPollRef.current = null;
+      }
+      pendingInicisOidRef.current = null;
       await rollbackOrder(orderNum);
       paymentInProgressRef.current = false;
       setSubmitting(false);
