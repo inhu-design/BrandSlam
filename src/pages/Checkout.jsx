@@ -721,8 +721,9 @@ export default function Checkout() {
   const [verifyingPassword, setVerifyingPassword] = useState(false);
   const paymentInProgressRef = useRef(false);
   const invoicePreviewRef = useRef(null);
-  const payWindowRef = useRef(null);
+  const payInicisPopupsRef = useRef([]);
   const payWindowMonitorRef = useRef(null);
+  const inicisUnpatchWindowOpenRef = useRef(() => {});
   const checkoutResumeHydratedForUserRef = useRef(null);
   const prevCheckoutUserIdRef = useRef(undefined);
 
@@ -812,9 +813,18 @@ export default function Checkout() {
     const body = document.body;
     const html = document.documentElement;
     body.classList.remove('modal-open');
-    body.style.overflow = '';
-    body.style.paddingRight = '';
-    html.style.overflow = '';
+    html.classList.remove('modal-open');
+    const clearScrollLock = (el) => {
+      ['overflow', 'padding-right', 'position', 'top', 'left', 'right', 'bottom', 'width', 'height', 'touch-action'].forEach((prop) => {
+        try {
+          el.style.removeProperty(prop);
+        } catch {
+          /* ignore */
+        }
+      });
+    };
+    clearScrollLock(body);
+    clearScrollLock(html);
     document.querySelectorAll('.modal-backdrop').forEach((el) => el.remove());
   };
 
@@ -827,6 +837,9 @@ export default function Checkout() {
       /* 이니시스 내부 정리 실패 시에도 스크롤 복구는 진행 */
     }
     restorePageScroll();
+    window.setTimeout(restorePageScroll, 0);
+    window.setTimeout(restorePageScroll, 120);
+    window.setTimeout(restorePageScroll, 400);
   };
 
   useEffect(() => {
@@ -890,12 +903,13 @@ export default function Checkout() {
       if (e.data?.type === 'INICIS_PAYMENT_SUCCESS' && e.data?.order_number) {
         paymentInProgressRef.current = false;
         setSubmitting(false);
+        inicisUnpatchWindowOpenRef.current();
         cleanupInicisPayUi();
         if (payWindowMonitorRef.current) {
           window.clearInterval(payWindowMonitorRef.current);
           payWindowMonitorRef.current = null;
         }
-        payWindowRef.current = null;
+        payInicisPopupsRef.current = [];
         clearCheckoutResume(uid);
         setOrderNumber(e.data.order_number);
         setCurrentStep(5);
@@ -911,6 +925,7 @@ export default function Checkout() {
         window.clearInterval(payWindowMonitorRef.current);
         payWindowMonitorRef.current = null;
       }
+      inicisUnpatchWindowOpenRef.current();
       cleanupInicisPayUi();
     };
   }, []);
@@ -921,11 +936,30 @@ export default function Checkout() {
         restorePageScroll();
       }
     };
+    const handlePopState = () => {
+      if (paymentInProgressRef.current) {
+        inicisUnpatchWindowOpenRef.current();
+        cleanupInicisPayUi();
+        paymentInProgressRef.current = false;
+        setSubmitting(false);
+      } else {
+        restorePageScroll();
+      }
+    };
+    const handlePageShow = (e) => {
+      if (e.persisted) {
+        restorePageScroll();
+      }
+    };
     window.addEventListener('focus', handleFocusBack);
     document.addEventListener('visibilitychange', handleFocusBack);
+    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('pageshow', handlePageShow);
     return () => {
       window.removeEventListener('focus', handleFocusBack);
       document.removeEventListener('visibilitychange', handleFocusBack);
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('pageshow', handlePageShow);
     };
   }, []);
 
@@ -1122,6 +1156,7 @@ export default function Checkout() {
     // 2) orders 행은 결제 성공 후 서버 콜백에서만 생성. 초안은 payment-params가 checkout_drafts에 저장.
 
     // 3) 결제창 오픈. 실패하면 임시 초안(draft) 롤백
+    let unpatchInicisWindowOpen = () => {};
     try {
       const formId = 'inicis-pay-form';
       let formEl = document.getElementById(formId);
@@ -1145,40 +1180,70 @@ export default function Checkout() {
 
       document.body.appendChild(formEl);
 
-      let payWindow = null;
-      const originalOpen = window.open;
-      window.open = function (...args) {
-        payWindow = originalOpen.apply(this, args);
-        return payWindow;
+      const originalOpen = window.open.bind(window);
+      let inicisOpenPatched = false;
+      unpatchInicisWindowOpen = () => {
+        if (!inicisOpenPatched) return;
+        window.open = originalOpen;
+        inicisOpenPatched = false;
+      };
+      inicisUnpatchWindowOpenRef.current = unpatchInicisWindowOpen;
+      window.open = function inicisWindowOpenWrap(...args) {
+        const w = originalOpen(...args);
+        if (w) payInicisPopupsRef.current.push(w);
+        return w;
+      };
+      inicisOpenPatched = true;
+      const scheduleUnpatchWindowOpen = () => {
+        window.setTimeout(unpatchInicisWindowOpen, 700);
       };
 
-      const openInicisPay = () => {
-        window.INIStdPay.pay(formId);
-        payWindowRef.current = payWindow;
+      const startPayWindowMonitor = () => {
         if (payWindowMonitorRef.current) {
           window.clearInterval(payWindowMonitorRef.current);
         }
         payWindowMonitorRef.current = window.setInterval(() => {
-          const w = payWindowRef.current;
-          if (!w) return;
-          if (w.closed) {
-            window.clearInterval(payWindowMonitorRef.current);
-            payWindowMonitorRef.current = null;
-            payWindowRef.current = null;
-            paymentInProgressRef.current = false;
-            setSubmitting(false);
-            cleanupInicisPayUi();
-            setCurrentStep((s) => (s === 5 ? 5 : Math.max(s, 4)));
-          }
+          const popups = payInicisPopupsRef.current.filter(Boolean);
+          if (!popups.length) return;
+          if (popups.some((p) => !p.closed)) return;
+          window.clearInterval(payWindowMonitorRef.current);
+          payWindowMonitorRef.current = null;
+          payInicisPopupsRef.current = [];
+          paymentInProgressRef.current = false;
+          setSubmitting(false);
+          unpatchInicisWindowOpen();
+          cleanupInicisPayUi();
+          setCurrentStep((s) => (s === 5 ? 5 : Math.max(s, 4)));
         }, 400);
-        setSubmitting(false);
-        window.setTimeout(() => {
-          if (!payWindowRef.current) {
-            paymentInProgressRef.current = false;
-            cleanupInicisPayUi();
+      };
+
+      const openInicisPay = () => {
+        const runPay = () => {
+          payInicisPopupsRef.current = [];
+          try {
+            window.INIStdPay.pay(formId);
+          } catch (payErr) {
+            unpatchInicisWindowOpen();
+            throw payErr;
           }
-        }, 1200);
-        setTimeout(() => { window.open = originalOpen; }, 5000);
+          queueMicrotask(scheduleUnpatchWindowOpen);
+          startPayWindowMonitor();
+          setSubmitting(false);
+          window.setTimeout(() => {
+            if (!paymentInProgressRef.current || payInicisPopupsRef.current.length > 0) return;
+            const maybeInicisLayer = document.querySelector(
+              'iframe[src*="inicis"], iframe[src*="stdpay"], iframe[src*="Inicis"], [id*="inicis"], [id*="INIStd"]',
+            );
+            if (maybeInicisLayer) return;
+            paymentInProgressRef.current = false;
+            unpatchInicisWindowOpen();
+            cleanupInicisPayUi();
+            setSubmitting(false);
+          }, 4500);
+        };
+        requestAnimationFrame(() => {
+          requestAnimationFrame(runPay);
+        });
       };
 
       if (!window.INIStdPay) {
@@ -1191,6 +1256,7 @@ export default function Checkout() {
       }
 
     } catch (e) {
+      unpatchInicisWindowOpen();
       console.error(e);
       await rollbackOrder(orderNum);
       paymentInProgressRef.current = false;
