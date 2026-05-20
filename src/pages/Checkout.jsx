@@ -89,10 +89,10 @@ const PLANS = {
   [PG_TEST_PLAN_ID]: {
     id: PG_TEST_PLAN_ID,
     name: 'PG 결제 테스트',
-    price: '100',
-    priceNum: 91,
+    price: '1,000',
+    priceNum: 909,
     count: 1,
-    desc: 'KG이니시스 카드 승인 확인용 (VAT 포함 100원)',
+    desc: 'KG이니시스 카드 승인 확인용 (VAT 포함 1,000원)',
     hiddenFromPicker: true,
     isPgTest: true,
   },
@@ -1696,7 +1696,7 @@ export default function Checkout() {
             </h1>
             <p className="text-lg text-slate-300 leading-relaxed max-w-xl mx-auto">
               {isPgTestActive
-                ? 'KG이니시스 카드 승인 확인용 100원 테스트입니다. 결제 후 이니시스·대시보드에서 주문번호를 확인하세요.'
+                ? 'KG이니시스 카드 승인 확인용 1,000원 테스트입니다. 결제 후 이니시스·대시보드에서 주문번호를 확인하세요.'
                 : isDbCustomOfferActive
                   ? (dbCustomOffer?.title
                       ? `${dbCustomOffer.title} — 관리자 발급 개인 결제창입니다. 공급가에 부가세가 합산됩니다.`

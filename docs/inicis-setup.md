@@ -65,13 +65,13 @@ KG이니시스에 결제 신청 후 발급받은 **MID(상점아이디)** 와 **
 
 ---
 
-## 4. 카드 승인 테스트 (100원)
+## 4. 카드 승인 테스트 (1,000원)
 
 배포된 사이트에서 로그인 후 아래 주소로 이동합니다.
 
 - `https://www.slam-global.com/checkout?plan=PgTest`
 
-결제 금액은 **VAT 포함 100원**이며, 일반 요금제 선택 화면에는 노출되지 않습니다. **신용카드**로 결제한 뒤 이니시스 관리자·Supabase `orders`(paid)·Vercel `/api/inicis/payment-callback` 로그를 확인하세요.
+결제 금액은 **VAT 포함 1,000원**이며, 일반 요금제 선택 화면에는 노출되지 않습니다. (이니시스 최소 결제 금액 미만은 승인되지 않을 수 있음) **신용카드**로 결제한 뒤 이니시스 관리자·Supabase `orders`(paid)·Vercel `/api/inicis/payment-callback` 로그를 확인하세요.
 
 ---
 
