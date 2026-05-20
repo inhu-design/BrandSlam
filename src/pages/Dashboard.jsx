@@ -8,7 +8,7 @@ import {
   ChevronLeft, ChevronRight, Calendar, ExternalLink, Zap, Trash2, CheckCircle2, MoreHorizontal,
   Plane, Gift, TrendingUp, BarChart2, Trophy, RefreshCw, AlertTriangle, Download,
   FileText, CreditCard, Printer, Video, ShieldCheck, X, Rocket, ArrowRight, Building2, Info, UserX, RotateCcw,
-  ClipboardList, Upload, LayoutDashboard, Table2, FileSpreadsheet, PlusCircle, Receipt, ListChecks,
+  ClipboardList, Upload, LayoutDashboard, Table2, FileSpreadsheet, PlusCircle, Receipt, ListChecks, Landmark,
 } from 'lucide-react';
 import Navbar from '../components/layout/Navbar'; 
 import Footer from '../components/layout/Footer';
@@ -6021,6 +6021,7 @@ export default function Dashboard() {
   const [user, setUser] = useState(null);
   const [campaigns, setCampaigns] = useState([]);
   const [paidOrders, setPaidOrders] = useState([]);
+  const [pendingPaymentOrders, setPendingPaymentOrders] = useState([]);
   /** 관리자가 발급한 활성 개인 결제창 — 해당 이메일 유저 대시보드에만 노출 */
   const [myCustomPaymentOffers, setMyCustomPaymentOffers] = useState([]);
   const [selectedCampaignId, setSelectedCampaignId] = useState(null);
@@ -6189,12 +6190,19 @@ export default function Dashboard() {
               console.error('[Dashboard] enrich campaigns', err);
             });
 
-          const [ordersDataRes, offersRes] = await Promise.all([
+          const [ordersDataRes, pendingOrdersRes, offersRes] = await Promise.all([
             supabase
               .from('orders')
               .select('order_number, plan_name, plan_price, status, created_at')
               .eq('email', user.email)
               .eq('status', 'paid')
+              .order('created_at', { ascending: false })
+              .limit(20),
+            supabase
+              .from('orders')
+              .select('order_number, plan_name, plan_price, status, created_at')
+              .eq('email', user.email)
+              .eq('status', 'pending_payment')
               .order('created_at', { ascending: false })
               .limit(20),
             token0
@@ -6204,6 +6212,7 @@ export default function Dashboard() {
               : Promise.resolve(null),
           ]);
           setPaidOrders(ordersDataRes?.data || []);
+          setPendingPaymentOrders(pendingOrdersRes?.data || []);
 
           try {
             if (offersRes?.ok) {
@@ -6397,12 +6406,19 @@ export default function Dashboard() {
 
         setLoading(false);
 
-        const [ordersDataRes, offersRes] = await Promise.all([
+        const [ordersDataRes, pendingOrdersRes, offersRes] = await Promise.all([
           supabase
             .from('orders')
             .select('order_number, plan_name, plan_price, status, created_at')
             .eq('email', user.email)
             .eq('status', 'paid')
+            .order('created_at', { ascending: false })
+            .limit(20),
+          supabase
+            .from('orders')
+            .select('order_number, plan_name, plan_price, status, created_at')
+            .eq('email', user.email)
+            .eq('status', 'pending_payment')
             .order('created_at', { ascending: false })
             .limit(20),
           token0
@@ -6412,6 +6428,7 @@ export default function Dashboard() {
             : Promise.resolve(null),
         ]);
         setPaidOrders(ordersDataRes?.data || []);
+        setPendingPaymentOrders(pendingOrdersRes?.data || []);
 
         try {
           if (offersRes?.ok) {
@@ -7565,12 +7582,47 @@ export default function Dashboard() {
         </div>
         )}
 
+        {user && pendingPaymentOrders.length > 0 && (
+          <div className="mb-10 p-6 rounded-2xl relative z-10 border bg-amber-500/10 border-amber-500/20">
+            <h2 className="text-lg font-bold mb-2 flex items-center gap-2 text-amber-100">
+              <Landmark size={20} className="text-amber-400" /> 입금 확인 대기
+            </h2>
+            <p className="text-amber-200/70 text-sm mb-4">
+              무통장 입금 신청이 접수된 주문입니다. 입금 확인 후 결제 완료로 전환됩니다. (카드 PG 승인과 별개)
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b font-medium border-amber-500/20 text-amber-200/60">
+                    <th className="py-3 pr-4">주문번호</th>
+                    <th className="py-3 pr-4">상품명</th>
+                    <th className="py-3 pr-4">입금 예정액</th>
+                    <th className="py-3">신청일시</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingPaymentOrders.map((o) => (
+                    <tr key={o.order_number} className="border-b border-amber-500/10">
+                      <td className="py-3 pr-4 font-mono text-amber-100/80">{o.order_number}</td>
+                      <td className="py-3 pr-4 text-white">{o.plan_name}</td>
+                      <td className="py-3 pr-4 text-amber-300 font-semibold">
+                        {displayPaidOrderPlanPriceForViewer(o, user?.email).toLocaleString()}원
+                      </td>
+                      <td className="py-3 text-amber-200/50">{o.created_at ? new Date(o.created_at).toLocaleString('ko-KR') : '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {user && paidOrders.length > 0 && (
           <div className="mb-10 p-6 rounded-2xl relative z-10 border bg-white/[0.03] border-white/10">
             <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-white">
-              <CreditCard size={20} className="text-purple-500" /> 결제 내역
+              <CreditCard size={20} className="text-purple-500" /> 카드 결제 완료
             </h2>
-            <p className="text-slate-500 text-sm mb-4">KG이니시스 승인 건은 아래와 같습니다. 통합내역조회는 PG사 반영 후 일정이 소요될 수 있습니다.</p>
+            <p className="text-slate-500 text-sm mb-4">KG이니시스 카드 승인 후 결제 완료 처리된 주문입니다.</p>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>

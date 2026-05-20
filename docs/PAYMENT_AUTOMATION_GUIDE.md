@@ -8,7 +8,7 @@
 
 - **결제 흐름**: Checkout에서 주문 제출 시 `orders`(status: `pending_payment`), `campaigns`(status: `PAYMENT_PENDING`) 생성
 - **카드 결제**: 결제 완료 시 `payment-callback`에서 `orders`만 `paid`로 갱신 → 대시보드 송장·캠페인 세팅 → 세팅 완료 시 착수
-- **계좌이체**: 결제 완료 시 `confirm-bank-transfer`에서 `orders`만 `paid`로 갱신 → 대시보드 송장·캠페인 세팅 → 세팅 완료 시 착수
+- **무통장 입금**: `confirm-bank-transfer`에서 `orders`를 `pending_payment`로 생성 → 관리자 입금 확인 후 `paid` → 송장·캠페인 세팅
 
 ---
 
@@ -31,7 +31,7 @@
 |-----|------|
 | `/api/inicis/payment-params` | 결제창 호출용 파라미터 생성 |
 | `/api/inicis/payment-callback` | 결제 결과 수신 (returnUrl). 카드 성공 시 orders만 paid |
-| `/api/checkout/confirm-bank-transfer` | 계좌이체 결제 완료. orders만 paid |
+| `/api/checkout/confirm-bank-transfer` | 무통장 입금 신청. orders pending_payment (관리자가 paid로 전환) |
 
 ---
 

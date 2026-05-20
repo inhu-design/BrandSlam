@@ -79,9 +79,22 @@ const clearCheckoutResume = (userId) => {
   }
 };
 
+/** KG이니시스 카드 승인 테스트 — /checkout?plan=PgTest (일반 요금제 목록에 노출 안 함) */
+export const PG_TEST_PLAN_ID = 'PgTest';
+
 const PLANS = {
   Starter: { id: 'Starter', name: 'Starter', price: '590,000', priceNum: 590000, count: 10, desc: '콘텐츠 10개 보장' },
   Growth: { id: 'Growth', name: 'Growth', price: '990,000', priceNum: 990000, count: 20, desc: '콘텐츠 20개 보장', isBest: true },
+  [PG_TEST_PLAN_ID]: {
+    id: PG_TEST_PLAN_ID,
+    name: 'PG 결제 테스트',
+    price: '1,000',
+    priceNum: 909,
+    count: 1,
+    desc: 'KG이니시스 카드 승인 확인용 (VAT 포함 1,000원)',
+    hiddenFromPicker: true,
+    isPgTest: true,
+  },
   Scale50: { id: 'Scale50', name: 'Scale50', price: '2,390,000', priceNum: 2390000, count: 50, desc: '콘텐츠 50개 보장' },
   Visit: { id: 'Visit', name: 'Visit Content', pricePerPerson: 300000, isVisit: true, desc: '방문형 콘텐츠 · 인당 300,000원' },
   /** 개인 맞춤 결제 (The Frameless) — 요금제 선택 UI에 숨김 */
@@ -613,6 +626,10 @@ export default function Checkout() {
   );
 
   const isCheckoutCustomPayment = isCustomOfferActive || isDbCustomOfferActive;
+  const isPgTestActive = useMemo(
+    () => lineItems.some((li) => li.planId === PG_TEST_PLAN_ID),
+    [lineItems],
+  );
 
   const dbOfferStepBootRef = useRef(null);
 
@@ -692,6 +709,19 @@ export default function Checkout() {
     setCurrentStep(1);
   }, [authLoading, user, activeCustomPaymentOfferId, effectiveCheckoutState?.customOfferId, navigate]);
 
+  const pgTestStepBootRef = useRef(false);
+  useLayoutEffect(() => {
+    if (authLoading || !user) return;
+    const fromUrl = (queryPlan || '').trim() === PG_TEST_PLAN_ID;
+    if (!fromUrl && !isPgTestActive) return;
+    if (pgTestStepBootRef.current) return;
+    pgTestStepBootRef.current = true;
+    setCart([{ planId: PG_TEST_PLAN_ID, qty: 1 }]);
+    setPaymentMethod('card');
+    setCurrentStep(1);
+    setFurthestStepReached((f) => Math.max(f, 1));
+  }, [authLoading, user, queryPlan, isPgTestActive]);
+
   const hasExistingPassword = user?.user_metadata?.password_set === true;
   const [isSettingPassword, setIsSettingPassword] = useState(!hasExistingPassword);
 
@@ -715,9 +745,12 @@ export default function Checkout() {
   });
   const [orderNumber, setOrderNumber] = useState('');
   const [legalModal, setLegalModal] = useState(null);
-  const [paymentMethod, setPaymentMethod] = useState('bank'); // 'bank' | 'card'
-  const [bankOrderNumber, setBankOrderNumber] = useState(null); // 계좌이체: 입금 안내용 주문번호 (DB 미생성)
-  const [bankOrderPayload, setBankOrderPayload] = useState(null); // 입금 확인 시 서버에 전달할 주문 본문
+  const [paymentMethod, setPaymentMethod] = useState('card'); // 'card' | 'bank' (무통장)
+  const [bankOrderNumber, setBankOrderNumber] = useState(null); // 무통장: 입금 안내용 주문번호 (DB 미생성)
+  const [bankOrderPayload, setBankOrderPayload] = useState(null); // 입금 신청 시 서버에 전달할 주문 본문
+  const [bankDepositAcknowledged, setBankDepositAcknowledged] = useState(false);
+  /** step 5 완료 화면 구분: 무통장 입금 대기 vs 관리자 스킵 */
+  const [checkoutCompleteKind, setCheckoutCompleteKind] = useState(null); // null | 'bank_pending' | 'admin_skip'
   const [verifyingPassword, setVerifyingPassword] = useState(false);
   const paymentInProgressRef = useRef(false);
   const invoicePreviewRef = useRef(null);
@@ -1148,7 +1181,7 @@ export default function Checkout() {
     restorePageScroll();
     window.scrollTo(0, 0);
 
-    if (isCheckoutCustomPayment) {
+    if (isCheckoutCustomPayment || isPgTestActive) {
       setCurrentStep(1);
       setFurthestStepReached(1);
     } else {
@@ -1464,6 +1497,7 @@ export default function Checkout() {
       setOrderNumber(orderNum);
       setBankOrderNumber(orderNum);
       setBankOrderPayload(bankPayload);
+      setBankDepositAcknowledged(false);
     } catch (e) {
       console.error(e);
       alert('처리에 실패했습니다. 다시 시도해 주세요.');
@@ -1475,6 +1509,16 @@ export default function Checkout() {
 
   const handleConfirmBankTransfer = async () => {
     if (!bankOrderNumber || !bankOrderPayload || submitting) return;
+    if (!bankDepositAcknowledged) {
+      alert('법인계좌로 입금을 완료한 뒤 체크박스를 선택해 주세요.');
+      return;
+    }
+    const ok = window.confirm(
+      `주문번호 ${bankOrderNumber}\n\n` +
+        '무통장 입금 신청을 접수합니다. 실제 입금이 확인되기 전까지는 결제 완료(카드 승인)로 처리되지 않습니다.\n' +
+        '입금자명·금액이 일치하는지 다시 확인해 주세요.',
+    );
+    if (!ok) return;
     setSubmitting(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -1500,11 +1544,13 @@ export default function Checkout() {
         return;
       }
       if (!res.ok) {
-        const msg = data?.error || '결제 완료 처리에 실패했습니다.';
+        const msg = data?.error || '입금 신청 접수에 실패했습니다.';
         alert(msg);
         setSubmitting(false);
         return;
       }
+      setOrderNumber(bankOrderNumber);
+      setCheckoutCompleteKind('bank_pending');
       setCurrentStep(5);
     } catch (e) {
       console.error('[결제 완료]', e);
@@ -1566,6 +1612,7 @@ export default function Checkout() {
         alert(data.error || '결제 스킵에 실패했습니다.');
         return;
       }
+      setCheckoutCompleteKind('admin_skip');
       setCurrentStep(5);
     } catch (e) {
       console.error(e);
@@ -1610,7 +1657,7 @@ export default function Checkout() {
 
   const goPrev = () => setCurrentStep((s) => {
     const next = Math.max(0, s - 1);
-    if ((isCustomOfferActive || isDbCustomOfferActive) && next === 0) return 1;
+    if ((isCustomOfferActive || isDbCustomOfferActive || isPgTestActive) && next === 0) return 1;
     return next;
   });
 
@@ -1653,7 +1700,7 @@ export default function Checkout() {
     if (idx === currentStep) return;
     if (idx > furthestStepReached) return;
     if (idx >= 1 && !hasCartItems) return;
-    if (idx === 0 && (isCustomOfferActive || isDbCustomOfferActive)) return;
+    if (idx === 0 && (isCustomOfferActive || isDbCustomOfferActive || isPgTestActive)) return;
     setCurrentStep(idx);
   };
 
@@ -1674,17 +1721,28 @@ export default function Checkout() {
               </div>
             </div>
             <h1 className="text-3xl md:text-5xl font-black tracking-tight mb-4">
-              {isCheckoutCustomPayment ? '맞춤 견적 결제' : '빠른 구매'}
+              {isPgTestActive
+                ? 'PG 카드 결제 테스트'
+                : isCheckoutCustomPayment
+                  ? '맞춤 견적 결제'
+                  : '빠른 구매'}
             </h1>
             <p className="text-lg text-slate-300 leading-relaxed max-w-xl mx-auto">
-              {isDbCustomOfferActive
-                ? (dbCustomOffer?.title
-                    ? `${dbCustomOffer.title} — 관리자 발급 개인 결제창입니다. 공급가에 부가세가 합산됩니다.`
-                    : '관리자가 발급한 개인 결제창입니다. 수량·단가는 계약과 동일하며, 공급가에 부가세가 합산됩니다.')
-                : isCustomOfferActive
+              {isPgTestActive
+                ? 'KG이니시스 카드 승인 확인용 1,000원 테스트입니다. 결제 후 이니시스·대시보드에서 주문번호를 확인하세요.'
+                : isDbCustomOfferActive
+                  ? (dbCustomOffer?.title
+                      ? `${dbCustomOffer.title} — 관리자 발급 개인 결제창입니다. 공급가에 부가세가 합산됩니다.`
+                      : '관리자가 발급한 개인 결제창입니다. 수량·단가는 계약과 동일하며, 공급가에 부가세가 합산됩니다.')
+                  : isCustomOfferActive
                   ? 'The Frameless 맞춤 견적(시딩(건당))에 대한 결제입니다. 공급가에 부가세가 합산됩니다.'
                   : '원하는 플랜을 선택하고, 간편하게 시작하세요'}
             </p>
+            {isPgTestActive && (
+              <p className="mt-4 text-sm text-cyan-300/90 font-mono bg-cyan-500/10 border border-cyan-500/20 rounded-xl px-4 py-2 inline-block">
+                /checkout?plan=PgTest · {totalPrice.toLocaleString()}원 (VAT 포함)
+              </p>
+            )}
           </div>
 
           {/* Progress bar - always visible */}
@@ -2134,29 +2192,39 @@ export default function Checkout() {
                       : 'bg-white/[0.04] border-white/10 text-slate-400 hover:border-white/20'
                   }`}
                 >
-                  <Landmark size={20} /> 실시간 계좌이체
+                  <Landmark size={20} /> 법인계좌 무통장
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setPaymentMethod('card'); setBankOrderNumber(null); setBankOrderPayload(null); }}
+                  onClick={() => {
+                    setPaymentMethod('card');
+                    setBankOrderNumber(null);
+                    setBankOrderPayload(null);
+                    setBankDepositAcknowledged(false);
+                  }}
                   className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl font-bold border-2 transition-all ${
                     paymentMethod === 'card'
                       ? 'bg-purple-500/20 border-purple-500 text-purple-300'
                       : 'bg-white/[0.04] border-white/10 text-slate-400 hover:border-white/20'
                   }`}
                 >
-                  <CreditCard size={20} /> 신용카드
+                  <CreditCard size={20} /> 신용카드 (KG이니시스)
                 </button>
               </div>
 
               {paymentMethod === 'bank' && !bankOrderNumber && (
                 <div className="bg-white/[0.04] rounded-2xl p-5 mb-8 border border-white/10">
-                  <p className="text-sm text-slate-400">아래 버튼을 누르면 입금할 법인계좌 정보가 표시됩니다. 입금 후 결제 완료 버튼을 눌러 주세요.</p>
+                  <p className="text-sm text-amber-100/90 leading-relaxed">
+                    카드가 아닌 <strong className="text-amber-50">법인계좌 입금</strong>입니다. PG 승인 없이 입금 확인 후 처리됩니다. 즉시 결제는 <strong className="text-white">신용카드</strong>를 선택해 주세요.
+                  </p>
                 </div>
               )}
               {paymentMethod === 'bank' && bankOrderNumber && (
                 <div className="bg-white/[0.04] rounded-2xl p-6 mb-8 border border-white/10 space-y-4">
-                  <p className="text-sm text-slate-400">아래 계좌로 결제 금액을 입금해 주신 뒤, 입금이 완료되면 <strong className="text-white">결제 완료</strong> 버튼을 눌러 주세요.</p>
+                  <p className="text-sm text-slate-400">
+                    아래 계좌로 입금한 뒤 입금 신청을 접수해 주세요. 입금 확인 전까지는{' '}
+                    <strong className="text-white">결제 완료(카드·PG 승인)</strong>로 처리되지 않습니다.
+                  </p>
                   <div className="p-5 bg-slate-900/50 rounded-xl border border-white/10">
                     <p className="text-xs text-slate-500 mb-2 font-bold uppercase tracking-wider">입금 계좌</p>
                     <p className="font-bold text-lg text-white flex items-center gap-2">
@@ -2164,7 +2232,20 @@ export default function Checkout() {
                     </p>
                     <p className="text-sm text-slate-400 mt-1">예금주: 주식회사 브랜드슬램</p>
                     <p className="text-sm text-purple-400 font-bold mt-3">{totalPrice.toLocaleString()}원</p>
+                    <p className="text-xs text-slate-500 mt-3 font-mono">입금 시 주문번호: {bankOrderNumber}</p>
                   </div>
+                  <label className="flex items-start gap-3 cursor-pointer text-sm text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={bankDepositAcknowledged}
+                      onChange={(e) => setBankDepositAcknowledged(e.target.checked)}
+                      className="mt-1 rounded border-white/20"
+                    />
+                    <span>
+                      위 계좌로 <strong className="text-white">{totalPrice.toLocaleString()}원</strong>을 입금했으며,
+                      입금 확인 후 서비스가 시작됨을 이해합니다.
+                    </span>
+                  </label>
                 </div>
               )}
 
@@ -2197,10 +2278,10 @@ export default function Checkout() {
                   bankOrderNumber ? (
                     <button
                       onClick={handleConfirmBankTransfer}
-                      disabled={submitting}
-                      className="flex-1 py-4 rounded-2xl font-bold text-lg bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:-translate-y-0.5 shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-50"
+                      disabled={submitting || !bankDepositAcknowledged}
+                      className="flex-1 py-4 rounded-2xl font-bold text-lg bg-gradient-to-r from-amber-600 to-amber-700 text-white hover:-translate-y-0.5 shadow-lg shadow-amber-600/20 transition-all disabled:opacity-50"
                     >
-                      {submitting ? '처리 중...' : '결제 완료'}
+                      {submitting ? '처리 중...' : '입금 신청 접수'}
                     </button>
                   ) : (
                     <button
@@ -2208,7 +2289,7 @@ export default function Checkout() {
                       disabled={submitting}
                       className="flex-1 py-4 rounded-2xl font-bold text-lg bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:-translate-y-0.5 shadow-lg shadow-purple-500/20 transition-all disabled:opacity-50"
                     >
-                      {submitting ? '처리 중...' : '계좌이체 안내보기'}
+                      {submitting ? '처리 중...' : '입금 계좌 안내'}
                     </button>
                   )
                 ) : (
@@ -2246,9 +2327,20 @@ export default function Checkout() {
                     <CheckCircle2 size={40} className="text-green-400" />
                   </div>
                 </div>
-                <h2 className="text-2xl font-black text-white mb-3">주문이 접수되었습니다!</h2>
+                <h2 className="text-2xl font-black text-white mb-3">
+                  {checkoutCompleteKind === 'bank_pending' ? '입금 확인 대기 중입니다' : '주문이 접수되었습니다!'}
+                </h2>
                 <p className="text-slate-400 leading-relaxed">
-                  결제가 완료되었습니다. 캠페인 대시보드에서 다음 단계를 진행해 주세요.
+                  {checkoutCompleteKind === 'bank_pending' ? (
+                    <>
+                      무통장 입금 신청이 접수되었습니다. 입금 확인 후 결제 완료로 전환되며, 그 전까지는 카드(PG) 승인이
+                      완료된 것이 아닙니다.
+                      <br />
+                      <span className="text-amber-200/90">입금 계좌: SC제일은행 325-20-322490 (주식회사 브랜드슬램)</span>
+                    </>
+                  ) : (
+                    '결제가 완료되었습니다. 캠페인 대시보드에서 다음 단계를 진행해 주세요.'
+                  )}
                 </p>
               </div>
 

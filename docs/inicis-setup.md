@@ -51,7 +51,17 @@ KG이니시스에 결제 신청 후 발급받은 **MID(상점아이디)** 와 **
 
 ---
 
-## 4. 테스트 환경(스테이징)
+## 4. 카드 승인 테스트 (1,000원)
+
+배포된 사이트에서 로그인 후 아래 주소로 이동합니다.
+
+- `https://www.slam-global.com/checkout?plan=PgTest`
+
+결제 금액은 **VAT 포함 1,000원**이며, 일반 요금제 선택 화면에는 노출되지 않습니다. **신용카드**로 결제한 뒤 이니시스 관리자·Supabase `orders`(paid)·Vercel `/api/inicis/payment-callback` 로그를 확인하세요.
+
+---
+
+## 5. 테스트 환경(스테이징)
 
 - 이니시스 **테스트 MID**를 쓰는 경우 결제창 요청 URL이 **스테이징**일 수 있습니다.
 - 현재 코드는 **운영** URL 기준: `https://stdpay.inicis.com/stdpay/INIStdPay.php`

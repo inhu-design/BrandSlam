@@ -1,8 +1,8 @@
 /**
- * 계좌이체 결제 완료 확인
+ * 무통장 입금 신청 접수 (입금 확인 전 pending_payment — 관리자가 입금 확인 후 paid)
  * - POST /api/checkout/confirm-bank-transfer
  * - Body: { order_number } + Authorization: Bearer <Supabase JWT>
- * - 주문 이메일과 로그인 사용자 이메일 일치 시 orders만 paid로 갱신 (campaigns는 PAYMENT_PENDING 유지 → 송장·캠페인 세팅 후 착수)
+ * - 주문 이메일과 로그인 사용자 이메일 일치 시 orders를 pending_payment로 생성/유지 (campaigns PAYMENT_PENDING)
  */
 import { createClient } from '@supabase/supabase-js';
 import { supabase as supabaseAdmin } from '../lib/supabase-server.js';
@@ -102,7 +102,7 @@ export default async function handler(req, res) {
       name: orderPayload.name,
       phone: orderPayload.phone,
       company: orderPayload.company || '',
-      status: 'paid',
+      status: 'pending_payment',
       user_id: user.id,
       client_address: orderPayload.client_address ?? null,
       client_biz_reg_no: orderPayload.client_biz_reg_no ?? null,
@@ -131,6 +131,10 @@ export default async function handler(req, res) {
   }
 
   if (order.status === 'paid') {
+    return res.status(200).json({ ok: true, order_number: orderNumber, status: 'paid' });
+  }
+
+  if (order.status === 'pending_payment') {
     const orderItems = Array.isArray(order.order_items) ? order.order_items : [];
     const userId = order.user_id || user.id;
     if (userId && orderItems.length > 0) {
@@ -160,7 +164,7 @@ export default async function handler(req, res) {
         }
       }
     }
-    return res.status(200).json({ ok: true, order_number: orderNumber });
+    return res.status(200).json({ ok: true, order_number: orderNumber, status: 'pending_payment' });
   }
 
   try {
@@ -189,8 +193,8 @@ export default async function handler(req, res) {
         }
       }
     }
-    await supabaseAdmin.from('orders').update({ status: 'paid' }).eq('order_number', orderNumber);
-    return res.status(200).json({ ok: true, order_number: orderNumber });
+    await supabaseAdmin.from('orders').update({ status: 'pending_payment' }).eq('order_number', orderNumber);
+    return res.status(200).json({ ok: true, order_number: orderNumber, status: 'pending_payment' });
   } catch (err) {
     console.error('[confirm-bank-transfer]', err);
     return res.status(500).json({ error: String(err.message) });
