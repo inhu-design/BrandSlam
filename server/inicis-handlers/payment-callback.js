@@ -20,10 +20,17 @@ function isPayApproved(pay) {
   return INICIS_SUCCESS_RESULT_CODES.has(pay.resultCode) && Boolean(pay.tid);
 }
 
-export default async function handler(req, res) {
+function redirectResult(res, params) {
+  const q = new URLSearchParams(params);
+  const orderId = params.order_number || '';
+  const resultPath = String(orderId).startsWith('CPM-') ? '/cpm/result' : '/checkout/result';
+  res.setHeader('Location', `${baseUrl}${resultPath}?${q.toString()}`);
+  return res.status(302).end();
+}
+
+async function handleInicisPaymentCallback(req, res) {
   if (req.method !== 'POST' && req.method !== 'GET') {
-    res.setHeader('Location', `${baseUrl}/checkout/result?success=0&msg=invalid_method`);
-    return res.status(302).end();
+    return redirectResult(res, { order_number: '', success: '0', msg: 'invalid_method' });
   }
 
   const rawBody = parseInicisCallbackBody(req);
@@ -48,14 +55,23 @@ export default async function handler(req, res) {
     } else if (!INICIS_MID || !INICIS_SIGNKEY) {
       console.error('[inicis payment-callback] missing MID/SIGNKEY for approval');
       pay = { ...pay, resultCode: 'CONFIG', resultMsg: '결제 설정 오류', tid: '' };
+    } else if (authStep.mid && authStep.mid !== INICIS_MID) {
+      console.error('[inicis payment-callback] MID mismatch', { envMid: INICIS_MID, callbackMid: authStep.mid });
+      pay = { ...pay, resultCode: 'MID_MISMATCH', resultMsg: '상점 ID 설정 불일치', tid: '' };
     } else {
+      let approvalPrice = authStep.price;
+      if (!approvalPrice && orderId && supabase) {
+        const { data: draftRow } = await supabase.from('checkout_drafts').select('payload').eq('oid', orderId).maybeSingle();
+        const p = draftRow?.payload;
+        if (p?.plan_price != null) approvalPrice = String(Number(p.plan_price));
+      }
       try {
         const approvalRaw = await requestInicisApproval({
-          mid: INICIS_MID || authStep.mid,
+          mid: INICIS_MID,
           signKey: INICIS_SIGNKEY,
           authToken: authStep.authToken,
           authUrl: authStep.authUrl,
-          price: authStep.price || undefined,
+          price: approvalPrice || undefined,
         });
         pay = extractInicisPayResult(approvalRaw);
         orderId = pay.orderId || orderId;
@@ -179,15 +195,27 @@ export default async function handler(req, res) {
     }
   }
 
-  const q = new URLSearchParams({
+  const redirectParams = {
     order_number: orderId || '',
     success: isSuccess ? '1' : '0',
-  });
-  if (resultMsg) q.set('msg', resultMsg);
-  if (tid && isSuccess) q.set('tid', tid);
-  if (pay.applNum && isSuccess) q.set('appl_num', pay.applNum);
+  };
+  if (resultMsg) redirectParams.msg = resultMsg;
+  if (tid && isSuccess) redirectParams.tid = tid;
+  if (pay.applNum && isSuccess) redirectParams.appl_num = pay.applNum;
 
-  const resultPath = (orderId || '').startsWith('CPM-') ? '/cpm/result' : '/checkout/result';
-  res.setHeader('Location', `${baseUrl}${resultPath}?${q.toString()}`);
-  return res.status(302).end();
+  return redirectResult(res, redirectParams);
+}
+
+/** 이니시스 returnUrl — 항상 302 리다이렉트 (500이면 PG·브라우저가 실패로 볼 수 있음) */
+export default async function handler(req, res) {
+  try {
+    return await handleInicisPaymentCallback(req, res);
+  } catch (err) {
+    console.error('[inicis payment-callback] unhandled', err);
+    return redirectResult(res, {
+      order_number: '',
+      success: '0',
+      msg: '서버 처리 오류',
+    });
+  }
 }
