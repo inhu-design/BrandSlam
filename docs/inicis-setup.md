@@ -26,9 +26,23 @@ KG이니시스에 결제 신청 후 발급받은 **MID(상점아이디)** 와 **
 | `INICIS_MID` | 이니시스 관리자 **계약정보/상점정보**에서 확인한 **상점ID** (MID) |
 | `INICIS_SIGNKEY` | 이니시스 **KEY 정보** → **웹결제 Sign Key** 조회해서 복사한 값 |
 
-3. (선택) 결제 결과 리다이렉트 기준 URL이 `https://www.slam-global.com` 이 아니면  
-   `INICIS_RETURN_BASE_URL` = `https://실제도메인` 추가
-4. **저장** 후 **Deployments**에서 **Redeploy** (최신 배포 기준으로 재배포)
+3. (선택) 사이트 도메인이 `https://www.slam-global.com` 이 아니면  
+   `INICIS_RETURN_BASE_URL` = `https://www.slam-global.com` 처럼 **우리 사이트 루트만** (끝에 `/api/...` 붙이지 않음)
+4. **저장** 후 **Deployments**에서 **Redeploy**
+
+### 환경 변수 — 넣지 말 것 / 헷갈리기 쉬운 것
+
+| 변수 | 운영(실 MID)에서 |
+|------|------------------|
+| `INICIS_PAYMENT_URL` | **설정하지 않음** (코드가 `stdpay` 상용 URL·JS를 자동 사용) |
+| `INICIS_RETURN_BASE_URL` | **우리 도메인만** — `https://stdpay.inicis.com/...` 넣으면 안 됨 |
+
+결제 완료 후 이니시스가 호출하는 주소는 코드가 자동으로 만듭니다:  
+`{INICIS_RETURN_BASE_URL}/api/inicis/payment-callback`  
+예: `https://www.slam-global.com/api/inicis/payment-callback`
+
+`INICIS_RETURN_BASE_URL`에 이니시스 `INIStdPay.php` 주소를 넣으면 브라우저가  
+`https://stdpay.inicis.com/stdpay/INIStdPay.php/api/inicis/payment-callback` 로 가서 **404**가 납니다.
 
 ---
 
@@ -61,16 +75,18 @@ KG이니시스에 결제 신청 후 발급받은 **MID(상점아이디)** 와 **
 
 ---
 
-## 5. 테스트 환경(스테이징)
+## 5. 테스트 MID (`INIpayTest`)
 
-- 이니시스 **테스트 MID**를 쓰는 경우 결제창 요청 URL이 **스테이징**일 수 있습니다.
-- 현재 코드는 **운영** URL 기준: `https://stdpay.inicis.com/stdpay/INIStdPay.php`
-- 스테이징용 URL로 바꿔야 하면 `src/pages/Checkout.jsx` 안 `handleCardPayment`의 `formEl.action` 값을 스테이징 주소로 수정하면 됩니다. (이니시스 매뉴얼 참고)
+테스트 MID만 쓸 때는 코드가 자동으로 `stgstdpay` 스크립트를 씁니다. 운영 MID + `INICIS_PAYMENT_URL` 수동 설정은 하지 마세요.
 
 ---
 
-## 5. 문제 해결
+## 6. 문제 해결
 
+- **「실 MID는 테스트 JS로 요청이 불가합니다」**  
+  - Vercel `INICIS_PAYMENT_URL`에 `stgstdpay`가 들어가 있으면 삭제 후 재배포 (운영 MID는 상용 JS만 사용)
+- **이니시스 사이트에서 404, URL에 `INIStdPay.php/api/inicis/payment-callback`**  
+  - `INICIS_RETURN_BASE_URL`을 이니시스 주소가 아닌 **우리 사이트**로 수정하거나, 잘못 넣었다면 **삭제**(기본값 `https://www.slam-global.com` 사용)
 - **결제창이 안 뜨거나 "결제 정보 생성에 실패했습니다"**  
   - `INICIS_MID`, `INICIS_SIGNKEY` 환경 변수 설정 여부 확인  
   - 재배포 후 다시 시도

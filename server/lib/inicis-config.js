@@ -17,18 +17,29 @@ export function isInicisTestMid(mid) {
 
 /** @param {string} mid */
 export function resolveInicisPayScriptUrl(mid) {
-  const envUrl = (process.env.INICIS_PAYMENT_URL || '').trim();
-  if (envUrl.includes('stgstdpay.inicis.com')) return STG_SCRIPT;
   if (isInicisTestMid(mid)) return STG_SCRIPT;
   return PROD_SCRIPT;
 }
 
 /** @param {string} mid */
 export function resolveInicisPaymentUrl(mid) {
-  const envUrl = (process.env.INICIS_PAYMENT_URL || '').trim();
-  if (envUrl) return envUrl.replace(/\/$/, '');
-  if (isInicisTestMid(mid)) return STG_PAY;
+  if (isInicisTestMid(mid)) {
+    const envUrl = (process.env.INICIS_PAYMENT_URL || '').trim();
+    if (envUrl) return envUrl.replace(/\/$/, '');
+    return STG_PAY;
+  }
   return PROD_PAY;
+}
+
+/** @param {string} base INICIS_RETURN_BASE_URL */
+export function assertInicisReturnBaseUrl(base) {
+  const b = String(base || '').trim().toLowerCase();
+  if (!b) return;
+  if (b.includes('inicis.com')) {
+    throw new Error(
+      'INICIS_RETURN_BASE_URL must be your website (e.g. https://www.slam-global.com), not KG Inicis stdpay URL.',
+    );
+  }
 }
 
 export const INICIS_SUCCESS_RESULT_CODES = new Set(['00', '0000']);
