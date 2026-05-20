@@ -10,10 +10,10 @@ import { assertFramelessOfferPrice } from '../lib/custom-offers.js';
 import { assertDbCustomPaymentOfferPrice } from '../lib/db-custom-payment-offers.js';
 import { assertCpmOrderPrice } from '../lib/assert-cpm-order-price.js';
 import {
-  assertInicisReturnBaseUrl,
   isInicisTestMid,
   resolveInicisPaymentUrl,
   resolveInicisPayScriptUrl,
+  resolveInicisReturnBaseUrl,
 } from '../lib/inicis-config.js';
 
 const INICIS_MID = process.env.INICIS_MID || '';
@@ -50,15 +50,7 @@ export default async function handler(req, res) {
     });
   }
 
-  const base = (process.env.INICIS_RETURN_BASE_URL || 'https://www.slam-global.com').replace(/\/$/, '');
-  try {
-    assertInicisReturnBaseUrl(base);
-  } catch (e) {
-    return res.status(500).json({
-      error:
-        'INICIS_RETURN_BASE_URL must be your site (https://www.slam-global.com). Do not set it to stdpay.inicis.com. Remove wrong env vars and redeploy.',
-    });
-  }
+  const base = resolveInicisReturnBaseUrl(process.env.INICIS_RETURN_BASE_URL);
   let closeUrlOverride = `${base}/checkout`;
 
   if (orderDraft != null && typeof orderDraft === 'object') {

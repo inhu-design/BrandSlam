@@ -31,6 +31,8 @@ export function resolveInicisPaymentUrl(mid) {
   return PROD_PAY;
 }
 
+export const INICIS_DEFAULT_RETURN_BASE = 'https://www.slam-global.com';
+
 /** @param {string} base INICIS_RETURN_BASE_URL */
 export function assertInicisReturnBaseUrl(base) {
   const b = String(base || '').trim().toLowerCase();
@@ -39,6 +41,23 @@ export function assertInicisReturnBaseUrl(base) {
     throw new Error(
       'INICIS_RETURN_BASE_URL must be your website (e.g. https://www.slam-global.com), not KG Inicis stdpay URL.',
     );
+  }
+}
+
+/** @param {string | undefined} envValue process.env.INICIS_RETURN_BASE_URL */
+export function resolveInicisReturnBaseUrl(envValue) {
+  const raw = String(envValue || '').trim();
+  const candidate = (raw || INICIS_DEFAULT_RETURN_BASE).replace(/\/$/, '');
+  try {
+    assertInicisReturnBaseUrl(candidate);
+    return candidate;
+  } catch {
+    console.warn(
+      '[inicis] invalid INICIS_RETURN_BASE_URL — ignored, using default',
+      INICIS_DEFAULT_RETURN_BASE,
+      { configured: raw || null },
+    );
+    return INICIS_DEFAULT_RETURN_BASE;
   }
 }
 

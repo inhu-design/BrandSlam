@@ -5,14 +5,9 @@
  */
 import { supabase } from '../lib/supabase-server.js';
 import { buildCampaignRowsFromOrderItems } from '../lib/build-campaign-rows-from-order-items.js';
-import { assertInicisReturnBaseUrl, INICIS_SUCCESS_RESULT_CODES } from '../lib/inicis-config.js';
+import { INICIS_SUCCESS_RESULT_CODES, resolveInicisReturnBaseUrl } from '../lib/inicis-config.js';
 
-const baseUrl = (process.env.INICIS_RETURN_BASE_URL || 'https://www.slam-global.com').replace(/\/$/, '');
-try {
-  assertInicisReturnBaseUrl(baseUrl);
-} catch {
-  console.error('[inicis payment-callback] invalid INICIS_RETURN_BASE_URL — must be your site, not inicis.com');
-}
+const baseUrl = resolveInicisReturnBaseUrl(process.env.INICIS_RETURN_BASE_URL);
 
 function parseBody(req) {
   const contentType = (req.headers['content-type'] || '').toLowerCase();
