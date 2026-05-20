@@ -1,27 +1,23 @@
 /**
  * KG이니시스 결제 결과 수신 (returnUrl)
- * - 이니시스가 결제 완료 후 이 URL로 POST
- * - resultCode "00" 또는 "0000" 등 성공 시 orders만 paid로 갱신 (campaigns는 PAYMENT_PENDING 유지 → 송장·캠페인 세팅 후 착수)
+ * STEP2 인증결과 수신 → STEP3 authUrl 승인요청 → STEP4 승인결과(tid) 기준으로 주문 paid 처리
  */
 import { supabase } from '../lib/supabase-server.js';
 import { buildCampaignRowsFromOrderItems } from '../lib/build-campaign-rows-from-order-items.js';
 import { INICIS_SUCCESS_RESULT_CODES, resolveInicisReturnBaseUrl } from '../lib/inicis-config.js';
+import {
+  extractInicisAuthStep,
+  extractInicisPayResult,
+  parseInicisCallbackBody,
+  requestInicisApproval,
+} from '../lib/inicis-approval.js';
 
 const baseUrl = resolveInicisReturnBaseUrl(process.env.INICIS_RETURN_BASE_URL);
+const INICIS_MID = process.env.INICIS_MID || '';
+const INICIS_SIGNKEY = process.env.INICIS_SIGNKEY || '';
 
-function parseBody(req) {
-  const contentType = (req.headers['content-type'] || '').toLowerCase();
-  if (contentType.includes('application/json')) {
-    return typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-  }
-  if (contentType.includes('application/x-www-form-urlencoded') || contentType.includes('multipart')) {
-    if (typeof req.body === 'string') {
-      const params = new URLSearchParams(req.body);
-      return Object.fromEntries(params.entries());
-    }
-    return req.body || {};
-  }
-  return typeof req.body === 'string' ? {} : (req.body || {});
+function isPayApproved(pay) {
+  return INICIS_SUCCESS_RESULT_CODES.has(pay.resultCode) && Boolean(pay.tid);
 }
 
 export default async function handler(req, res) {
@@ -30,25 +26,67 @@ export default async function handler(req, res) {
     return res.status(302).end();
   }
 
-  const body = req.method === 'GET' ? (req.query || {}) : parseBody(req);
-  const resultCode = (body.resultCode || body.resultcode || body.RESULT_CODE || body.result_code || '').toString().trim();
-  const orderId = (body.MOID || body.moid || body.orderNumber || body.oid || body.order_number || body.OID || '').toString().trim();
-  const isSuccess = INICIS_SUCCESS_RESULT_CODES.has(resultCode);
-  const tid = (body.tid || body.TID || '').toString().trim();
-  const totPrice = (body.TotPrice || body.totPrice || body.price || '').toString().trim();
+  const rawBody = parseInicisCallbackBody(req);
+  const authStep = extractInicisAuthStep(rawBody);
 
-  console.info('[inicis payment-callback]', {
+  let pay = extractInicisPayResult(rawBody);
+  let orderId = pay.orderId || authStep.orderId;
+
+  console.info('[inicis payment-callback] auth', {
     method: req.method,
-    resultCode,
-    resultMsg: body.resultMsg || body.resultmsg || '',
-    orderId,
-    tid: tid || null,
-    totPrice: totPrice || null,
-    payMethod: body.payMethod || body.PAYMETHOD || null,
-    isSuccess,
+    resultCode: authStep.resultCode,
+    resultMsg: authStep.resultMsg || null,
+    orderId: orderId || null,
+    hasAuthToken: Boolean(authStep.authToken),
+    hasAuthUrl: Boolean(authStep.authUrl),
+    idcName: authStep.idcName || null,
   });
 
-  // 결제 실패·취소: 임시 초안만 제거 (orders 행은 없음); CPM은 대기 상태 제거
+  if (authStep.authToken && authStep.authUrl) {
+    if (!INICIS_SUCCESS_RESULT_CODES.has(authStep.resultCode)) {
+      pay = { ...pay, resultCode: authStep.resultCode, resultMsg: authStep.resultMsg, tid: '' };
+    } else if (!INICIS_MID || !INICIS_SIGNKEY) {
+      console.error('[inicis payment-callback] missing MID/SIGNKEY for approval');
+      pay = { ...pay, resultCode: 'CONFIG', resultMsg: '결제 설정 오류', tid: '' };
+    } else {
+      try {
+        const approvalRaw = await requestInicisApproval({
+          mid: INICIS_MID || authStep.mid,
+          signKey: INICIS_SIGNKEY,
+          authToken: authStep.authToken,
+          authUrl: authStep.authUrl,
+          price: authStep.price || undefined,
+        });
+        pay = extractInicisPayResult(approvalRaw);
+        orderId = pay.orderId || orderId;
+        console.info('[inicis payment-callback] approval', {
+          resultCode: pay.resultCode,
+          resultMsg: pay.resultMsg || null,
+          orderId: orderId || null,
+          tid: pay.tid || null,
+          applNum: pay.applNum || null,
+          totPrice: pay.totPrice || null,
+          payMethod: pay.payMethod || null,
+        });
+      } catch (err) {
+        console.error('[inicis payment-callback] approval request failed', err);
+        pay = {
+          resultCode: 'APPROVAL_ERR',
+          resultMsg: '승인 요청 실패',
+          tid: '',
+          orderId,
+          totPrice: '',
+          applNum: '',
+          payMethod: '',
+        };
+      }
+    }
+  }
+
+  const isSuccess = isPayApproved(pay);
+  const tid = pay.tid;
+  const resultMsg = pay.resultMsg;
+
   if (!isSuccess && orderId && supabase) {
     try {
       await supabase.from('checkout_drafts').delete().eq('oid', orderId);
@@ -60,7 +98,6 @@ export default async function handler(req, res) {
     }
   }
 
-  // 결제 성공: orders 없으면 checkout_drafts → orders INSERT 후 캠페인 생성, paid 처리
   if (isSuccess && orderId && supabase) {
     try {
       let { data: order } = await supabase
@@ -146,8 +183,10 @@ export default async function handler(req, res) {
     order_number: orderId || '',
     success: isSuccess ? '1' : '0',
   });
-  if (body.resultMsg) q.set('msg', String(body.resultMsg));
+  if (resultMsg) q.set('msg', resultMsg);
   if (tid && isSuccess) q.set('tid', tid);
+  if (pay.applNum && isSuccess) q.set('appl_num', pay.applNum);
+
   const resultPath = (orderId || '').startsWith('CPM-') ? '/cpm/result' : '/checkout/result';
   res.setHeader('Location', `${baseUrl}${resultPath}?${q.toString()}`);
   return res.status(302).end();

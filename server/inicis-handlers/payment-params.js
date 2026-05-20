@@ -4,8 +4,8 @@
  * - Body: { oid, price, goodname, buyername, buyertel, buyeremail }
  * - SignKey는 서버에만 두고, signature/verification/mKey만 반환
  */
-import { createHash } from 'crypto';
 import { supabase } from '../lib/supabase-server.js';
+import { inicisSha256 } from '../lib/inicis-crypto.js';
 import { assertFramelessOfferPrice } from '../lib/custom-offers.js';
 import { assertDbCustomPaymentOfferPrice } from '../lib/db-custom-payment-offers.js';
 import { assertCpmOrderPrice } from '../lib/assert-cpm-order-price.js';
@@ -18,10 +18,6 @@ import {
 
 const INICIS_MID = process.env.INICIS_MID || '';
 const INICIS_SIGNKEY = process.env.INICIS_SIGNKEY || '';
-
-function sha256(str) {
-  return createHash('sha256').update(str, 'utf8').digest('hex');
-}
 
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -95,14 +91,14 @@ export default async function handler(req, res) {
 
   // 이니시스 웹표준: signature = SHA256("oid=...&price=...&timestamp=...")
   const signStr = `oid=${oid}&price=${priceStr}&timestamp=${timestamp}`;
-  const signature = sha256(signStr);
+  const signature = inicisSha256(signStr);
 
   // verification = SHA256(NVP 문자열), NVP: oid=...&price=...&signKey=...&timestamp=...
   const verificationStr = `oid=${oid}&price=${priceStr}&signKey=${INICIS_SIGNKEY}&timestamp=${timestamp}`;
-  const verification = sha256(verificationStr);
+  const verification = inicisSha256(verificationStr);
 
   // mKey = SHA256(signKey) — signKey 문자열 그대로 해시
-  const mKey = sha256(INICIS_SIGNKEY);
+  const mKey = inicisSha256(INICIS_SIGNKEY);
 
   const returnUrl = `${base}/api/inicis/payment-callback`;
   const closeUrl = closeUrlOverride;
