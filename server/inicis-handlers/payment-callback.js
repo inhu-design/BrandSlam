@@ -5,6 +5,7 @@
  */
 import { supabase } from '../lib/supabase-server.js';
 import { buildCampaignRowsFromOrderItems } from '../lib/build-campaign-rows-from-order-items.js';
+import { INICIS_SUCCESS_RESULT_CODES } from '../lib/inicis-config.js';
 
 const baseUrl = (process.env.INICIS_RETURN_BASE_URL || 'https://www.slam-global.com').replace(/\/$/, '');
 
@@ -32,8 +33,20 @@ export default async function handler(req, res) {
   const body = req.method === 'GET' ? (req.query || {}) : parseBody(req);
   const resultCode = (body.resultCode || body.resultcode || body.RESULT_CODE || body.result_code || '').toString().trim();
   const orderId = (body.MOID || body.moid || body.orderNumber || body.oid || body.order_number || body.OID || '').toString().trim();
-  const successCodes = ['00', '0000', '0', '000'];
-  const isSuccess = successCodes.includes(resultCode);
+  const isSuccess = INICIS_SUCCESS_RESULT_CODES.has(resultCode);
+  const tid = (body.tid || body.TID || '').toString().trim();
+  const totPrice = (body.TotPrice || body.totPrice || body.price || '').toString().trim();
+
+  console.info('[inicis payment-callback]', {
+    method: req.method,
+    resultCode,
+    resultMsg: body.resultMsg || body.resultmsg || '',
+    orderId,
+    tid: tid || null,
+    totPrice: totPrice || null,
+    payMethod: body.payMethod || body.PAYMETHOD || null,
+    isSuccess,
+  });
 
   // 결제 실패·취소: 임시 초안만 제거 (orders 행은 없음); CPM은 대기 상태 제거
   if (!isSuccess && orderId && supabase) {
@@ -133,7 +146,8 @@ export default async function handler(req, res) {
     order_number: orderId || '',
     success: isSuccess ? '1' : '0',
   });
-  if (body.resultMsg) q.set('msg', body.resultMsg);
+  if (body.resultMsg) q.set('msg', String(body.resultMsg));
+  if (tid && isSuccess) q.set('tid', tid);
   const resultPath = (orderId || '').startsWith('CPM-') ? '/cpm/result' : '/checkout/result';
   res.setHeader('Location', `${baseUrl}${resultPath}?${q.toString()}`);
   return res.status(302).end();

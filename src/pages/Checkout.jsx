@@ -23,6 +23,7 @@ import {
   getDbOfferOrderItemsForDraft,
   isDbOfferForUser,
 } from '../lib/customPaymentOffers';
+import { INICIS_PROD_SCRIPT, loadIniStdPayScript } from '../lib/inicis-client.js';
 
 const CHECKOUT_RESUME_KEY_LEGACY = 'checkout_resume_state_v1';
 
@@ -1289,6 +1290,9 @@ export default function Checkout() {
         alert(params.error || '결제 정보 생성에 실패했습니다. 다시 시도해 주세요.');
         return;
       }
+      if (params.inicisEnv === 'test') {
+        console.info('[inicis] 테스트 MID 환경 — stgstdpay 스크립트 사용', params.mid);
+      }
     } catch (e) {
       console.error('[카드결제] 결제 파라미터 요청 실패', e);
       paymentInProgressRef.current = false;
@@ -1361,34 +1365,14 @@ export default function Checkout() {
         }, 400);
       };
 
-      const startInicisLayerEndPoll = () => {
-        if (inicisLayerPollRef.current) {
-          window.clearInterval(inicisLayerPollRef.current);
-          inicisLayerPollRef.current = null;
+      const openInicisPay = async () => {
+        const payScriptUrl = params.payScriptUrl || INICIS_PROD_SCRIPT;
+        try {
+          await loadIniStdPayScript(payScriptUrl);
+        } catch (scriptErr) {
+          console.error('[inicis] script load', scriptErr);
+          throw scriptErr;
         }
-        let sawInicisHostUi = false;
-        const layerSelector =
-          'iframe[src*="inicis"], iframe[src*="stdpay"], iframe[src*="Inicis"], [id*="INIStd"], [id*="inicis"]';
-        inicisLayerPollRef.current = window.setInterval(() => {
-          if (!paymentInProgressRef.current) {
-            if (inicisLayerPollRef.current) {
-              window.clearInterval(inicisLayerPollRef.current);
-              inicisLayerPollRef.current = null;
-            }
-            return;
-          }
-          const layer = document.querySelector(layerSelector);
-          if (layer) sawInicisHostUi = true;
-          const popupsOpen = payInicisPopupsRef.current.some((w) => w && !w.closed);
-          if (sawInicisHostUi && !layer && !popupsOpen) {
-            window.clearInterval(inicisLayerPollRef.current);
-            inicisLayerPollRef.current = null;
-            void runInicisCanceledFlow();
-          }
-        }, 400);
-      };
-
-      const openInicisPay = () => {
         const runPay = () => {
           payInicisPopupsRef.current = [];
           try {
@@ -1399,31 +1383,14 @@ export default function Checkout() {
           }
           queueMicrotask(scheduleUnpatchWindowOpen);
           startPayWindowMonitor();
-          startInicisLayerEndPoll();
           setSubmitting(false);
-          window.setTimeout(() => {
-            if (!paymentInProgressRef.current || inicisCancelHandledRef.current) return;
-            if (payInicisPopupsRef.current.some((w) => w && !w.closed)) return;
-            const maybeInicisLayer = document.querySelector(
-              'iframe[src*="inicis"], iframe[src*="stdpay"], iframe[src*="Inicis"], [id*="inicis"], [id*="INIStd"]',
-            );
-            if (maybeInicisLayer) return;
-            void runInicisCanceledFlow();
-          }, 4500);
         };
         requestAnimationFrame(() => {
           requestAnimationFrame(runPay);
         });
       };
 
-      if (!window.INIStdPay) {
-        const script = document.createElement('script');
-        script.src = 'https://stdpay.inicis.com/stdjs/INIStdPay.js';
-        script.onload = openInicisPay;
-        document.body.appendChild(script);
-      } else {
-        openInicisPay();
-      }
+      await openInicisPay();
 
     } catch (e) {
       unpatchInicisWindowOpen();

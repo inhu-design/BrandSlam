@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabase-server.js';
 import { assertFramelessOfferPrice } from '../lib/custom-offers.js';
 import { assertDbCustomPaymentOfferPrice } from '../lib/db-custom-payment-offers.js';
 import { assertCpmOrderPrice } from '../lib/assert-cpm-order-price.js';
+import { isInicisTestMid, resolveInicisPaymentUrl, resolveInicisPayScriptUrl } from '../lib/inicis-config.js';
 
 const INICIS_MID = process.env.INICIS_MID || '';
 const INICIS_SIGNKEY = process.env.INICIS_SIGNKEY || '';
@@ -101,13 +102,16 @@ export default async function handler(req, res) {
   const returnUrl = `${base}/api/inicis/payment-callback`;
   const closeUrl = closeUrlOverride;
 
-  // 테스트: stgstdpay.inicis.com / 운영: stdpay.inicis.com (기본)
-  const paymentUrl = (process.env.INICIS_PAYMENT_URL || 'https://stdpay.inicis.com/stdpay/INIStdPay.php').replace(/\/$/, '');
+  const paymentUrl = resolveInicisPaymentUrl(INICIS_MID);
+  const payScriptUrl = resolveInicisPayScriptUrl(INICIS_MID);
+  const inicisEnv = isInicisTestMid(INICIS_MID) ? 'test' : 'production';
 
   const payload = {
     version: '1.0',
     mid: INICIS_MID,
+    inicisEnv,
     paymentUrl,
+    payScriptUrl,
     oid,
     price: priceStr,
     currency: 'WON',

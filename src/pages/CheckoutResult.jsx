@@ -9,6 +9,7 @@ export default function CheckoutResult() {
   const success = searchParams.get('success') === '1';
   const orderNumber = searchParams.get('order_number') || '';
   const msg = searchParams.get('msg') || '';
+  const tid = searchParams.get('tid') || '';
 
   useEffect(() => {
     if (window.opener) {
@@ -46,7 +47,15 @@ export default function CheckoutResult() {
                 캠페인 대시보드에서 진행 상황을 확인하실 수 있습니다.
               </p>
               {orderNumber && (
-                <p className="text-sm text-slate-500 mb-8">주문번호: {orderNumber}</p>
+                <p className="text-sm text-slate-500 mb-2">주문번호: {orderNumber}</p>
+              )}
+              {tid && (
+                <p className="text-sm text-emerald-400/80 mb-8 font-mono">PG 승인번호(TID): {tid}</p>
+              )}
+              {success && orderNumber && !tid && (
+                <p className="text-sm text-amber-400/90 mb-8">
+                  PG 승인번호가 없습니다. 카드 앱에 결제 알림이 없다면 실제 승인되지 않았을 수 있습니다.
+                </p>
               )}
             </>
           ) : (

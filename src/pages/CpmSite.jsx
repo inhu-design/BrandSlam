@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Calculator, Loader2, CreditCard } from 'lucide-react';
 import Navbar from '../components/layout/Navbar';
+import { INICIS_PROD_SCRIPT, loadIniStdPayScript } from '../lib/inicis-client.js';
 import Footer from '../components/layout/Footer';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -244,19 +245,10 @@ export default function CpmSite() {
       });
       document.body.appendChild(formEl);
 
-      const openPay = () => {
-        window.INIStdPay.pay(formId);
-      };
-
       setOrderBusy(false);
-      if (!window.INIStdPay) {
-        const script = document.createElement('script');
-        script.src = 'https://stdpay.inicis.com/stdjs/INIStdPay.js';
-        script.onload = openPay;
-        document.body.appendChild(script);
-      } else {
-        openPay();
-      }
+      const payScriptUrl = params.payScriptUrl || INICIS_PROD_SCRIPT;
+      await loadIniStdPayScript(payScriptUrl);
+      window.INIStdPay.pay(formId);
     } catch (e) {
       console.error(e);
       alert(e?.message || String(e));
